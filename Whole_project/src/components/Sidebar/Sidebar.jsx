@@ -27,7 +27,7 @@ function Sidebar() {
         { id: "dashboard", label: "Dashboard", path: "/", icon: HomeIcon, roles: ['superadmin', 'educator', 'student', 'school_admin'] },
         { id: "schools", label: "Schools", path: "/schools", icon: AcademicCapIcon, roles: ['superadmin', 'educator', 'school_admin'] },
         // SUPERADMIN DOES NOT HAVE SCENARIOS OR STUDENTS
-        { id: "scenario", label: "Scenarios", path: "/scenario", icon: BeakerIcon, roles: ['educator'] }, // Only Educator (and potentially School Admin)
+         { id: "scenario", label: "Scenarios", path: "/scenarios", icon: BeakerIcon, roles: ['educator', 'superadmin'] }, // Educator and Superadmin
         { id: "students", label: "Students", path: "/students", icon: UsersIcon, roles: ['educator'] }, // Only Educator (and potentially School Admin)
       ]
     },

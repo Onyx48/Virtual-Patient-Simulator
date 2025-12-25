@@ -1,13 +1,19 @@
 // src/components/Container/ContentArea.jsx
-import React from "react";
+import React, { lazy } from "react";
 import { Routes, Route, Navigate } from "react-router-dom"; // Don't forget Routes and Route
 
 // Import your actual page components
-import DashboardPage from '../Home/Home'; // Assuming this is src/components/Dashboard/DashboardPage.jsx
-import SchoolsPage from '../Schools/Schools';       // Assuming this is src/components/Schools/SchoolsPage.jsx
-import ScenarioPage from '../Scenario/Scenario';     // Assuming this is src/components/Scenario/ScenarioPage.jsx
-import StudentPage from '../Students/Student';       // Assuming this is src/components/Students/StudentsPage.jsx
+const StudentDashboard = lazy(() => import('../../roles/student/Dashboard'));
+const EducatorDashboard = lazy(() => import('../../roles/educator/Dashboard'));
+const SuperAdminDashboard = lazy(() => import('../../roles/superadmin/Dashboard'));
+const SchoolAdminDashboard = lazy(() => import('../../roles/school_admin/Dashboard'));
+import SchoolsPage from '../../roles/superadmin/schools/Schools';       // Schools in superadmin
+import ScenariosPage from '../../roles/educator/scenarios/index';     // Scenarios in educator
+import ScenarioFormPage from '../../roles/educator/scenarios/ScenarioFormPage';     // Add/Edit scenario in educator
+import StudentPage from '../../roles/educator/students/Student';       // Students in educator
 import AccountSettingsPage from '../UserSettings/AccountSettings'; // Assuming this is src/components/Settings/AccountSettingsPage.jsx
+import HelpCenterPage from '../HelpCenter/HelpCenterPage';
+import ReportPage from '../Report/ReportPage';
 
 // You'll also need a RoleBasedRoute if you want to reuse it here
 import { useAuth } from '../../AuthContext'; // To import useAuth for RoleBasedRoute
@@ -27,38 +33,58 @@ const RoleBasedRoute = ({ children, allowedRoles }) => {
   return children;
 };
 
-// Placeholder components for Help & Center and Report pages
-// These should eventually be in their own files like:
-// src/components/HelpCenter/HelpCenterPage.jsx
-// src/components/Report/ReportPage.jsx
-const HelpCenterPage = () => <div className="p-6 text-2xl font-bold text-gray-800">Help & Center Page</div>;
-const ReportPage = () => <div className="p-6 text-2xl font-bold text-gray-800">Report Page</div>;
-
 
 function ContentArea() {
+  const { user } = useAuth();
+
+  const getDashboardComponent = () => {
+    switch (user?.role) {
+      case 'student':
+        return <StudentDashboard />;
+      case 'educator':
+        return <EducatorDashboard />;
+      case 'superadmin':
+        return <SuperAdminDashboard />;
+      case 'school_admin':
+        return <SchoolAdminDashboard />;
+      default:
+        return <div>Unknown role</div>;
+    }
+  };
+
   return (
     <main className="absolute top-16 left-64 right-0 bottom-0 overflow-y-auto bg-gray-50 p-4">
       <Routes>
         {/* Dashboard - Accessible by all authenticated roles */}
-        <Route path="/" element={<DashboardPage />} />
+        <Route path="/" element={getDashboardComponent()} />
 
-        {/* Schools - Example: Accessible by Superadmin and Educator */}
+        {/* Schools - Example: Accessible by Superadmin, School Admin, and Educator */}
         <Route path="/schools/*" element={
-          <RoleBasedRoute allowedRoles={['superadmin', 'educator']}> {/* Note 'educator' role */}
+          <RoleBasedRoute allowedRoles={['superadmin', 'school_admin', 'educator']}> {/* Note 'educator' role */}
             <SchoolsPage />
           </RoleBasedRoute>
         }/>
 
-        {/* Scenario - Example: Accessible by Superadmin and Educator */}
-        <Route path="/scenario/*" element={
-          <RoleBasedRoute allowedRoles={['superadmin', 'educator']}>
-            <ScenarioPage />
+        {/* Scenarios - Accessible by Superadmin, School Admin, Educator, and Student (read-only for student) */}
+        <Route path="/scenarios" element={
+          <RoleBasedRoute allowedRoles={['superadmin', 'school_admin', 'educator', 'student']}>
+            <ScenariosPage />
+          </RoleBasedRoute>
+        }/>
+        <Route path="/scenarios/add" element={
+          <RoleBasedRoute allowedRoles={['superadmin', 'school_admin', 'educator']}>
+            <ScenarioFormPage />
+          </RoleBasedRoute>
+        }/>
+        <Route path="/scenarios/edit/:id" element={
+          <RoleBasedRoute allowedRoles={['superadmin', 'school_admin', 'educator']}>
+            <ScenarioFormPage />
           </RoleBasedRoute>
         }/>
 
-        {/* Students - Example: Accessible by Superadmin and Educator */}
+        {/* Students - Example: Accessible by Superadmin, School Admin, and Educator */}
         <Route path="/students/*" element={
-          <RoleBasedRoute allowedRoles={['superadmin', 'educator']}>
+          <RoleBasedRoute allowedRoles={['superadmin', 'school_admin', 'educator']}>
             <StudentPage />
           </RoleBasedRoute>
         }/>
@@ -77,9 +103,9 @@ function ContentArea() {
           </RoleBasedRoute>
         }/>
 
-        {/* Report - Example: Accessible by Superadmin and Educator */}
+        {/* Report - Example: Accessible by Superadmin, School Admin, and Educator */}
         <Route path="/report" element={
-          <RoleBasedRoute allowedRoles={['superadmin', 'educator']}>
+          <RoleBasedRoute allowedRoles={['superadmin', 'school_admin', 'educator']}>
             <ReportPage />
           </RoleBasedRoute>
         }/>

@@ -1,0 +1,37 @@
+[
+  {
+    "id": 1,
+    "educatorName": "Tatiana Baptista",
+    "emailAddress": "hcarter@hotmail.com",
+    "schoolName": "Maplewood High School",
+    "numberOfStudents": 25
+  },
+  {
+    "id": 2,
+    "educatorName": "Ashlynn Septimus",
+    "emailAddress": "pmiller@gmail.com",
+    "schoolName": "Riverside Academy",
+    "numberOfStudents": 18
+  },
+  {
+    "id": 3,
+    "educatorName": "Marilyn Lipshutz",
+    "emailAddress": "jhill@hotmail.com",
+    "schoolName": "Sunnyvale School",
+    "numberOfStudents": 22
+  },
+  {
+    "id": 4,
+    "educatorName": "Emerson Bator",
+    "emailAddress": "privera@gmail.com",
+    "schoolName": "Cedar Grove Institute",
+    "numberOfStudents": 30
+  },
+  {
+    "id": 5,
+    "educatorName": "Abram Philips",
+    "emailAddress": "bthompson@icloud.com",
+    "schoolName": "Oak Hill College",
+    "numberOfStudents": 15
+  }
+]

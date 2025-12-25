@@ -1,0 +1,47 @@
+[
+  {
+    "id": 1,
+    "scenarioName": "Emergency Room Case",
+    "description": "A Patient Arrives With Chest Pain.",
+    "creator": "Ahmad Botosh",
+    "avgTimeSpent": "20 Minutes",
+    "status": "Draft",
+    "permissions": "Read Only"
+  },
+  {
+    "id": 2,
+    "scenarioName": "Post-Surgery Recovery",
+    "description": "Monitoring A Patient After Surgery",
+    "creator": "Gustavo Torff",
+    "avgTimeSpent": "30 Minutes",
+    "status": "Published",
+    "permissions": "Write Only"
+  },
+  {
+    "id": 3,
+    "scenarioName": "Pediatric Fever",
+    "description": "Diagnosing A Child With High Fever.",
+    "creator": "Phillip Torff",
+    "avgTimeSpent": "25 Minutes",
+    "status": "Published",
+    "permissions": "Both"
+  },
+  {
+    "id": 4,
+    "scenarioName": "Diabetic Crisis",
+    "description": "Managing A Severe Diabetic Episode.",
+    "creator": "Marley Bergson",
+    "avgTimeSpent": "40 Minutes",
+    "status": "Published",
+    "permissions": "Read Only"
+  },
+  {
+    "id": 5,
+    "scenarioName": "Stroke Assessment",
+    "description": "Identifying And Treating A Stroke Patient.",
+    "creator": "Cooper Gouse",
+    "avgTimeSpent": "35 Minutes",
+    "status": "Archived",
+    "permissions": "Read Only"
+  }
+]

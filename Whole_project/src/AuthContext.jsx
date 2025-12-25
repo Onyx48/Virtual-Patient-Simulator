@@ -17,19 +17,19 @@ export const AuthProvider = ({ children }) => {
     if (userData && userData._id) { // Basic check for valid user data
       setUser(userData);
       localStorage.setItem('currentUser', JSON.stringify(userData));
-      // If using JWTs in the future:
-      // if (userData.token) {
-      //   localStorage.setItem('authToken', userData.token);
-      //   axios.defaults.headers.common['Authorization'] = `Bearer ${userData.token}`;
-      // }
+      // If using JWTs
+      if (userData.token) {
+        localStorage.setItem('authToken', userData.token);
+        axios.defaults.headers.common['Authorization'] = `Bearer ${userData.token}`;
+      }
     } else {
       // Clear session if userData is invalid or null
       setUser(null);
       localStorage.removeItem('currentUser');
-      // if (localStorage.getItem('authToken')) { // If using JWTs
-      //   localStorage.removeItem('authToken');
-      //   delete axios.defaults.headers.common['Authorization'];
-      // }
+      if (localStorage.getItem('authToken')) { // If using JWTs
+        localStorage.removeItem('authToken');
+        delete axios.defaults.headers.common['Authorization'];
+      }
     }
   }, []);
 
@@ -37,11 +37,13 @@ export const AuthProvider = ({ children }) => {
   // --- Check for existing session on app load ---
   useEffect(() => {
     const storedUserString = localStorage.getItem('currentUser');
-    // const storedToken = localStorage.getItem('authToken'); // If using JWTs
+    const storedToken = localStorage.getItem('authToken'); // If using JWTs
 
-    if (storedUserString) {
+    if (storedUserString && storedToken) {
       try {
         const storedUser = JSON.parse(storedUserString);
+        // Restore axios header for JWT
+        axios.defaults.headers.common['Authorization'] = `Bearer ${storedToken}`;
         // Here, you might want to verify the session with the backend if it's sensitive,
         // especially if not using JWTs or if JWTs could be stale.
         // For now, we trust localStorage for simplicity.

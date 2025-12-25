@@ -8,7 +8,7 @@ import {
   Schools,
 
 } from "./Home/Home";
-import StatCard from "./Dashbord/StatCard";
+import StatCard from "./Dashboard/StatCard";
 
 export {
   Container,
