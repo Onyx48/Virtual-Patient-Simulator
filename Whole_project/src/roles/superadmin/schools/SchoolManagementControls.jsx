@@ -4,9 +4,9 @@ import DatePicker from "react-datepicker";
 import "react-datepicker/dist/react-datepicker.css";
 import { format, isValid } from "date-fns";
 
-import searchIconPng from "./search.png";
-import sortIconPng from "./sort.png";
-import plusIconPng from "./plus.png";
+import searchIconPng from "/search.png";
+import sortIconPng from "/sort.png";
+import plusIconPng from "/plus.png";
 
 const ChevronDownIcon = () => (
   <svg

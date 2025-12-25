@@ -5,10 +5,8 @@ import { useAuth } from "@/AuthContext"; // For user role and token (if JWT)
 
 import SchoolManagementControls from "./SchoolManagementControls.jsx";
 import SchoolTable from "./SchoolTable.jsx";
-import EditSchoolPage from "./EditSchoolPage.jsx";
-import AddSchoolPage from "./AddSchoolPage.jsx";
 
-import { parse, isValid, format } from "date-fns"; // Make sure format is imported
+import { parse, format } from "date-fns"; // Make sure format is imported
 
 function SchoolsPage() {
   const { user } = useAuth(); // Get logged-in user to determine permissions

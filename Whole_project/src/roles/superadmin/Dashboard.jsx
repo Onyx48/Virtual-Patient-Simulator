@@ -5,11 +5,9 @@ import { fetchDashboardData } from '../../redux/slices/dashboardSlice';
 import { Link } from 'react-router-dom';
 import DashbordStats from '../../components/Dashboard/DashbordStats';
 import AllSchoolsSection from '../../components/Dashboard/AllSchoolsSection';
-import SchoolManagementHeader from './schools/SchoolManagement.jsx';
+import SchoolManagementControls from './schools/SchoolManagementControls.jsx';
 import SchoolTable from './schools/SchoolTable.jsx';
-import EditSchoolPage from './schools/EditSchoolPage.jsx';
-import AddSchoolPage from './schools/AddSchoolPage.jsx';
-import SchoolFilterForm from './schools/SchoolFilterForm.jsx';
+import SchoolModal from './schools/SchoolModal.jsx';
 
 function SuperAdminDashboard() {
   const { user } = useAuth();
@@ -22,8 +20,7 @@ function SuperAdminDashboard() {
   const [sortConfig, setSortConfig] = useState(null);
   const [editingSchool, setEditingSchool] = useState(null);
   const [isAddingSchool, setIsAddingSchool] = useState(false);
-  const [isFiltering, setIsFiltering] = useState(false);
-  const [filterCriteria, setFilterCriteria] = useState({});
+
 
   useEffect(() => {
     dispatch(fetchDashboardData());
@@ -70,11 +67,10 @@ function SuperAdminDashboard() {
       <DashbordStats stats={stats} />
       <AllSchoolsSection schools={schools} />
       <div className="mt-8">
-        <SchoolManagementHeader
+        <SchoolManagementControls
           searchTerm={searchTerm}
           onSearchChange={setSearchTerm}
           onAddNewClick={handleSchoolAddNewClick}
-          onFilterClick={() => setIsFiltering(true)}
         />
 
         <SchoolTable
@@ -86,7 +82,7 @@ function SuperAdminDashboard() {
 
         {editingSchool && (
           <div className="fixed inset-0 z-50 bg-gray-800 bg-opacity-50 flex justify-center items-center p-4">
-            <EditSchoolPage
+            <SchoolModal
               schoolData={editingSchool}
               onSave={handleUpdateSchool}
               onClose={handleSchoolCloseEditDialog}
@@ -96,22 +92,14 @@ function SuperAdminDashboard() {
 
         {isAddingSchool && (
           <div className="fixed inset-0 z-50 bg-gray-800 bg-opacity-50 flex justify-center items-center p-4">
-            <AddSchoolPage
+            <SchoolModal
               onSave={handleAddSchool}
               onClose={handleSchoolCloseAddDialog}
             />
           </div>
         )}
 
-        {isFiltering && (
-          <div className="fixed inset-0 z-50 bg-gray-800 bg-opacity-50 flex justify-center items-center p-4">
-            <SchoolFilterForm
-              initialFilters={filterCriteria}
-              onApplyFilters={(filters) => { setFilterCriteria(filters); setIsFiltering(false); }}
-              onClose={() => setIsFiltering(false)}
-            />
-          </div>
-        )}
+
       </div>
       <div className="mt-8">
         <div className="flex justify-between items-center mb-4">

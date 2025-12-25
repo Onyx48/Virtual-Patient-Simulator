@@ -1,9 +1,6 @@
 import React, { useState } from "react";
 import { useForm } from "react-hook-form";
-
-import searchIconPng from "/search.png";
-import sortIconPng from "/sort.png";
-import plusIconPng from "/plus.png";
+import { Search, Filter, Plus, X } from "lucide-react";
 
 function ScenarioManagementControls({
   searchTerm,
@@ -14,131 +11,108 @@ function ScenarioManagementControls({
 }) {
   const [showFilters, setShowFilters] = useState(false);
 
-  const { register, handleSubmit } = useForm({
-    defaultValues: initialFilters || {
-      status: "",
-      creator: "",
-    },
+  const { register, handleSubmit, reset } = useForm({
+    defaultValues: initialFilters || { status: "", creator: "" },
   });
 
   const onSubmit = (data) => {
-    console.log("Applying Filters:", data);
-    if (onApplyFilters) {
-      onApplyFilters(data);
-    }
+    if (onApplyFilters) onApplyFilters(data);
     setShowFilters(false);
   };
 
-  const handleFilterToggle = () => {
-    setShowFilters(!showFilters);
+  const handleClear = () => {
+    reset();
+    if (onApplyFilters) onApplyFilters({});
+    setShowFilters(false);
   };
 
-  const ChevronDownIcon = () => (
-    <svg
-      className="fill-current h-4 w-4"
-      xmlns="http://www.w3.org/2000/svg"
-      viewBox="0 0 20 20"
-    >
-      <path d="M9.293 12.95l.707.707L15.657 8l-1.414-1.414L10 10.828 5.757 6.586 4.343 8z" />
-    </svg>
-  );
-
   return (
-    <div className="p-4 bg-gray-100 mt-0">
-      <div className="flex items-center">
-        <div className="flex items-center max-w-[500px] flex-grow">
-          <div className="relative flex-grow">
-            <img
-              src={searchIconPng}
-              alt="Search Icon"
-              className="absolute left-3 top-1/2 transform -translate-y-1/2 w-5 h-5 pointer-events-none"
-            />
+    <div className="mb-6">
+      <div className="flex flex-col md:flex-row md:items-center justify-between gap-4">
+        {/* Left Side: Search & Filter */}
+        <div className="flex items-center gap-3 flex-1">
+          <div className="relative w-full max-w-md">
+            <div className="absolute inset-y-0 left-0 pl-3 flex items-center pointer-events-none">
+              <Search className="h-4 w-4 text-gray-400" />
+            </div>
             <input
               type="text"
-              placeholder="Search for Scenario"
+              placeholder="Search for a scenario"
               value={searchTerm}
               onChange={(e) => onSearchChange(e.target.value)}
-              className={
-                "w-full pl-10 pr-4 py-2 rounded bg-white text-black border border-gray-300 placeholder-gray-600 focus:outline-none focus:border-gray-300 focus:ring-2 focus:ring-black text-sm"
-              }
+              className="block w-full pl-10 pr-3 py-2.5 border border-gray-200 rounded-lg leading-5 bg-white placeholder-gray-500 focus:outline-none focus:ring-1 focus:ring-gray-300 sm:text-sm shadow-sm hover:border-gray-300 transition-colors"
             />
           </div>
+
           <button
-            className="flex items-center bg-gray-200 hover:bg-gray-300 text-gray-700 rounded-lg px-4 py-2 ml-4 transition duration-200 ease-in-out text-sm"
-            onClick={handleFilterToggle}
+            onClick={() => setShowFilters(!showFilters)}
+            className={`inline-flex items-center px-4 py-2.5 border rounded-lg shadow-sm text-sm font-medium transition-colors ${
+              showFilters
+                ? "bg-gray-100 border-gray-300 text-gray-900"
+                : "bg-white border-gray-200 text-gray-700 hover:bg-gray-50"
+            }`}
           >
-            <img src={sortIconPng} alt="Filters Icon" className="w-4 h-4 mr-1" />
+            <Filter className="h-4 w-4 mr-2 text-gray-500" />
             Filters
           </button>
         </div>
 
+        {/* Right Side: New Scenario Button */}
         <button
-          className="flex items-center bg-black hover:bg-gray-800 text-white rounded-lg px-4 py-2 transition duration-200 ease-in-out text-sm ml-auto"
           onClick={onAddNewClick}
+          className="inline-flex items-center justify-center px-5 py-2.5 border border-transparent text-sm font-medium rounded-lg text-white bg-black hover:bg-gray-800 shadow-sm transition-all"
         >
-          <img src={plusIconPng} alt="Plus Icon" className="w-4 h-4 mr-1" />
+          <Plus className="h-4 w-4 mr-2" />
           New Scenario
         </button>
       </div>
 
+      {/* Filter Dropdown Panel */}
       {showFilters && (
-        <div className="mt-4 p-4 bg-white rounded-lg shadow">
-          <h3 className="text-lg font-semibold mb-4">Filter Scenarios</h3>
-          <form onSubmit={handleSubmit(onSubmit)} className="grid gap-4">
-            <div className="grid gap-2">
-              <label
-                htmlFor="filterStatus"
-                className="block text-sm font-medium text-gray-700"
-              >
+        <div className="mt-4 p-5 bg-white rounded-xl shadow-lg border border-gray-100 animate-in fade-in slide-in-from-top-2">
+          <div className="flex justify-between items-center mb-4">
+            <h3 className="text-sm font-semibold text-gray-900">
+              Filter Scenarios
+            </h3>
+            <button
+              onClick={() => setShowFilters(false)}
+              className="text-gray-400 hover:text-gray-600"
+            >
+              <X className="h-4 w-4" />
+            </button>
+          </div>
+          <form
+            onSubmit={handleSubmit(onSubmit)}
+            className="grid grid-cols-1 md:grid-cols-3 gap-4"
+          >
+            <div>
+              <label className="block text-xs font-medium text-gray-700 mb-1">
                 Status
               </label>
-              <div className="relative">
-                <select
-                  id="filterStatus"
-                  {...register("status")}
-                  className="w-full px-4 py-2 rounded-lg border border-gray-300 appearance-none bg-white focus:outline-none focus:ring-blue-500 focus:border-blue-500 text-sm"
-                >
-                  <option value="">All Statuses</option>
-                  <option value="Draft">Draft</option>
-                  <option value="Published">Published</option>
-                  <option value="Archived">Archived</option>
-                </select>
-                <div className="pointer-events-none absolute inset-y-0 right-0 flex items-center px-2 text-gray-700">
-                  <ChevronDownIcon />
-                </div>
-              </div>
-            </div>
-
-            <div className="grid gap-2">
-              <label
-                htmlFor="filterCreator"
-                className="block text-sm font-medium text-gray-700"
+              <select
+                {...register("status")}
+                className="block w-full pl-3 pr-10 py-2 text-sm border border-gray-300 focus:outline-none focus:ring-black focus:border-black rounded-md"
               >
-                Creator
-              </label>
-              <input
-                type="text"
-                id="filterCreator"
-                {...register("creator")}
-                placeholder="Enter Creator Name"
-                className="w-full px-4 py-2 rounded-lg border border-gray-300 focus:outline-none focus:ring-blue-500 focus:border-blue-500 text-sm"
-              />
+                <option value="">All Statuses</option>
+                <option value="Draft">Draft</option>
+                <option value="Published">Published</option>
+                <option value="Archived">Archived</option>
+              </select>
             </div>
 
-            <div className="flex justify-end space-x-4 mt-6">
+            <div className="flex items-end gap-2 md:col-span-2 justify-end">
               <button
                 type="button"
-                onClick={() => setShowFilters(false)}
-                className="bg-gray-200 hover:bg-gray-300 text-gray-700 px-4 py-2 rounded-lg font-medium"
+                onClick={handleClear}
+                className="px-4 py-2 text-sm text-gray-600 hover:text-gray-900 font-medium"
               >
-                Close
+                Clear
               </button>
-
               <button
                 type="submit"
-                className="bg-orange-500 hover:bg-orange-600 text-white px-4 py-2 rounded-lg font-medium"
+                className="px-6 py-2 bg-black text-white text-sm font-medium rounded-lg hover:bg-gray-800"
               >
-                Apply Filters
+                Apply
               </button>
             </div>
           </form>

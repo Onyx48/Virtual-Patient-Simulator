@@ -1,111 +1,87 @@
 import React, { useState, useMemo } from "react";
+import { useNavigate } from "react-router-dom";
 
+// --- Components ---
 import ScenarioManagementControls from "./ScenarioManagementControls.jsx";
 import ScenarioTable from "./ScenarioTable.jsx";
-import ScenarioModal from "./ScenarioModal.jsx";
-import initialScenarios from "./initialScenarios.json"
 
+// --- Mock Data ---
+// Ensure this file exists in the same folder with the data I gave you previously
+import initialScenarios from "./initialScenarios.json";
 
+function ScenariosPage() {
+  const navigate = useNavigate();
 
-
-function ScenarioPage() {
+  // --- STATE: Initialize directly with Mock Data ---
   const [scenarios, setScenarios] = useState(initialScenarios);
+
   const [searchTerm, setSearchTerm] = useState("");
+  const [filterCriteria, setFilterCriteria] = useState({});
   const [sortConfig, setSortConfig] = useState(null);
 
-  const [modalOpen, setModalOpen] = useState(false);
-  const [isEdit, setIsEdit] = useState(false);
-  const [currentScenario, setCurrentScenario] = useState(null);
-  const [filterCriteria, setFilterCriteria] = useState({});
-
-  const handleSaveScenario = (scenarioData) => {
-    console.log("Saving scenario:", scenarioData);
-    if (scenarioData.id) {
-      // Update
-      setScenarios((prevScenarios) =>
-        prevScenarios.map((scenario) =>
-          scenario.id === scenarioData.id
-            ? { ...scenario, ...scenarioData }
-            : scenario
-        )
-      );
-    } else {
-      // Add
-      const newScenarioWithId = {
-        ...scenarioData,
-        id: Date.now() + Math.random(),
-      };
-      setScenarios((prevScenarios) => [...prevScenarios, newScenarioWithId]);
-    }
-    setModalOpen(false);
-    setIsEdit(false);
-    setCurrentScenario(null);
+  // --- NAVIGATION HANDLERS ---
+  const handleAddNewClick = () => {
+    navigate("/scenarios/add");
   };
 
+  const handleEditClick = (scenario) => {
+    // Navigate to edit page with ID
+    navigate(`/scenarios/edit/${scenario.id}`);
+  };
+
+  // --- FILTERING LOGIC ---
   const filteredScenarios = useMemo(() => {
     let currentData = scenarios;
 
+    // 1. Search Filter
     if (searchTerm) {
-      const lowerCaseSearchTerm = searchTerm.toLowerCase();
+      const lowerTerm = searchTerm.toLowerCase();
       currentData = currentData.filter(
-        (scenario) =>
-          scenario.scenarioName.toLowerCase().includes(lowerCaseSearchTerm) ||
-          scenario.description.toLowerCase().includes(lowerCaseSearchTerm) ||
-          scenario.creator.toLowerCase().includes(lowerCaseSearchTerm)
+        (s) =>
+          s.scenarioName.toLowerCase().includes(lowerTerm) ||
+          s.description.toLowerCase().includes(lowerTerm) ||
+          s.creator.toLowerCase().includes(lowerTerm)
       );
     }
 
-    const hasActiveFilters = Object.values(filterCriteria).some(
-      (value) => value !== "" && value !== null && value !== undefined
-    );
-    if (hasActiveFilters) {
-      currentData = currentData.filter((scenario) => {
-        let matchesFilters = true;
-        if (filterCriteria.status && filterCriteria.status !== "") {
-          if (scenario.status !== filterCriteria.status) {
-            matchesFilters = false;
-          }
-        }
-        if (filterCriteria.creator && filterCriteria.creator !== "") {
-          if (
-            !scenario.creator
-              .toLowerCase()
-              .includes(filterCriteria.creator.toLowerCase())
-          ) {
-            matchesFilters = false;
-          }
-        }
-        return matchesFilters;
-      });
+    // 2. Dropdown Filters
+    if (filterCriteria.status) {
+      currentData = currentData.filter(
+        (s) => s.status === filterCriteria.status
+      );
     }
+    // Add other filters here if needed (e.g. Creator)
 
     return currentData;
   }, [scenarios, searchTerm, filterCriteria]);
 
+  // --- SORTING LOGIC ---
   const filteredAndSortedScenarios = useMemo(() => {
-    let sortableItems = [...filteredScenarios];
+    let items = [...filteredScenarios];
     if (sortConfig !== null) {
-      sortableItems.sort((a, b) => {
+      items.sort((a, b) => {
         const aValue = a[sortConfig.key];
         const bValue = b[sortConfig.key];
-        if (aValue === null || aValue === undefined)
-          return sortConfig.direction === "asc" ? 1 : -1;
-        if (bValue === null || bValue === undefined)
-          return sortConfig.direction === "asc" ? -1 : 1;
-        if (aValue < bValue) {
-          return sortConfig.direction === "asc" ? -1 : 1;
-        }
-        if (aValue > bValue) {
-          return sortConfig.direction === "asc" ? 1 : -1;
-        }
+
+        // Handle nulls
+        if (aValue == null) return sortConfig.direction === "asc" ? 1 : -1;
+        if (bValue == null) return sortConfig.direction === "asc" ? -1 : 1;
+
+        if (aValue < bValue) return sortConfig.direction === "asc" ? -1 : 1;
+        if (aValue > bValue) return sortConfig.direction === "asc" ? 1 : -1;
         return 0;
       });
     }
-    return sortableItems;
+    return items;
   }, [filteredScenarios, sortConfig]);
 
+  // --- CONTROLS HANDLERS ---
   const handleSearchChange = (term) => {
     setSearchTerm(term);
+  };
+
+  const handleApplyFilters = (filters) => {
+    setFilterCriteria(filters);
   };
 
   const handleSort = (key) => {
@@ -116,43 +92,16 @@ function ScenarioPage() {
       sortConfig.direction === "asc"
     ) {
       direction = "desc";
-    } else if (
-      sortConfig &&
-      sortConfig.key === key &&
-      sortConfig.direction === "desc"
-    ) {
-      setSortConfig(null);
-      return;
     }
     setSortConfig({ key, direction });
   };
 
-  const handleEditClick = (scenario) => {
-    setCurrentScenario(scenario);
-    setIsEdit(true);
-    setModalOpen(true);
-  };
-
-  const handleAddNewClick = () => {
-    console.log("handleAddNewClick triggered!");
-    setCurrentScenario(null);
-    setIsEdit(false);
-    setModalOpen(true);
-  };
-
-  const handleApplyFilters = (filters) => {
-    console.log("Applying filter criteria:", filters);
-    setFilterCriteria(filters);
-  };
-
-  const handleCloseModal = () => {
-    setModalOpen(false);
-    setIsEdit(false);
-    setCurrentScenario(null);
-  };
-
   return (
-    <div className="p-4">
+    <div className="p-6 bg-gray-50 min-h-screen">
+      <h1 className="text-2xl font-bold text-gray-900 mb-6">
+        Scenarios Management
+      </h1>
+
       <ScenarioManagementControls
         searchTerm={searchTerm}
         onSearchChange={handleSearchChange}
@@ -167,19 +116,8 @@ function ScenarioPage() {
         sortConfig={sortConfig}
         onSort={handleSort}
       />
-
-      {modalOpen && (
-        <div className="fixed inset-0 z-50 bg-gray-800 bg-opacity-50 flex justify-center items-center p-4">
-          <ScenarioModal
-            isEdit={isEdit}
-            scenarioData={currentScenario}
-            onSave={handleSaveScenario}
-            onClose={handleCloseModal}
-          />
-        </div>
-      )}
     </div>
   );
 }
 
-export default ScenarioPage;
+export default ScenariosPage;

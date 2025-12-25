@@ -1,11 +1,11 @@
 // src/components/Schools/SchoolTable.jsx
 import React, { useState, useMemo } from "react";
-import { format, parse, isValid } from "date-fns";
+import { format } from "date-fns";
 
 // Ensure your image paths are correct relative to SchoolTable.jsx
-import sortIconPng from "./sort.png";
-import editIconPng from "./edit.png";
-import deleteIconPng from "./delete.png";
+import sortIconPng from "/sort.png";
+import editIconPng from "/edit.png";
+import deleteIconPng from "/delete.png";
 
 // Assuming these are from your Shadcn/ui setup
 import {
