@@ -7,39 +7,80 @@ import {
   ArrowLeft,
   Sparkles,
   ArrowUp,
-  Eye,
-  ChevronDown,
   Loader,
-} from "lucide-react"; // Removed 'X' icon as deletion is disabled
+  X,
+  AlertCircle,
+} from "lucide-react";
 import axios from "axios";
-
-import { addScenario, updateScenario } from "../../redux/slices/scenarioSlice";
-
+// --- CONFIGURATION ---
+const AI_SERVICE_URL = "http://64.227.110.183:8888";
+// --- INTERNAL COMPONENT: ERROR POPUP ---
+const ErrorModal = ({ isOpen, message, onClose }) => {
+  if (!isOpen) return null;
+  return (
+    <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/50 backdrop-blur-sm">
+      <div className="bg-white rounded-xl shadow-2xl max-w-md w-full overflow-hidden animate-in fade-in zoom-in duration-200">
+        <div className="bg-red-50 px-6 py-4 border-b border-red-100 flex items-center justify-between">
+          <div className="flex items-center gap-2 text-red-700 font-bold">
+            <AlertCircle className="w-5 h-5" />
+            <span>Action Failed</span>
+          </div>
+          <button
+            onClick={onClose}
+            className="text-red-400 hover:text-red-700 transition-colors"
+          >
+            <X className="w-5 h-5" />
+          </button>
+        </div>
+        <div className="p-6">
+          <p className="text-gray-600 text-sm leading-relaxed">{message}</p>
+        </div>
+        <div className="px-6 py-4 bg-gray-50 flex justify-end">
+          <button
+            onClick={onClose}
+            className="px-4 py-2 bg-white border border-gray-300 rounded-lg text-sm font-semibold text-gray-700 hover:bg-gray-50 transition-colors shadow-sm"
+          >
+            Close
+          </button>
+        </div>
+      </div>
+    </div>
+  );
+};
+// --- HELPER: ROBUST TOKEN GETTER ---
+const getAuthToken = () => {
+  // 1. Try finding 'token' string directly
+  let token = localStorage.getItem("token");
+  if (token) return token;
+  // 2. Try finding 'userInfo' object (common in MERN apps)
+  const userInfo = localStorage.getItem("userInfo");
+  if (userInfo) {
+    try {
+      const parsed = JSON.parse(userInfo);
+      // Check if token exists inside the object
+      if (parsed.token) return parsed.token;
+    } catch (e) {
+      console.warn("Failed to parse userInfo for token");
+    }
+  }
+  return null;
+};
 function ScenarioFormPage() {
-  const dispatch = useDispatch();
   const navigate = useNavigate();
   const { id } = useParams();
   const { user } = useAuth();
-
-  const { scenarios, loading: reduxLoading } = useSelector(
-    (state) => state.scenarios
-  );
+  // Access Redux just for the list data
+  const { scenarios } = useSelector((state) => state.scenarios);
+  // --- 1. DETERMINE MODE (DB EDIT vs NEW) ---
   const selectedScenario = id
     ? scenarios.find((s) => s._id === id || s.id === id)
     : null;
-
-  const isEdit = !!id;
-  const title = isEdit
+  const isDbEdit = !!id;
+  const title = isDbEdit
     ? "Edit Scenario (AI Generated Only)"
     : "Add Scenario (AI Generated Only)";
-
-  const {
-    register,
-    handleSubmit,
-    setValue,
-    watch,
-    formState: { errors },
-  } = useForm({
+  // --- 2. FORM SETUP ---
+  const { register, handleSubmit, setValue, watch } = useForm({
     defaultValues: {
       scenarioName: "",
       template: "",
@@ -54,23 +95,28 @@ function ScenarioFormPage() {
       animationTriggers: { shoulder: [], neck: [] },
     },
   });
-
+  // --- 3. LOCAL STATE ---
   const [shoulderTags, setShoulderTags] = useState([]);
   const [neckTags, setNeckTags] = useState([]);
   const [aiInput, setAiInput] = useState("");
   const [isAiLoading, setIsAiLoading] = useState(false);
+  const [isSaving, setIsSaving] = useState(false);
   const [currentApiKey, setCurrentApiKey] = useState("");
-
+  const [aiGeneratedId, setAiGeneratedId] = useState(null);
+  // Error Popup State
+  const [errorPopup, setErrorPopup] = useState({ open: false, message: "" });
   const currentDifficulty = watch("difficulty");
   const isSchoolAdmin = user?.role === "school_admin";
   const isEducator = user?.role === "educator";
-
+  // --- 4. EFFECTS ---
+  // Redirect if not authorized
   useEffect(() => {
     if (!isEducator && !isSchoolAdmin) navigate("/dashboard");
   }, [isEducator, isSchoolAdmin, navigate]);
-
+  // Load Data if Editing Existing Scenario
   useEffect(() => {
-    if (isEdit && selectedScenario) {
+    if (isDbEdit && selectedScenario) {
+      console.log("Loading Existing Scenario Data...", selectedScenario);
       const fields = [
         "scenarioName",
         "template",
@@ -83,8 +129,7 @@ function ScenarioFormPage() {
         "description",
         "permissions",
       ];
-      fields.forEach((field) => setValue(field, selectedScenario[field] || ""));
-
+       fields.forEach((field) => setValue(field, selectedScenario[field] || ""));
       if (selectedScenario.animationTriggers) {
         setShoulderTags(selectedScenario.animationTriggers.shoulder || []);
         setNeckTags(selectedScenario.animationTriggers.neck || []);
@@ -94,76 +139,135 @@ function ScenarioFormPage() {
         setCurrentApiKey(selectedScenario.apiKey);
       }
     }
-  }, [isEdit, selectedScenario, setValue]);
-
+  }, [isDbEdit, selectedScenario, setValue]);
+  // Sync Tags with Form
   useEffect(() => {
     setValue("animationTriggers.shoulder", shoulderTags);
     setValue("animationTriggers.neck", neckTags);
   }, [shoulderTags, neckTags, setValue]);
-
-  // --- AI Interaction ---
+  // --- 5. AI INTERACTION HANDLER ---
   const handleAskAI = async (e) => {
     e.preventDefault();
     if (!aiInput) return;
-
+    console.log("--- STARTING AI REQUEST ---");
     setIsAiLoading(true);
 
     try {
       let response;
+      const headers = { "Content-Type": "application/json" };
 
-      if (isEdit) {
-        const payload = {
-          scenarioId: id,
-          apiKey: currentApiKey,
-          userInput: aiInput,
-        };
-        // REPLACE WITH ACTUAL EDIT API
-        response = await axios.post("YOUR_EDIT_AI_API_ENDPOINT", payload);
+      if (currentApiKey) {
+        // --- EDIT MODE ---
+        const url = `${AI_SERVICE_URL}/edit-scenario`;
+        const payload = { api_key: currentApiKey, scenario_prompt: aiInput };
+        console.log(`Sending POST to ${url}`);
+        response = await axios.post(url, payload, { headers });
       } else {
+        // --- ADD MODE ---
+        const url = `${AI_SERVICE_URL}/add-scenario`;
         const payload = {
-          educatorId: user._id || user.id,
-          userInput: aiInput,
+          educator_id: user?._id || user?.id,
+          scenario_prompt: aiInput,
         };
-        // REPLACE WITH ACTUAL CREATE API
-        response = await axios.post("YOUR_CREATE_AI_API_ENDPOINT", payload);
+        console.log(`Sending POST to ${url}`);
+        response = await axios.post(url, payload, { headers });
       }
 
-      const { apiKey, json } = response.data;
+      console.log("--- AI RESPONSE RECEIVED ---");
+      const rawData = response.data;
+      const actualData = rawData.response ? rawData.response : rawData;
+      console.log("Unwrapped Data:", actualData);
 
-      if (apiKey) {
-        setCurrentApiKey(apiKey);
+      const returnedApiKey = actualData.apiKey || actualData.api_key;
+      const returnedJson = actualData.json || actualData;
+
+      if (returnedApiKey) {
+        setCurrentApiKey(returnedApiKey);
       }
 
-      if (json) {
-        if (json.scenarioName) setValue("scenarioName", json.scenarioName);
-        if (json.description) setValue("description", json.description);
-        if (json.scenarioPrompt)
-          setValue("scenarioPrompt", json.scenarioPrompt);
-        if (json.aiAvatarRole) setValue("aiAvatarRole", json.aiAvatarRole);
-        if (json.aiInstructions)
-          setValue("aiInstructions", json.aiInstructions);
-        if (json.aiQuestions) setValue("aiQuestions", json.aiQuestions);
-        if (json.difficulty) setValue("difficulty", json.difficulty);
-        if (json.status) setValue("status", json.status); // AI can update status
+      if (returnedJson) {
+        if (returnedJson._id) {
+          setAiGeneratedId(returnedJson._id);
+        }
 
-        if (json.animationTriggers) {
-          if (json.animationTriggers.shoulder)
-            setShoulderTags(json.animationTriggers.shoulder);
-          if (json.animationTriggers.neck)
-            setNeckTags(json.animationTriggers.neck);
+        // Map Name
+        if (returnedJson.scenarioName || returnedJson.scenario_name) {
+          const name = returnedJson.scenarioName || returnedJson.scenario_name;
+          setValue("scenarioName", name);
+          setValue("description", name);
+        }
+
+        if (returnedJson.scenarioPrompt || returnedJson.scenario_prompt)
+          setValue(
+            "scenarioPrompt",
+            returnedJson.scenarioPrompt || returnedJson.scenario_prompt
+          );
+
+        // Map Questions
+        const questions =
+          returnedJson.aiQuestions ||
+          returnedJson.ai_questions ||
+          returnedJson.questions_for_feedback;
+        if (questions) {
+          const val = Array.isArray(questions)
+            ? questions.join("\n")
+            : questions;
+          setValue("aiQuestions", val);
+        }
+
+        if (returnedJson.difficulty || returnedJson.difficulty_level)
+          setValue(
+            "difficulty",
+            returnedJson.difficulty || returnedJson.difficulty_level
+          );
+
+        if (returnedJson.status) setValue("status", returnedJson.status);
+
+        // Animation Triggers
+        const triggers =
+          returnedJson.animationTriggers || returnedJson.animation_triggers;
+        if (triggers) {
+          if (triggers.shoulder) setShoulderTags(triggers.shoulder);
+          if (triggers.neck) setNeckTags(triggers.neck);
         }
       }
-
       setAiInput("");
     } catch (error) {
-      console.error("Error calling AI Service:", error);
-      alert("Failed to process AI request. Please try again.");
+      console.error("--- AI REQUEST FAILED ---");
+      const msg = error.response
+        ? JSON.stringify(error.response.data)
+        : error.message;
+      setErrorPopup({ open: true, message: `AI Error: ${msg}` });
     } finally {
       setIsAiLoading(false);
     }
   };
+  // --- 6. SUBMIT HANDLER (UPDATED TOKEN LOGIC) ---
+   const onSubmit = async (data) => {
+    setIsSaving(true);
+    // Use the robust helper function to find the token
+    const token = getAuthToken();
 
-  const onSubmit = async (data) => {
+    if (!token) {
+      console.error(
+        "Token missing in localStorage. Checked 'token' and 'userInfo'."
+      );
+      setErrorPopup({
+        open: true,
+        message:
+          "Authentication token missing. Please log out and log back in.",
+      });
+      setIsSaving(false);
+      return;
+    }
+
+    const config = {
+      headers: {
+        Authorization: `Bearer ${token}`,
+        "Content-Type": "application/json",
+      },
+    };
+
     const finalData = {
       ...data,
       creator: user?.name || "Unknown",
@@ -174,28 +278,43 @@ function ScenarioFormPage() {
       },
     };
 
+    if (!isDbEdit && aiGeneratedId) {
+      finalData._id = aiGeneratedId;
+    }
+
+    console.log("Submitting to DB via Direct Axios:", finalData);
+
     try {
-      if (isEdit) {
-        await dispatch(updateScenario({ id, updates: finalData })).unwrap();
+      if (isDbEdit) {
+        await axios.put(`/api/scenarios/${id}`, finalData, config);
       } else {
-        await dispatch(addScenario(finalData)).unwrap();
+        await axios.post("/api/scenarios", finalData, config);
       }
+      // Navigate on success
       navigate("/scenarios");
     } catch (err) {
-      console.error("Failed to save:", err);
-      alert("Error saving scenario.");
+      console.error("Failed to save to DB:", err);
+      const errMsg =
+        err.response?.data?.message || err.message || "Unknown error occurred";
+      setErrorPopup({ open: true, message: errMsg });
+    } finally {
+      setIsSaving(false);
     }
   };
-
   if (!isEducator && !isSchoolAdmin) return null;
-
-  // --- COMMON STYLES FOR READ-ONLY FIELDS ---
+  // --- STYLES ---
   const readOnlyClass =
     "w-full px-4 py-3 rounded-lg border border-gray-200 text-sm bg-gray-100 text-gray-600 cursor-not-allowed focus:outline-none";
-  const disabledContainerClass = "opacity-60 pointer-events-none"; // Disables clicks on divs/selects
-
+  const disabledContainerClass = "opacity-60 pointer-events-none";
   return (
     <div className="min-h-screen bg-gray-50 flex flex-col items-center py-8 px-4">
+      {/* Error Popup Component */}
+      <ErrorModal
+        isOpen={errorPopup.open}
+        message={errorPopup.message}
+        onClose={() => setErrorPopup({ ...errorPopup, open: false })}
+      />
+      code Code
       {/* Header */}
       <div className="w-full max-w-4xl mb-6 flex items-center justify-between">
         <button
@@ -206,17 +325,17 @@ function ScenarioFormPage() {
         </button>
         <button
           onClick={handleSubmit(onSubmit)}
-          disabled={reduxLoading || isAiLoading}
-          className="px-6 py-2 rounded-lg bg-[#F59E0B] text-white text-sm font-bold hover:bg-amber-600 shadow-md transition-colors disabled:opacity-50"
+          disabled={isSaving || isAiLoading}
+          className="px-6 py-2 rounded-lg bg-[#F59E0B] text-white text-sm font-bold hover:bg-amber-600 shadow-md transition-colors disabled:opacity-50 flex items-center gap-2"
         >
-          {reduxLoading
+          {isSaving && <Loader className="w-4 h-4 animate-spin" />}
+          {isSaving
             ? "Saving..."
-            : isEdit
+            : isDbEdit
             ? "Save Scenario"
             : "Publish Scenario"}
         </button>
       </div>
-
       <div className="w-full max-w-4xl bg-white rounded-2xl shadow-sm border border-gray-100 overflow-hidden relative pb-24">
         <div className="px-8 py-6 border-b border-gray-100 flex items-center gap-3">
           <h1 className="text-xl font-bold text-gray-900">{title}</h1>
@@ -238,134 +357,53 @@ function ScenarioFormPage() {
             />
           </div>
 
-          {!isSchoolAdmin && (
-            <>
-              <div>
-                <label className="block text-xs font-bold text-gray-900 mb-2">
-                  Scenario Prompt (Read Only)
-                </label>
-                <textarea
-                  {...register("scenarioPrompt")}
-                  rows={3}
-                  className={readOnlyClass}
-                  readOnly
-                />
-              </div>
+           <div>
+             <label className="block text-xs font-bold text-gray-900 mb-2">
+               Scenario Prompt (Read Only)
+             </label>
+             <textarea
+               {...register("scenarioPrompt")}
+               rows={3}
+               className={readOnlyClass}
+               readOnly
+             />
+           </div>
 
-              <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-                <div>
-                  <label className="block text-xs font-bold text-gray-900 mb-2">
-                    AI Avatar Role (Read Only)
-                  </label>
-                  <input
-                    {...register("aiAvatarRole")}
-                    className={readOnlyClass}
-                    readOnly
-                  />
-                </div>
-                <div className={disabledContainerClass}>
-                  <label className="block text-xs font-bold text-gray-900 mb-2">
-                    Difficulty (Read Only)
-                  </label>
-                  <div className="flex bg-gray-100 p-1 rounded-lg">
-                    {["Low", "Medium", "High"].map((level) => (
-                      <button
-                        key={level}
-                        type="button"
-                        className={`flex-1 py-2 text-xs font-medium rounded-md transition-all ${
-                          currentDifficulty === level
-                            ? "bg-white shadow-sm"
-                            : "text-gray-500"
-                        }`}
-                      >
-                        {level}
-                      </button>
-                    ))}
-                  </div>
-                </div>
-              </div>
+           {/* Grid: Difficulty Only */}
+           <div className="grid grid-cols-1 gap-6">
+             <div className={disabledContainerClass}>
+               <label className="block text-xs font-bold text-gray-900 mb-2">
+                 Difficulty (Read Only)
+               </label>
+               <div className="flex bg-gray-100 p-1 rounded-lg">
+                 {["Low", "Medium", "High"].map((level) => (
+                   <button
+                     key={level}
+                     type="button"
+                     className={`flex-1 py-2 text-xs font-medium rounded-md transition-all ${
+                       currentDifficulty === level
+                         ? "bg-white shadow-sm"
+                         : "text-gray-500"
+                     }`}
+                   >
+                     {level}
+                   </button>
+                 ))}
+               </div>
+             </div>
+           </div>
 
-              <div>
-                <label className="block text-xs font-bold text-gray-900 mb-2">
-                  Instructions (Read Only)
-                </label>
-                <textarea
-                  {...register("aiInstructions")}
-                  rows={2}
-                  className={readOnlyClass}
-                  readOnly
-                />
-              </div>
-              <div>
-                <label className="block text-xs font-bold text-gray-900 mb-2">
-                  Questions (Read Only)
-                </label>
-                <textarea
-                  {...register("aiQuestions")}
-                  rows={2}
-                  className={readOnlyClass}
-                  readOnly
-                />
-              </div>
-
-              {/* Animation Triggers (Read Only - Dropdowns disabled, delete buttons hidden) */}
-              <div className="space-y-6 pt-4 border-t border-gray-100">
-                <h3 className="text-sm font-bold text-gray-900">
-                  Animation Triggers (Read Only)
-                </h3>
-
-                {/* Shoulder */}
-                <div className="bg-gray-50 p-4 rounded-lg">
-                  <div className={disabledContainerClass}>
-                    <select className="w-full px-4 py-2 rounded-lg border text-sm bg-gray-200 text-gray-500">
-                      <option value="">
-                        + Add Shoulder Animation (Disabled)
-                      </option>
-                    </select>
-                  </div>
-                  <div className="flex flex-wrap gap-2 mt-3">
-                    {shoulderTags.map((tag) => (
-                      <span
-                        key={tag}
-                        className="inline-flex items-center px-3 py-1 rounded-full text-xs font-medium bg-gray-200 text-gray-700"
-                      >
-                        {tag} {/* Delete button removed */}
-                      </span>
-                    ))}
-                    {shoulderTags.length === 0 && (
-                      <span className="text-xs text-gray-400 italic">
-                        No animations generated yet
-                      </span>
-                    )}
-                  </div>
-                </div>
-
-                {/* Neck */}
-                <div className="bg-gray-50 p-4 rounded-lg">
-                  <div className={disabledContainerClass}>
-                    <select className="w-full px-4 py-2 rounded-lg border text-sm bg-gray-200 text-gray-500">
-                      <option value="">+ Add Neck Animation (Disabled)</option>
-                    </select>
-                  </div>
-                  <div className="flex flex-wrap gap-2 mt-3">
-                    {neckTags.map((tag) => (
-                      <span
-                        key={tag}
-                        className="inline-flex items-center px-3 py-1 rounded-full text-xs font-medium bg-gray-200 text-gray-700"
-                      >
-                        {tag} {/* Delete button removed */}
-                      </span>
-                    ))}
-                    {neckTags.length === 0 && (
-                      <span className="text-xs text-gray-400 italic">
-                        No animations generated yet
-                      </span>
-                    )}
-                  </div>
-                </div>
-              </div>
-            </>
-          )}
+           <div>
+             <label className="block text-xs font-bold text-gray-900 mb-2">
+               Questions (Read Only)
+             </label>
+             <textarea
+               {...register("aiQuestions")}
+               rows={4}
+               className={readOnlyClass}
+               readOnly
+             />
+           </div>
 
           <div>
             <label className="block text-xs font-bold text-gray-900 mb-2">
@@ -380,47 +418,43 @@ function ScenarioFormPage() {
           </div>
         </form>
 
-        {/* Floating AI Bar - THIS REMAINS ACTIVE */}
-        {!isSchoolAdmin && (
-          <div className="absolute bottom-8 left-8 right-8">
-            <div className="relative p-[2px] rounded-xl bg-gradient-to-r from-[#FF9D80] via-[#FF66C4] to-[#9F7AEA] shadow-lg">
-              <div className="bg-white rounded-[10px] flex items-center pr-2">
-                <div className="pl-3 text-gray-400">
-                  {isAiLoading ? (
-                    <Loader className="w-4 h-4 animate-spin text-purple-600" />
-                  ) : (
-                    <Sparkles className="w-4 h-4" />
-                  )}
-                </div>
-                <input
-                  type="text"
-                  value={aiInput}
-                  onChange={(e) => setAiInput(e.target.value)}
-                  onKeyDown={(e) => e.key === "Enter" && handleAskAI(e)}
-                  disabled={isAiLoading}
-                  placeholder={
-                    isAiLoading
-                      ? "AI is processing..."
-                      : "Ask AI to generate the form content..."
-                  }
-                  className="w-full px-3 py-3 text-sm outline-none bg-transparent placeholder:text-gray-400"
-                />
-                <button
-                  onClick={handleAskAI}
-                  disabled={isAiLoading || !aiInput}
-                  className={`w-8 h-8 flex items-center justify-center rounded-full text-white transition-colors ${
-                    isAiLoading ? "bg-gray-400" : "bg-black hover:bg-gray-800"
-                  }`}
-                >
-                  <ArrowUp className="w-4 h-4" />
-                </button>
+        <div className="absolute bottom-8 left-8 right-8">
+          <div className="relative p-[2px] rounded-xl bg-gradient-to-r from-[#FF9D80] via-[#FF66C4] to-[#9F7AEA] shadow-lg">
+            <div className="bg-white rounded-[10px] flex items-center pr-2">
+              <div className="pl-3 text-gray-400">
+                {isAiLoading ? (
+                  <Loader className="w-4 h-4 animate-spin text-purple-600" />
+                ) : (
+                  <Sparkles className="w-4 h-4" />
+                )}
               </div>
+              <input
+                type="text"
+                value={aiInput}
+                onChange={(e) => setAiInput(e.target.value)}
+                onKeyDown={(e) => e.key === "Enter" && handleAskAI(e)}
+                disabled={isAiLoading}
+                placeholder={
+                  isAiLoading
+                    ? "AI is processing..."
+                    : "Ask AI to generate the form content..."
+                }
+                className="w-full px-3 py-3 text-sm outline-none bg-transparent placeholder:text-gray-400"
+              />
+              <button
+                onClick={handleAskAI}
+                disabled={isAiLoading || !aiInput}
+                className={`w-8 h-8 flex items-center justify-center rounded-full text-white transition-colors ${
+                  isAiLoading ? "bg-gray-400" : "bg-black hover:bg-gray-800"
+                }`}
+              >
+                <ArrowUp className="w-4 h-4" />
+              </button>
             </div>
           </div>
-        )}
+        </div>
       </div>
     </div>
   );
 }
-
 export default ScenarioFormPage;

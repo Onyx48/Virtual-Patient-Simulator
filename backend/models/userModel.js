@@ -40,6 +40,11 @@ const userSchema = new mongoose.Schema(
       ref: "School",
       required: false, // Only for educator and school_admin
     },
+    supervisor: {
+      type: mongoose.Schema.Types.ObjectId,
+      ref: "User",
+      default: null, // Links educator to school_admin who created them
+    },
   },
   {
     timestamps: true,

@@ -12,6 +12,9 @@ import {
 
 // Import Modal (Sibling import since they are in the same folder)
 import EducatorModal from "./EducatorModal";
+import ConfirmationModal from "./ui/ConfirmationModal.jsx";
+import { toast } from 'react-hot-toast';
+import { useAuth } from '../AuthContext';
 
 // Helper for Auth Headers
 const getAuthHeaders = () => {
@@ -20,6 +23,7 @@ const getAuthHeaders = () => {
 };
 
 function EducatorsPage() {
+  const { user } = useAuth();
   // --- State ---
   const [educators, setEducators] = useState([]);
   const [loading, setLoading] = useState(true);
@@ -28,6 +32,10 @@ function EducatorsPage() {
   // Modal State
   const [isModalOpen, setIsModalOpen] = useState(false);
   const [editingEducator, setEditingEducator] = useState(null);
+  const [isConfirmModalOpen, setIsConfirmModalOpen] = useState(false);
+  const [confirmTitle, setConfirmTitle] = useState('');
+  const [confirmMessage, setConfirmMessage] = useState('');
+  const [onConfirmAction, setOnConfirmAction] = useState(() => {});
 
   // Pagination State
   const [currentPage, setCurrentPage] = useState(1);
@@ -74,19 +82,22 @@ function EducatorsPage() {
     setIsModalOpen(true);
   };
 
-  const handleDelete = async (id) => {
-    if (!window.confirm("Are you sure you want to delete this educator?"))
-      return;
-    try {
-      await axios.delete(`/api/users/${id}`, getAuthHeaders());
-      // Optimistic UI update
-      setEducators((prev) => prev.filter((e) => e.id !== id));
-    } catch (error) {
-      alert(
-        "Failed to delete educator: " +
-          (error.response?.data?.message || error.message)
-      );
-    }
+  const handleDelete = (id) => {
+    setConfirmTitle('Delete Educator');
+    setConfirmMessage('Are you sure you want to delete this educator?');
+    setOnConfirmAction(() => async () => {
+      try {
+        await axios.delete(`/api/users/${id}`, getAuthHeaders());
+        // Optimistic UI update
+        setEducators((prev) => prev.filter((e) => e.id !== id));
+      } catch (error) {
+        toast.error(
+          "Failed to delete educator: " +
+            (error.response?.data?.message || error.message)
+        );
+      }
+    });
+    setIsConfirmModalOpen(true);
   };
 
   const handleSave = async (formData) => {
@@ -120,7 +131,7 @@ function EducatorsPage() {
       await fetchEducators();
       setIsModalOpen(false);
     } catch (error) {
-      alert(
+      toast.error(
         "Error saving: " + (error.response?.data?.message || error.message)
       );
     }
@@ -245,24 +256,26 @@ function EducatorsPage() {
                   <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-600">
                     {educator.department}
                   </td>
-                  <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500">
-                    <div className="flex items-center gap-4">
-                      <button
-                        onClick={() => handleEdit(educator)}
-                        className="flex items-center gap-1 text-gray-500 hover:text-gray-900 transition-colors"
-                      >
-                        <PencilSquareIcon className="w-4 h-4" />
-                        Edit
-                      </button>
-                      <button
-                        onClick={() => handleDelete(educator.id)}
-                        className="flex items-center gap-1 text-red-400 hover:text-red-600 transition-colors"
-                      >
-                        <TrashIcon className="w-4 h-4" />
-                        Delete
-                      </button>
-                    </div>
-                  </td>
+                   <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500">
+                     <div className="flex items-center gap-4">
+                       {user?.role !== "school_admin" && (
+                         <button
+                           onClick={() => handleEdit(educator)}
+                           className="flex items-center gap-1 text-gray-500 hover:text-gray-900 transition-colors"
+                         >
+                           <PencilSquareIcon className="w-4 h-4" />
+                           Edit
+                         </button>
+                       )}
+                       <button
+                         onClick={() => handleDelete(educator.id)}
+                         className="flex items-center gap-1 text-red-400 hover:text-red-600 transition-colors"
+                       >
+                         <TrashIcon className="w-4 h-4" />
+                         Delete
+                       </button>
+                     </div>
+                   </td>
                 </tr>
               ))
             )}
@@ -335,6 +348,17 @@ function EducatorsPage() {
           />
         </div>
       )}
+
+      <ConfirmationModal
+        isOpen={isConfirmModalOpen}
+        onClose={() => setIsConfirmModalOpen(false)}
+        onConfirm={() => {
+          onConfirmAction();
+          setIsConfirmModalOpen(false);
+        }}
+        title={confirmTitle}
+        message={confirmMessage}
+      />
     </div>
   );
 }

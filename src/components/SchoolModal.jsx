@@ -2,7 +2,9 @@ import React, { useEffect } from "react";
 import { useForm, Controller } from "react-hook-form";
 import DatePicker from "react-datepicker";
 import "react-datepicker/dist/react-datepicker.css";
+import "./ui/react-datepicker-custom.css";
 import { format, isValid } from "date-fns";
+import { toast } from 'react-hot-toast';
 
 function SchoolModal({ onSave, onClose, schoolData }) {
   const isEdit = !!schoolData;
@@ -83,7 +85,7 @@ function SchoolModal({ onSave, onClose, schoolData }) {
       isValid(data.endDate) &&
       data.endDate < data.startDate
     ) {
-      alert("End Date cannot be before Start Date. Please correct the dates.");
+      toast.error("Start date must be before end date.");
       return;
     }
 
@@ -295,8 +297,13 @@ function SchoolModal({ onSave, onClose, schoolData }) {
                     onChange={(date) => field.onChange(date)}
                     dateFormat="dd/MM/yyyy"
                     placeholderText="DD/MM/YYYY"
-                    className="w-full px-4 py-2 rounded-lg border border-gray-300 focus:outline-none focus:ring-blue-500 focus:border-blue-500"
+                    className="w-full px-4 py-2 rounded-lg border border-gray-300 focus:outline-none focus:ring-orange-500 focus:border-orange-500"
                     popperPlacement="bottom-start"
+                    showYearDropdown={true}
+                    showMonthDropdown={true}
+                    dropdownMode="select"
+                    yearDropdownItemNumber={10}
+                    monthDropdownItemNumber={12}
                   />
                 )}
               />
@@ -326,8 +333,13 @@ function SchoolModal({ onSave, onClose, schoolData }) {
                     onChange={(date) => field.onChange(date)}
                     dateFormat="dd/MM/yyyy"
                     placeholderText="DD/MM/YYYY"
-                    className="w-full px-4 py-2 rounded-lg border border-gray-300 bg-gray-100 focus:outline-none"
+                    className="w-full px-4 py-2 rounded-lg border border-gray-300 bg-gray-100 focus:outline-none focus:ring-orange-500 focus:border-orange-500"
                     popperPlacement="bottom-end"
+                    showYearDropdown={true}
+                    showMonthDropdown={true}
+                    dropdownMode="select"
+                    yearDropdownItemNumber={10}
+                    monthDropdownItemNumber={12}
                   />
                 )}
               />

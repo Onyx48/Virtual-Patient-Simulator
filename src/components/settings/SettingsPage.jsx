@@ -1,6 +1,7 @@
 import React, { useState, useEffect } from "react";
 import { useForm } from "react-hook-form";
 import { useAuth } from "@/AuthContext.jsx";
+import { toast } from 'react-hot-toast';
 
 const initialUserData = {
   profilePictureUrl: "https://via.placeholder.com/150/FF5733/FFFFFF?text=JD",
@@ -150,7 +151,7 @@ function SettingsPage() {
   const onSubmit = (data) => {
     console.log("Form submitted:", data);
     // TODO: API call to save settings
-    alert("Settings saved (API integration pending)");
+    toast.success("Settings saved (API integration pending)");
   };
 
   const handleProfilePictureChange = (e) => {

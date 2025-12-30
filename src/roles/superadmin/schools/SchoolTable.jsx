@@ -56,18 +56,24 @@ function SchoolTable({ data, onEditClick, onDeleteClick, onSort, canEdit }) {
               >
                 Expire <SortIcon />
               </th>
-              <th
-                scope="col"
-                className="px-6 py-3 text-left text-xs font-bold text-gray-500 uppercase tracking-wider cursor-pointer group select-none"
-                onClick={() => handleSort("timeSpent")}
-              >
-                Time Spent <SortIcon />
-              </th>
-              <th
-                scope="col"
-                className="px-6 py-3 text-left text-xs font-bold text-gray-500 uppercase tracking-wider"
-              >
-                Action
+               <th
+                 scope="col"
+                 className="px-6 py-3 text-left text-xs font-bold text-gray-500 uppercase tracking-wider cursor-pointer group select-none"
+                 onClick={() => handleSort("timeSpent")}
+               >
+                 Time Spent <SortIcon />
+               </th>
+               <th
+                 scope="col"
+                 className="px-6 py-3 text-left text-xs font-bold text-gray-500 uppercase tracking-wider"
+               >
+                 Assigned Admin
+               </th>
+               <th
+                 scope="col"
+                 className="px-6 py-3 text-left text-xs font-bold text-gray-500 uppercase tracking-wider"
+               >
+                 Action
               </th>
             </tr>
           </thead>
@@ -109,10 +115,13 @@ function SchoolTable({ data, onEditClick, onDeleteClick, onSort, canEdit }) {
                       ? format(new Date(school.expireDate), "dd MMM, yyyy")
                       : "-"}
                   </td>
-                  <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-900">
-                    {school.timeSpent || "0h"}
-                  </td>
-                  <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500">
+                   <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-900">
+                     {school.timeSpent || "0h"}
+                   </td>
+                   <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-900">
+                     {school.assignedAdmin?.id ? school.assignedAdmin.name : "Unassigned"}
+                   </td>
+                   <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500">
                     <div className="flex items-center gap-3">
                       {canEdit && (
                         <button

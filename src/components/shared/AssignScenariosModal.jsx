@@ -1,6 +1,7 @@
 import React, { useState, useEffect } from "react";
 import axios from "axios";
 import { XMarkIcon, PlusIcon, MinusIcon } from "@heroicons/react/24/outline";
+import { toast } from 'react-hot-toast';
 
 function AssignScenariosModal({ onClose, onAssignSuccess }) {
   const [scenarios, setScenarios] = useState([]);
@@ -101,7 +102,7 @@ function AssignScenariosModal({ onClose, onAssignSuccess }) {
     });
 
     if (changes.length === 0) {
-      alert("No changes to assign.");
+      toast("No changes to assign.");
       return;
     }
 
@@ -123,7 +124,7 @@ function AssignScenariosModal({ onClose, onAssignSuccess }) {
       if (onAssignSuccess) onAssignSuccess();
       onClose();
     } catch (error) {
-      alert("Failed to update assignments.");
+      toast.error("Failed to update assignments.");
     }
   };
 

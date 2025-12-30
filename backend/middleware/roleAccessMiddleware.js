@@ -17,10 +17,10 @@ export const checkAccess = (action) => {
     // Set scope based on role for data filtering (to be used in routes)
     req.scope = {};
     if (userRole === "school_admin") {
-      req.scope.schoolId = req.user.schoolId; // Filter to admin's school
+      if (req.user.schoolId) req.scope.schoolId = req.user.schoolId._id; // Filter to admin's school
     } else if (userRole === "educator") {
       req.scope.educatorId = req.user._id; // Filter to educator's students
-      req.scope.schoolId = req.user.schoolId; // Also filter by school
+      if (req.user.schoolId) req.scope.schoolId = req.user.schoolId._id; // Also filter by school
     } else if (userRole === "student") {
       req.scope.userId = req.user._id; // Filter to own data
     }

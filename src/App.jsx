@@ -9,6 +9,7 @@ import {
 import { Provider } from 'react-redux';
 import { store } from './redux/store';
 import { AuthProvider, useAuth } from "./AuthContext";
+import { Toaster } from 'react-hot-toast';
 
 // Import Startup Pages (Public Routes)
 import LoginPage from "./components/StartupPages/LoginPage";
@@ -46,6 +47,13 @@ function App() {
   return (
     <Provider store={store}>
       <AuthProvider>
+        <Toaster position="top-right" toastOptions={{
+          style: {
+            background: '#fef3c7',
+            color: '#f97316',
+            border: '1px solid #f97316',
+          },
+        }} />
         <Router>
           <Routes>
             {/* Public Routes for Authentication Flows */}

@@ -1,7 +1,7 @@
 import React from "react";
 import { Target, Edit, Loader2 } from "lucide-react";
 
-function ScenarioTable({ data, onEditClick }) {
+function ScenarioTable({ data, onEditClick, canEdit = true }) {
   // Helper for Status Text Colors
   const getStatusStyle = (status) => {
     switch (status?.toLowerCase()) {
@@ -87,17 +87,23 @@ function ScenarioTable({ data, onEditClick }) {
 
           {/* --- Card Footer: Actions --- */}
           <div className="flex gap-3 mt-auto">
-            <button
-              onClick={() => onEditClick(scenario)}
-              className="flex-1 flex items-center justify-center gap-2 py-2.5 rounded-lg border border-gray-200 text-sm font-semibold text-gray-700 hover:bg-gray-50 transition-colors"
-            >
-              <Edit className="w-3 h-3" /> Edit
-            </button>
+            {canEdit && (
+              <button
+                onClick={() => onEditClick(scenario)}
+                className="flex-1 flex items-center justify-center gap-2 py-2.5 rounded-lg border border-gray-200 text-sm font-semibold text-gray-700 hover:bg-gray-50 transition-colors"
+              >
+                <Edit className="w-3 h-3" /> Edit
+              </button>
+            )}
             <button
               onClick={() =>
                 console.log("Test clicked for", scenario.scenarioName)
               }
-              className="flex-1 flex items-center justify-center gap-2 py-2.5 rounded-lg bg-black text-white text-sm font-semibold hover:bg-gray-800 transition-colors"
+              className={`flex-1 flex items-center justify-center gap-2 py-2.5 rounded-lg text-sm font-semibold transition-colors ${
+                canEdit
+                  ? "bg-black text-white hover:bg-gray-800"
+                  : "bg-black text-white hover:bg-gray-800 w-full"
+              }`}
             >
               Test
             </button>

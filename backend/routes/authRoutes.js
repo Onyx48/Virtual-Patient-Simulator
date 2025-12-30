@@ -124,13 +124,19 @@ router.post(
       "school_admin",
       "superadmin",
     ]),
+    body("schoolId")
+      .if(body("roleToCreate").isIn(["educator", "school_admin"]))
+      .notEmpty()
+      .withMessage("School ID is required for educators and school admins")
+      .isMongoId()
+      .withMessage("Invalid School ID"),
   ],
   async (req, res) => {
     const errors = validationResult(req);
     if (!errors.isEmpty())
       return res.status(400).json({ errors: errors.array() });
 
-    const { name, email, password, roleToCreate, creatorRole } = req.body;
+    const { name, email, password, roleToCreate, creatorRole, schoolId } = req.body;
     const lowerEmail = email.toLowerCase();
     const lowerRoleToCreate = roleToCreate.toLowerCase();
 
@@ -138,28 +144,21 @@ router.post(
       // Authorization Check
       if (creatorRole) {
         const lowerCreatorRole = creatorRole.toLowerCase();
-        if (
-          lowerCreatorRole === "superadmin" &&
-          !["educator", "school_admin", "superadmin"].includes(
-            lowerRoleToCreate
-          )
-        ) {
-          return res
-            .status(403)
-            .json({ message: "Not authorized to create this role." });
-        }
-        if (
-          lowerCreatorRole === "educator" &&
-          lowerRoleToCreate !== "student"
-        ) {
-          return res
-            .status(403)
-            .json({ message: "Educators can only create students." });
+        const allowedCreations = {
+          superadmin: ["school_admin"],
+          school_admin: ["educator", "student"],
+          educator: ["student"]
+        };
+
+        if (!allowedCreations[lowerCreatorRole]?.includes(lowerRoleToCreate)) {
+          return res.status(403).json({
+            message: `${creatorRole} cannot create ${roleToCreate} role.`
+          });
         }
       } else if (lowerRoleToCreate !== "student") {
-        return res
-          .status(403)
-          .json({ message: "Public registration is only for students." });
+        return res.status(403).json({
+          message: "Public registration is only for students."
+        });
       }
 
       const userExists = await User.findOne({ email: lowerEmail });
@@ -172,6 +171,7 @@ router.post(
         email: lowerEmail,
         password,
         role: lowerRoleToCreate,
+        ...(schoolId && { schoolId }),
       });
       await user.save();
 
@@ -219,7 +219,7 @@ router.post(
       const token = jwt.sign(
         { id: user._id, role: user.role },
         process.env.JWT_SECRET,
-        { expiresIn: "1h" }
+        { expiresIn: "24h" }
       );
 
       res.json({
@@ -227,6 +227,7 @@ router.post(
         name: user.name,
         email: user.email,
         role: user.role,
+        schoolId: user.schoolId,
         token: token,
       });
     } catch (err) {

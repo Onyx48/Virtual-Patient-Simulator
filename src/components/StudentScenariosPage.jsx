@@ -1,6 +1,7 @@
 import React, { useState, useEffect, useMemo } from "react";
 import { useAuth } from "../AuthContext.jsx";
 import axios from "axios";
+import { getAuthHeaders } from "../lib/utils.js";
 import ScenarioManagementControlsStudent from "../roles/student/scenarios/ScenarioManagementControlsStudent.jsx";
 import ScenrioGridStudent from "../roles/student/scenarios/ScenrioGridStudent.jsx";
 
@@ -14,7 +15,7 @@ function StudentScenariosPage() {
   useEffect(() => {
     const fetchScenarios = async () => {
       try {
-        const response = await axios.get("/api/scenarios");
+        const response = await axios.get("/api/scenarios", getAuthHeaders());
         // Scenarios are already filtered server-side for students
         const mappedScenarios = response.data.map((scenario) => ({
           id: scenario._id,

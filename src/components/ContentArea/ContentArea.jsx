@@ -16,6 +16,7 @@ import SchoolFormPage from "../../roles/superadmin/schools/SchoolFormPage";
 
 // Scenarios Pages
 import ScenariosPage from "../../roles/educator/scenarios/Scenario.jsx";
+import SchoolAdminScenariosPage from "../../roles/school_admin/scenarios/index.jsx";
 import StudentScenariosPage from "../StudentScenariosPage.jsx";
 import StudentScenarioDetails from "../../roles/student/scenarios/StudentScenarioDetails.jsx";
 import ScenarioFormPage from "../shared/ScenarioFormPage";
@@ -119,6 +120,8 @@ function ContentArea() {
             >
               {user?.role === "student" ? (
                 <StudentScenariosPage />
+              ) : user?.role === "school_admin" ? (
+                <SchoolAdminScenariosPage />
               ) : (
                 <ScenariosPage />
               )}
@@ -138,7 +141,7 @@ function ContentArea() {
         <Route
           path="/scenarios/add"
           element={
-            <RoleBasedRoute allowedRoles={["school_admin", "educator"]}>
+            <RoleBasedRoute allowedRoles={["educator"]}>
               <ScenarioFormPage />
             </RoleBasedRoute>
           }
@@ -146,7 +149,7 @@ function ContentArea() {
         <Route
           path="/scenarios/edit/:id"
           element={
-            <RoleBasedRoute allowedRoles={["school_admin", "educator"]}>
+            <RoleBasedRoute allowedRoles={["educator"]}>
               <ScenarioFormPage />
             </RoleBasedRoute>
           }

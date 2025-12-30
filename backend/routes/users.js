@@ -2,6 +2,7 @@
 import express from "express";
 import User from "../models/userModel.js";
 import Student from "../models/studentModel.js";
+import School from "../models/schoolModel.js";
 import { protect } from "../middleware/authMiddleware.js";
 import { checkAccess } from "../middleware/roleAccessMiddleware.js";
 
@@ -57,6 +58,8 @@ router.post("/", protect, checkAccess("manageUsers"), async (req, res) => {
     // 3. Normalize role
     const normalizedRole = role.toLowerCase();
 
+
+
     // 4. Validate Role against allowed list
     const allowedRoles = ["student", "educator", "school_admin", "superadmin"];
     if (!allowedRoles.includes(normalizedRole)) {
@@ -65,6 +68,32 @@ router.post("/", protect, checkAccess("manageUsers"), async (req, res) => {
           ", "
         )}`,
       });
+    }
+
+    // 5. Enforce creation hierarchy
+    const allowedCreations = {
+      superadmin: ["school_admin"],
+      school_admin: ["educator", "student"],
+      educator: ["student"]
+    };
+
+    if (!allowedCreations[req.user.role]?.includes(normalizedRole)) {
+      return res.status(403).json({
+        message: `${req.user.role} cannot create ${normalizedRole} role.`
+      });
+    }
+
+    // 6. For school_admin, ensure school exists and is not already assigned
+    if (normalizedRole === "school_admin") {
+      const school = await School.findById(schoolId);
+      if (!school) {
+        return res.status(400).json({ message: "Invalid school ID." });
+      }
+      if (school.assignedAdmin && school.assignedAdmin.id) {
+        return res.status(400).json({
+          message: "This school is already assigned to another school admin."
+        });
+      }
     }
 
     // 5. Check if user exists
@@ -86,18 +115,37 @@ router.post("/", protect, checkAccess("manageUsers"), async (req, res) => {
     }
     // Superadmin can specify any schoolId or leave undefined
 
+    // Validate final schoolId
+    if ((normalizedRole === "educator" || normalizedRole === "school_admin") && !finalSchoolId) {
+      return res.status(400).json({ message: "School ID is required for educators and school admins." });
+    }
+
     // 7. Create New User
+    const supervisor = req.user.role === "school_admin" && normalizedRole === "educator" ? req.user._id : null;
     const newUser = new User({
       name,
       email,
       password,
       role: normalizedRole,
       schoolId: finalSchoolId,
+      supervisor,
     });
 
     await newUser.save();
+    console.log("Assigned schoolId", finalSchoolId, "to school_admin user", newUser._id);
 
-    // 7. Handle Student Profile Creation
+    // 7. For school_admin, assign to school
+    if (normalizedRole === "school_admin") {
+      await School.findByIdAndUpdate(finalSchoolId, {
+        assignedAdmin: {
+          id: newUser._id,
+          name: newUser.name,
+          email: newUser.email,
+        }
+      });
+    }
+
+    // 8. Handle Student Profile Creation
     if (normalizedRole === "student") {
       const studentProfileExists = await Student.findOne({ user: newUser._id });
       if (!studentProfileExists) {
@@ -113,6 +161,7 @@ router.post("/", protect, checkAccess("manageUsers"), async (req, res) => {
       email: newUser.email,
       role: newUser.role,
       schoolId: newUser.schoolId,
+      supervisor: newUser.supervisor,
     };
     res.status(201).json({ success: true, user: userResponse });
   } catch (err) {
@@ -160,6 +209,10 @@ router.put("/:id", protect, checkAccess("manageUsers"), async (req, res) => {
       return res.status(404).json({ message: "User not found" });
     }
 
+    if (user.role === "educator" && req.user.role === "school_admin") {
+      return res.status(403).json({ message: "School admins can only create educators, not edit them." });
+    }
+
     user.name = name || user.name;
     user.email = email || user.email;
 
@@ -183,22 +236,62 @@ router.put("/:id", protect, checkAccess("manageUsers"), async (req, res) => {
       }
 
       const oldRole = user.role;
-      if (normalizedRole !== oldRole) {
-        user.role = normalizedRole;
-        // Handle profile cleanup/creation based on role change
-        if (oldRole === "student" && normalizedRole !== "student") {
-          await Student.findOneAndDelete({ user: user._id });
-        } else if (oldRole !== "student" && normalizedRole === "student") {
-          const existingProfile = await Student.findOne({ user: user._id });
-          if (!existingProfile) {
-            await new Student({ user: user._id }).save();
-          }
+       if (normalizedRole !== oldRole) {
+         user.role = normalizedRole;
+         // Handle profile cleanup/creation based on role change
+         if (oldRole === "student" && normalizedRole !== "student") {
+           await Student.findOneAndDelete({ user: user._id });
+         } else if (oldRole !== "student" && normalizedRole === "student") {
+           const existingProfile = await Student.findOne({ user: user._id });
+           if (!existingProfile) {
+             await new Student({ user: user._id }).save();
+           }
+         }
+       }
+     }
+
+      // Check for school_admin uniqueness if role is school_admin and schoolId is provided
+      if (user.role === "school_admin" && schoolId !== undefined) {
+        const school = await School.findById(schoolId);
+        if (!school) {
+          return res.status(400).json({ message: "Invalid school ID." });
+        }
+        if (school.assignedAdmin && school.assignedAdmin.toString() !== user._id.toString()) {
+          return res.status(400).json({
+            message: "This school is already assigned to another school admin."
+          });
         }
       }
-    }
 
-    const updatedUser = await user.save();
-    res.status(200).json({ success: true, user: updatedUser });
+      // Handle school assignment changes
+      const oldSchoolId = user.schoolId;
+      const oldRole = user.role;
+      const newRole = user.role; // Already updated above
+      const newSchoolId = user.schoolId; // Already updated above
+
+      const updatedUser = await user.save();
+
+      // Clear old assignment if role changed from school_admin or schoolId changed
+      if (oldRole === "school_admin" && (newRole !== "school_admin" || newSchoolId?.toString() !== oldSchoolId?.toString())) {
+        if (oldSchoolId) {
+          await School.findByIdAndUpdate(oldSchoolId, {
+            assignedAdmin: { id: null, name: '', email: '' }
+          });
+        }
+      }
+
+      // Set new assignment if now school_admin
+      if (newRole === "school_admin" && newSchoolId) {
+        await School.findByIdAndUpdate(newSchoolId, {
+          assignedAdmin: {
+            id: updatedUser._id,
+            name: updatedUser.name,
+            email: updatedUser.email,
+          }
+        });
+      }
+
+     res.status(200).json({ success: true, user: updatedUser });
   } catch (err) {
     res.status(500).json({ message: err.message });
   }
@@ -214,8 +307,15 @@ router.delete("/:id", protect, checkAccess("manageUsers"), async (req, res) => {
     if (!user) {
       return res.status(404).json({ message: "User not found" });
     }
+
+
     if (user.role === "student") {
       await Student.findOneAndDelete({ user: user._id });
+    }
+    if (user.role === "school_admin" && user.schoolId) {
+      await School.findByIdAndUpdate(user.schoolId, {
+        assignedAdmin: { id: null, name: '', email: '' }
+      });
     }
     await User.findByIdAndDelete(id);
     res

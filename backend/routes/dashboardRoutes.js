@@ -66,6 +66,7 @@ router.get(
           students: studentCount,
           educators: educatorCount,
           activeScenarios: scenarioCount,
+          assignedAdmin: school.assignedAdmin,
         };
       });
 

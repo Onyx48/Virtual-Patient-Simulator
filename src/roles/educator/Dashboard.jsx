@@ -2,6 +2,7 @@ import React, { useState, useEffect } from "react";
 import { useNavigate } from "react-router-dom";
 import { useAuth } from "@/AuthContext.jsx";
 import axios from "axios";
+import { getAuthHeaders } from "../../lib/utils.js";
 
 // --- External Libraries for UI & Charts ---
 import {
@@ -67,7 +68,7 @@ function EducatorDashboard() {
     // Fetch students
     const fetchStudents = async () => {
       try {
-        const response = await axios.get("/api/students");
+        const response = await axios.get("/api/students", getAuthHeaders());
         setStudents(response.data);
       } catch (error) {
         console.error("Error fetching students:", error);

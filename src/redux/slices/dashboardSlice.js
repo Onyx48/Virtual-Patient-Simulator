@@ -1,5 +1,6 @@
 import { createSlice, createAsyncThunk } from "@reduxjs/toolkit";
 import axios from "axios";
+import { getAuthHeaders } from "../../lib/utils.js";
 
 // Async thunk for fetching dashboard data
 export const fetchDashboardData = createAsyncThunk(
@@ -7,8 +8,8 @@ export const fetchDashboardData = createAsyncThunk(
   async (_, { rejectWithValue }) => {
     try {
       const [statsResponse, schoolsResponse] = await Promise.all([
-        axios.get("/api/dashboard/stats"),
-        axios.get("/api/dashboard/schools-detailed"), // Updated to fetch detailed data
+        axios.get("/api/dashboard/stats", getAuthHeaders()),
+        axios.get("/api/dashboard/schools-detailed", getAuthHeaders()), // Updated to fetch detailed data
       ]);
       return {
         stats: statsResponse.data,

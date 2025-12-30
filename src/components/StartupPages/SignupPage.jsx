@@ -3,6 +3,7 @@ import React, { useState } from "react";
 import { Link, useNavigate } from "react-router-dom";
 import signupImage from "./login-bg.jpg"; // Ensure path is correct
 import { useAuth } from "../../AuthContext"; // Import useAuth
+import { toast } from 'react-hot-toast';
 
 // ... (validateName, validateEmail, validatePasswordSignup, errorIcon remain the same) ...
 const validateName = (name) => {
@@ -52,7 +53,7 @@ function SignupPage() {
         // After successful signup, AuthContext might log them in automatically or not.
         // If it does log them in, PublicRoute will redirect.
         // If not, navigate to login or show a success message.
-        alert("Signup Successful! Please log in."); // Or a more elegant notification
+        toast.success("Signup Successful! Please log in."); // Or a more elegant notification
         navigate("/login");
       } catch (err) {
         setApiError(

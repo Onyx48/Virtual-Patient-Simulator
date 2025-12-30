@@ -8,6 +8,22 @@ const AuthContext = createContext(null);
 // For this example, I'll assume it's done elsewhere, or you can uncomment and set it here if needed.
 // axios.defaults.baseURL = 'http://localhost:5001'; // Your backend URL (e.g., if backend is on 5001)
 
+// Axios response interceptor to handle 401 errors
+axios.interceptors.response.use(
+  (response) => response,
+  (error) => {
+    if (error.response && error.response.status === 401) {
+      // Token expired or invalid, logout user
+      console.log('Token expired or invalid, logging out...');
+      localStorage.removeItem('token');
+      localStorage.removeItem('currentUser');
+      delete axios.defaults.headers.common['Authorization'];
+      window.location.href = '/login'; // Redirect to login
+    }
+    return Promise.reject(error);
+  }
+);
+
 export const AuthProvider = ({ children }) => {
   const [user, setUser] = useState(null); // Stores user object { _id, name, email, role } or null
   const [loading, setLoading] = useState(true); // Initial loading state to check for existing session
@@ -18,16 +34,16 @@ export const AuthProvider = ({ children }) => {
       setUser(userData);
       localStorage.setItem('currentUser', JSON.stringify(userData));
       // If using JWTs
-      if (userData.token) {
-        localStorage.setItem('authToken', userData.token);
-        axios.defaults.headers.common['Authorization'] = `Bearer ${userData.token}`;
-      }
+       if (userData.token) {
+         localStorage.setItem('token', userData.token);
+         axios.defaults.headers.common['Authorization'] = `Bearer ${userData.token}`;
+       }
     } else {
       // Clear session if userData is invalid or null
       setUser(null);
       localStorage.removeItem('currentUser');
-      if (localStorage.getItem('authToken')) { // If using JWTs
-        localStorage.removeItem('authToken');
+       if (localStorage.getItem('token')) { // If using JWTs
+         localStorage.removeItem('token');
         delete axios.defaults.headers.common['Authorization'];
       }
     }
@@ -37,7 +53,7 @@ export const AuthProvider = ({ children }) => {
   // --- Check for existing session on app load ---
   useEffect(() => {
     const storedUserString = localStorage.getItem('currentUser');
-    const storedToken = localStorage.getItem('authToken'); // If using JWTs
+    const storedToken = localStorage.getItem('token'); // If using JWTs
 
     if (storedUserString && storedToken) {
       try {

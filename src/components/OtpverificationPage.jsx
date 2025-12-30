@@ -3,6 +3,7 @@ import React, { useState, useRef, useEffect, useCallback } from 'react'; // Adde
 import { Link, useLocation, useNavigate } from 'react-router-dom';
 import formBgImage from './StartupPages/Login-bg.jpg';
 import axios from 'axios';
+import { toast } from 'react-hot-toast';
 
 function OtpVerificationPage() {
   const navigate = useNavigate();
@@ -110,7 +111,7 @@ function OtpVerificationPage() {
         navigate(`/reset-password/${response.data.resetToken}`, { state: { email: emailForOtp } });
       } else if (response.data.canResetPassword) {
         // If no token but can reset, maybe navigate to a generic reset page or prompt login
-        alert("OTP Verified! Please proceed to reset your password."); // Placeholder
+        toast.success("OTP Verified! Please proceed to reset your password."); // Placeholder
         navigate('/login'); // Or a dedicated reset password form page
       } else {
         // Handle cases where OTP is verified but not for password reset (e.g., 2FA login)

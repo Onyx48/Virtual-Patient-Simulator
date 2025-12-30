@@ -1,8 +1,23 @@
 import React, { useState } from "react";
-import { useNavigate, useParams } from "react-router-dom";
+import { useNavigate } from "react-router-dom";
 import { ChevronLeft, Bell, MessageSquare } from "lucide-react";
 
 // --- MOCK DATA (Matches your Screenshot) ---
+const MOCK_QUESTIONS = [
+  {
+    id: 1,
+    question: "What is the primary symptom described by the patient?",
+    options: ["Hand pain", "Stiffness", "Fatigue", "Nausea"],
+    correct: 0,
+  },
+  {
+    id: 2,
+    question: "Which diagnostic test would you recommend first?",
+    options: ["X-ray", "MRI", "Blood test", "Physical exam"],
+    correct: 3,
+  },
+];
+
 const MOCK_DETAILS = {
   id: "VS123456",
   name: "Pediatric Asthma Case",
@@ -23,8 +38,10 @@ const MOCK_DETAILS = {
 
 function StudentScenarioDetails({ onBack }) {
   const navigate = useNavigate();
-  const { id } = useParams();
   const [activeAttempt, setActiveAttempt] = useState(1);
+  const [isMockTestActive, setIsMockTestActive] = useState(false);
+  const [mockAnswers, setMockAnswers] = useState({});
+  const [mockScore, setMockScore] = useState(null);
 
   // Use mock data for UI visualization
   const data = MOCK_DETAILS;
@@ -51,10 +68,75 @@ function StudentScenarioDetails({ onBack }) {
            >
             <ChevronLeft className="w-4 h-4 mr-1" /> Go Back
           </button>
-          <button className="px-6 py-2.5 bg-[#F59E0B] hover:bg-amber-600 text-white text-sm font-bold rounded-lg shadow-md transition-colors">
-            Start Scenario
-          </button>
-        </div>
+           <button
+             onClick={() => setIsMockTestActive(true)}
+             className="px-6 py-2.5 bg-[#F59E0B] hover:bg-amber-600 text-white text-sm font-bold rounded-lg shadow-md transition-colors"
+           >
+             Start Mock Test
+           </button>
+         </div>
+
+        {/* Mock Test Section */}
+        {isMockTestActive && !mockScore && (
+          <div className="bg-white rounded-2xl p-8 shadow-[0_2px_10px_-3px_rgba(6,81,237,0.1)] border border-gray-100">
+            <div className="flex justify-between items-center mb-6">
+              <h3 className="text-lg font-bold text-gray-900">Mock Test</h3>
+              <button
+                onClick={() => setIsMockTestActive(false)}
+                className="text-gray-400 hover:text-gray-600"
+              >
+                ✕
+              </button>
+            </div>
+            <div className="space-y-6">
+              {MOCK_QUESTIONS.map((q) => (
+                <div key={q.id} className="border-b border-gray-100 pb-4">
+                  <p className="font-semibold text-gray-900 mb-3">{q.question}</p>
+                  <div className="space-y-2">
+                    {q.options.map((option, idx) => (
+                      <label key={idx} className="flex items-center">
+                        <input
+                          type="radio"
+                          name={`question-${q.id}`}
+                          value={idx}
+                          onChange={(e) => setMockAnswers({ ...mockAnswers, [q.id]: parseInt(e.target.value) })}
+                          className="mr-2"
+                        />
+                        <span className="text-sm text-gray-700">{option}</span>
+                      </label>
+                    ))}
+                  </div>
+                </div>
+              ))}
+              <button
+                onClick={() => {
+                  const correct = MOCK_QUESTIONS.reduce((acc, q) => acc + (mockAnswers[q.id] === q.correct ? 1 : 0), 0);
+                  setMockScore(Math.round((correct / MOCK_QUESTIONS.length) * 100));
+                }}
+                className="px-6 py-2 bg-[#F59E0B] text-white rounded-lg hover:bg-amber-600"
+              >
+                Submit Test
+              </button>
+            </div>
+          </div>
+        )}
+
+        {mockScore !== null && (
+          <div className="bg-white rounded-2xl p-8 shadow-[0_2px_10px_-3px_rgba(6,81,237,0.1)] border border-gray-100">
+            <h3 className="text-lg font-bold text-gray-900 mb-4">Mock Test Result</h3>
+            <p className="text-xl font-semibold text-[#F59E0B]">Score: {mockScore}%</p>
+            <button
+              onClick={() => {
+                setIsMockTestActive(false);
+                setMockScore(null);
+                setMockAnswers({});
+              }}
+              className="mt-4 px-4 py-2 bg-gray-200 text-gray-700 rounded-lg hover:bg-gray-300"
+            >
+              Close
+            </button>
+          </div>
+        )}
 
         {/* 1. Feedback / Description Card */}
         <div className="bg-white rounded-2xl p-8 shadow-[0_2px_10px_-3px_rgba(6,81,237,0.1)] border border-gray-100">

@@ -2,6 +2,7 @@
 import express from "express";
 import { body, validationResult } from "express-validator";
 import School from "../models/schoolModel.js"; // Adjust path
+import User from "../models/userModel.js";
 import { protect } from "../middleware/authMiddleware.js"; // Adjust path
 import { checkAccess } from "../middleware/roleAccessMiddleware.js";
 
@@ -70,17 +71,18 @@ router.get(
   protect,
   checkAccess('viewSchools'),
   async (req, res) => {
-    try {
-      let query = {};
-      // Implement filters if passed in query params (e.g., /api/schools?status=Active)
-      const {
-        status,
-        subscription,
-        permissions,
-        startDateAfter,
-        expireDateBefore,
-        searchTerm,
-      } = req.query;
+  try {
+    let query = {};
+    // Implement filters if passed in query params (e.g., /api/schools?status=Active)
+    const {
+      status,
+      subscription,
+      permissions,
+      startDateAfter,
+      expireDateBefore,
+      searchTerm,
+      availableForSchoolAdmin,
+    } = req.query;
 
       if (status) query.status = status;
       if (subscription) query.subscription = subscription;
@@ -102,6 +104,10 @@ router.get(
           { email: searchRegex },
           { description: searchRegex },
         ];
+      }
+
+      if (availableForSchoolAdmin === 'true') {
+        query['assignedAdmin.id'] = null;
       }
 
       const schools = await School.find(query).sort({ schoolName: 1 }); // Sort by name by default

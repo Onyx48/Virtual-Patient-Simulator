@@ -1,12 +1,13 @@
 import { createAsyncThunk, createSlice } from '@reduxjs/toolkit';
 import axios from 'axios';
+import { getAuthHeaders } from '../../lib/utils.js';
 
 // Async thunks for scenarios
 export const fetchScenarios = createAsyncThunk(
   'scenarios/fetchScenarios',
   async (_, { rejectWithValue }) => {
     try {
-      const response = await axios.get('/api/scenarios');
+      const response = await axios.get('/api/scenarios', getAuthHeaders());
       return response.data;
     } catch (error) {
       return rejectWithValue(error.response?.data || 'Failed to fetch scenarios');
@@ -18,7 +19,7 @@ export const addScenario = createAsyncThunk(
   'scenarios/addScenario',
   async (scenarioData, { rejectWithValue }) => {
     try {
-      const response = await axios.post('/api/scenarios', scenarioData);
+      const response = await axios.post('/api/scenarios', scenarioData, getAuthHeaders());
       return response.data;
     } catch (error) {
       return rejectWithValue(error.response?.data || 'Failed to add scenario');
@@ -30,7 +31,7 @@ export const updateScenario = createAsyncThunk(
   'scenarios/updateScenario',
   async ({ id, updates }, { rejectWithValue }) => {
     try {
-      const response = await axios.put(`/api/scenarios/${id}`, updates);
+      const response = await axios.put(`/api/scenarios/${id}`, updates, getAuthHeaders());
       return response.data;
     } catch (error) {
       return rejectWithValue(error.response?.data || 'Failed to update scenario');
@@ -42,7 +43,7 @@ export const deleteScenario = createAsyncThunk(
   'scenarios/deleteScenario',
   async (id, { rejectWithValue }) => {
     try {
-      await axios.delete(`/api/scenarios/${id}`);
+      await axios.delete(`/api/scenarios/${id}`, getAuthHeaders());
       return id;
     } catch (error) {
       return rejectWithValue(error.response?.data || 'Failed to delete scenario');

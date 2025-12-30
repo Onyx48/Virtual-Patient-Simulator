@@ -9,6 +9,11 @@ const scenarioSchema = new mongoose.Schema(
       ref: "User",
       required: true,
     },
+    schoolId: {
+      type: mongoose.Schema.Types.ObjectId,
+      ref: "School",
+      required: true,
+    },
     status: {
       type: String,
       enum: ["Draft", "Published", "Archived"],

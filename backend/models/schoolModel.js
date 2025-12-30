@@ -53,9 +53,12 @@ const schoolSchema = new mongoose.Schema({
     type: String, // Keeping as string to match your JSON "10h"
     default: '0h'
   },
-  // You might want to link schools to specific admins/users later
-  // createdBy: { type: mongoose.Schema.Types.ObjectId, ref: 'User' },
-  // assignedEducators: [{ type: mongoose.Schema.Types.ObjectId, ref: 'User' }]
+  // Link school to assigned admin (embedded for MongoDB visibility)
+  assignedAdmin: {
+    id: { type: mongoose.Schema.Types.ObjectId, ref: 'User', default: null },
+    name: { type: String, default: '' },
+    email: { type: String, default: '' },
+  },
 }, {
   timestamps: true, // Adds createdAt and updatedAt
   collection: 'schools' // Mongoose will pluralize anyway, but explicit

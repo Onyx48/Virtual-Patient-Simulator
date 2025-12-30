@@ -24,20 +24,28 @@ const SchoolCard = ({ school }) => {
       {/* Divider */}
       <div className="w-full h-px bg-gray-100 mb-4"></div>
 
-      <div className="grid grid-cols-3 gap-2 divide-x divide-gray-200">
-        <div className="pr-2">
-          <StatItem label="Students" value={school.students || 0} />
-        </div>
-        <div className="px-2">
-          <StatItem label="Educators" value={school.educators || 0} />
-        </div>
-        <div className="pl-2">
-          <StatItem
-            label="Active Scenarios"
-            value={school.activeScenarios || 0}
-          />
-        </div>
-      </div>
+       <div className="grid grid-cols-3 gap-2 divide-x divide-gray-200 mb-4">
+         <div className="pr-2">
+           <StatItem label="Students" value={school.students || 0} />
+         </div>
+         <div className="px-2">
+           <StatItem label="Educators" value={school.educators || 0} />
+         </div>
+         <div className="pl-2">
+           <StatItem
+             label="Active Scenarios"
+             value={school.activeScenarios || 0}
+           />
+         </div>
+       </div>
+
+       {/* Assigned Admin */}
+       <div className="pt-2 border-t border-gray-100">
+         <p className="text-xs text-gray-500 mb-1">Assigned Admin</p>
+         <p className="text-sm font-medium text-gray-900">
+           {school.assignedAdmin?.id ? school.assignedAdmin.name : "Unassigned"}
+         </p>
+       </div>
     </div>
   );
 };

@@ -1,6 +1,7 @@
 import React, { useState, useMemo, useEffect } from "react";
 import { useAuth } from "../../AuthContext";
 import axios from "axios";
+import { getAuthHeaders } from "../../lib/utils.js";
 import {
   ResponsiveContainer,
   PieChart,
@@ -83,7 +84,7 @@ function StudentDashboard() {
   useEffect(() => {
     const fetchScenarios = async () => {
       try {
-        const response = await axios.get("/api/scenarios");
+        const response = await axios.get("/api/scenarios", getAuthHeaders());
         const allScenarios = response.data;
         // Filter scenarios assigned to the current user
         const assignedScenarios = allScenarios.filter(

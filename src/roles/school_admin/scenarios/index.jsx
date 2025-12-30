@@ -1,23 +1,16 @@
 import React, { useState, useMemo, useEffect } from "react";
 import { useSelector, useDispatch } from "react-redux";
-import { useNavigate } from "react-router-dom";
-import { useAuth } from "../../../AuthContext";
 
 // Import Shared Components
 import ScenarioManagementControls from "../../educator/scenarios/ScenarioManagementControls.jsx";
 import ScenarioTable from "../../educator/scenarios/ScenarioTable.jsx";
-// Import Assign Modal (Ensure this path matches your project structure)
-import AssignScenariosModal from "../../../components/shared/AssignScenariosModal.jsx";
 
 import {
   fetchScenarios,
-  setSelectedScenario,
 } from "../../../redux/slices/scenarioSlice.js";
 
 function SchoolAdminScenariosPage() {
   const dispatch = useDispatch();
-  const navigate = useNavigate();
-  const { user } = useAuth();
 
   // Get scenarios from Redux Store
   const { scenarios, loading, error } = useSelector((state) => state.scenarios);
@@ -28,8 +21,7 @@ function SchoolAdminScenariosPage() {
     key: "createdAt",
     direction: "desc",
   });
-  const [filterCriteria, setFilterCriteria] = useState({});
-  const [isAssignModalOpen, setIsAssignModalOpen] = useState(false);
+   const [filterCriteria, setFilterCriteria] = useState({});
 
   // Fetch Data on Component Mount
   useEffect(() => {
@@ -110,19 +102,6 @@ function SchoolAdminScenariosPage() {
     setSortConfig({ key, direction });
   };
 
-  const handleAddNewClick = () => {
-    navigate("/scenarios/add");
-  };
-
-  const handleEditClick = (scenario) => {
-    dispatch(setSelectedScenario(scenario));
-    navigate(`/scenarios/edit/${scenario._id || scenario.id}`);
-  };
-
-  const handleAssignClick = () => {
-    setIsAssignModalOpen(true);
-  };
-
   // Simple filter application (you can expand this to a modal if needed)
   const handleApplyFilters = (filters) => {
     setFilterCriteria((prev) => ({ ...prev, ...filters }));
@@ -150,8 +129,6 @@ function SchoolAdminScenariosPage() {
       <ScenarioManagementControls
         searchTerm={searchTerm}
         onSearchChange={setSearchTerm}
-        onAddNewClick={handleAddNewClick}
-        onAssignScenariosClick={handleAssignClick} // School Admin Feature
         initialFilters={filterCriteria}
         onApplyFilters={handleApplyFilters}
       />
@@ -159,19 +136,13 @@ function SchoolAdminScenariosPage() {
       {/* Renders the Table View for School Admins */}
       <ScenarioTable
         data={filteredAndSortedScenarios}
-        onEditClick={handleEditClick}
+        canEdit={false}
         variant="table"
         onSort={handleSort}
         sortConfig={sortConfig}
       />
 
-      {/* Assign Modal */}
-      {isAssignModalOpen && (
-        <AssignScenariosModal
-          onClose={() => setIsAssignModalOpen(false)}
-          onAssignSuccess={() => dispatch(fetchScenarios())}
-        />
-      )}
+
     </div>
   );
 }

@@ -13,6 +13,7 @@ import {
 // Import Modals (Ensure these exist in src/components/)
 import StudentModal from "../StudentModal";
 import AssignScenariosModal from "./AssignScenariosModal";
+import { toast } from 'react-hot-toast';
 
 // Helper for Auth Headers
 const getAuthHeaders = () => {
@@ -117,7 +118,7 @@ function StudentPage({ role }) {
       await fetchStudents(); // Refresh table
       setIsStudentModalOpen(false);
     } catch (error) {
-      alert(
+      toast.error(
         "Error saving student: " +
           (error.response?.data?.message || error.message)
       );
@@ -172,21 +173,25 @@ function StudentPage({ role }) {
           </button>
         </div>
 
-        <div className="flex gap-3">
-          <button
-            onClick={() => setIsAssignModalOpen(true)}
-            className="px-5 py-2.5 bg-gray-100 hover:bg-gray-200 text-gray-800 text-sm font-semibold rounded-lg transition-colors"
-          >
-            Assign Scenarios
-          </button>
-          <button
-            onClick={handleAddNew}
-            className="flex items-center gap-2 px-5 py-2.5 bg-black hover:bg-gray-800 text-white text-sm font-bold rounded-lg transition-colors shadow-sm"
-          >
-            <PlusIcon className="h-5 w-5" />
-            New Student
-          </button>
-        </div>
+         <div className="flex gap-3">
+           {role !== "school_admin" && (
+             <>
+               <button
+                 onClick={() => setIsAssignModalOpen(true)}
+                 className="px-5 py-2.5 bg-gray-100 hover:bg-gray-200 text-gray-800 text-sm font-semibold rounded-lg transition-colors"
+               >
+                 Assign Scenarios
+               </button>
+               <button
+                 onClick={handleAddNew}
+                 className="flex items-center gap-2 px-5 py-2.5 bg-black hover:bg-gray-800 text-white text-sm font-bold rounded-lg transition-colors shadow-sm"
+               >
+                 <PlusIcon className="h-5 w-5" />
+                 New Student
+               </button>
+             </>
+           )}
+         </div>
       </div>
 
       {/* Table */}
@@ -262,21 +267,23 @@ function StudentPage({ role }) {
                       View
                     </button>
                   </td>
-                  <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500">
-                    <div className="flex items-center gap-4">
-                      <button
-                        onClick={() => handleEdit(student)}
-                        className="flex items-center gap-1.5 text-gray-500 hover:text-gray-900 transition-colors"
-                      >
-                        <PencilSquareIcon className="w-4 h-4" />
-                        Edit
-                      </button>
-                      <button className="flex items-center gap-1.5 text-gray-500 hover:text-gray-900 transition-colors">
-                        <UserCircleIcon className="w-4 h-4" />
-                        Profile
-                      </button>
-                    </div>
-                  </td>
+                   <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500">
+                     <div className="flex items-center gap-4">
+                       {role !== "school_admin" && (
+                         <button
+                           onClick={() => handleEdit(student)}
+                           className="flex items-center gap-1.5 text-gray-500 hover:text-gray-900 transition-colors"
+                         >
+                           <PencilSquareIcon className="w-4 h-4" />
+                           Edit
+                         </button>
+                       )}
+                       <button className="flex items-center gap-1.5 text-gray-500 hover:text-gray-900 transition-colors">
+                         <UserCircleIcon className="w-4 h-4" />
+                         Profile
+                       </button>
+                     </div>
+                   </td>
                 </tr>
               ))
             )}
@@ -340,7 +347,7 @@ function StudentPage({ role }) {
       </div>
 
       {/* Modals */}
-      {isStudentModalOpen && (
+      {isStudentModalOpen && role !== "school_admin" && (
         <div className="fixed inset-0 z-50 bg-black/40 backdrop-blur-sm flex justify-center items-center p-4">
           <StudentModal
             studentData={editingStudent}
@@ -350,7 +357,7 @@ function StudentPage({ role }) {
         </div>
       )}
 
-      {isAssignModalOpen && (
+      {isAssignModalOpen && role !== "school_admin" && (
         <AssignScenariosModal
           onClose={() => setIsAssignModalOpen(false)}
           onAssignSuccess={() => {
