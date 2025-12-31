@@ -25,7 +25,7 @@ axios.interceptors.response.use(
 );
 
 export const AuthProvider = ({ children }) => {
-  const [user, setUser] = useState(null); // Stores user object { _id, name, email, role } or null
+  const [user, setUser] = useState(null); // Stores user object { _id, name, email, role, phoneNumber, profilePicture } or null
   const [loading, setLoading] = useState(true); // Initial loading state to check for existing session
 
   // --- Function to set user and persist to localStorage ---
@@ -134,6 +134,15 @@ export const AuthProvider = ({ children }) => {
     }
   };
 
+  // --- Update Profile Function ---
+  const updateProfile = (updates) => {
+    if (user) {
+      const updatedUser = { ...user, ...updates };
+      setUser(updatedUser);
+      localStorage.setItem('currentUser', JSON.stringify(updatedUser));
+    }
+  };
+
   // --- Logout Function ---
   const logout = () => {
     console.log("Logging out user...");
@@ -148,6 +157,7 @@ export const AuthProvider = ({ children }) => {
     login,
     signup, // Public student signup
     createUserByAuthorized, // For admin/teacher to create users
+    updateProfile,
     logout,
     // You can add more functions here later, e.g., fetchUserProfile, updateUser, etc.
   };

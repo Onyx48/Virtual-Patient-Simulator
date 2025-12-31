@@ -2,6 +2,7 @@ import React, { useState, useEffect } from "react";
 import { useForm } from "react-hook-form";
 import { useAuth } from "@/AuthContext.jsx";
 import { toast } from 'react-hot-toast';
+import axios from 'axios';
 
 const initialUserData = {
   profilePictureUrl: "https://via.placeholder.com/150/FF5733/FFFFFF?text=JD",
@@ -101,18 +102,25 @@ const ToggleSwitch = ({ enabled, onToggle, disabled }) => (
 );
 
 function SettingsPage() {
-  const { user } = useAuth();
+  const { user, updateProfile } = useAuth();
   const [userData, setUserData] = useState(initialUserData);
+  const [showChangeEmailModal, setShowChangeEmailModal] = useState(false);
+  const [uploading, setUploading] = useState(false);
+  const [passwordData, setPasswordData] = useState({
+    currentPassword: '',
+    newPassword: '',
+    confirmPassword: '',
+  });
+  const [emailData, setEmailData] = useState({
+    newEmail: '',
+    password: '',
+  });
 
   // Role-based permissions
   const isSuperadmin = user?.role === 'superadmin';
-  const isEducatorOrSchoolAdmin = user?.role === 'educator' || user?.role === 'school_admin';
-  const isStudent = user?.role === 'student';
 
-  // Can edit personal info
-  const canEditPersonalInfo = !isStudent;
-  // Can edit security (password, two-factor)
-  const canEditSecurity = isSuperadmin || isEducatorOrSchoolAdmin;
+  // All roles can edit personal info
+  const canEditPersonalInfo = true;
   // Can edit two-factor
   const canEditTwoFactor = isSuperadmin;
 
@@ -135,7 +143,7 @@ function SettingsPage() {
   useEffect(() => {
     if (user) {
       setUserData({
-        profilePictureUrl: user.profilePictureUrl || initialUserData.profilePictureUrl,
+        profilePictureUrl: user.profilePicture ? `http://localhost:5001${user.profilePicture}` : initialUserData.profilePictureUrl,
         fullName: user.name || initialUserData.fullName,
         email: user.email || initialUserData.email,
         phoneNumber: user.phoneNumber || initialUserData.phoneNumber,
@@ -148,32 +156,114 @@ function SettingsPage() {
     }
   }, [user, setValue]);
 
-  const onSubmit = (data) => {
-    console.log("Form submitted:", data);
-    // TODO: API call to save settings
-    toast.success("Settings saved (API integration pending)");
+  const onSubmit = async (data) => {
+    try {
+      const response = await axios.put('/api/auth/profile', {
+        name: data.fullName,
+        phoneNumber: data.phoneNumber,
+      });
+      updateProfile({
+        name: response.data.name,
+        phoneNumber: response.data.phoneNumber,
+      });
+      toast.success("Profile updated successfully");
+    } catch (error) {
+      console.error("Profile update error:", error);
+      toast.error(error.response?.data?.message || "Failed to update profile");
+    }
   };
 
-  const handleProfilePictureChange = (e) => {
+  const handleProfilePictureChange = async (e) => {
     const file = e.target.files[0];
     if (file) {
+      // Validate file type and size
+      const allowedTypes = ['image/jpeg', 'image/jpg', 'image/png', 'image/gif'];
+      if (!allowedTypes.includes(file.type)) {
+        toast.error("Only JPG, PNG, and GIF files are allowed");
+        return;
+      }
+      if (file.size > 2 * 1024 * 1024) { // 2MB
+        toast.error("File size must be less than 2MB");
+        return;
+      }
+
+      // Preview
       const reader = new FileReader();
       reader.onloadend = () => {
         setUserData({ ...userData, profilePictureUrl: reader.result });
       };
       reader.readAsDataURL(file);
+
+      // Upload
+      setUploading(true);
+      try {
+        const formData = new FormData();
+        formData.append('profilePicture', file);
+        const response = await axios.post('/api/auth/upload-profile-picture', formData, {
+          headers: {
+            'Content-Type': 'multipart/form-data',
+          },
+        });
+        updateProfile({ profilePicture: response.data.profilePicture });
+        toast.success("Profile picture updated successfully");
+      } catch (error) {
+        console.error("Upload error:", error);
+        toast.error(error.response?.data?.message || "Failed to upload profile picture");
+        // Reset to original
+        setUserData({ ...userData, profilePictureUrl: user?.profilePicture ? `http://localhost:5001${user.profilePicture}` : initialUserData.profilePictureUrl });
+      } finally {
+        setUploading(false);
+      }
     }
   };
 
-  const handleRemoveProfilePicture = () => {
-    setUserData({ ...userData, profilePictureUrl: initialUserData.profilePictureUrl });
+  const handleRemoveProfilePicture = async () => {
+    try {
+      await axios.delete('/api/auth/profile-picture');
+      updateProfile({ profilePicture: null });
+      setUserData({ ...userData, profilePictureUrl: initialUserData.profilePictureUrl });
+      toast.success("Profile picture removed successfully");
+    } catch (error) {
+      console.error("Remove error:", error);
+      toast.error(error.response?.data?.message || "Failed to remove profile picture");
+    }
+  };
+
+  const handlePasswordSubmit = async () => {
+    if (passwordData.newPassword !== passwordData.confirmPassword) {
+      toast.error("New passwords do not match");
+      return;
+    }
+    try {
+      await axios.put('/api/auth/change-password', passwordData);
+      setPasswordData({ currentPassword: '', newPassword: '', confirmPassword: '' });
+      toast.success("Password updated successfully");
+    } catch (error) {
+      console.error("Password change error:", error);
+      toast.error(error.response?.data?.message || "Failed to update password");
+    }
+  };
+
+  const handleEmailSubmit = async (e) => {
+    e.preventDefault();
+    try {
+      const response = await axios.put('/api/auth/change-email', emailData);
+      updateProfile({ email: response.data.email });
+      setEmailData({ newEmail: '', password: '' });
+      setShowChangeEmailModal(false);
+      toast.success("Email updated successfully");
+    } catch (error) {
+      console.error("Email change error:", error);
+      toast.error(error.response?.data?.message || "Failed to update email");
+    }
   };
 
   return (
-    <div className="max-w-4xl mx-auto p-6 bg-white rounded-lg shadow-md">
-      <h1 className="text-2xl font-bold text-gray-900 mb-6">Settings</h1>
+    <div>
+      <div className="max-w-4xl mx-auto p-6 bg-white rounded-lg shadow-md">
+        <h1 className="text-2xl font-bold text-gray-900 mb-6">Settings</h1>
 
-      <form onSubmit={handleSubmit(onSubmit)} className="space-y-8">
+        <form onSubmit={handleSubmit(onSubmit)} className="space-y-8">
         {/* Profile Picture Section */}
         <div className="flex items-center space-x-6">
           <img
@@ -194,17 +284,17 @@ function SettingsPage() {
               <label
                 htmlFor="profile-pic"
                 className={`px-4 py-2 text-sm font-medium text-white bg-blue-600 rounded-md cursor-pointer ${
-                  !canEditPersonalInfo ? "opacity-50 cursor-not-allowed" : "hover:bg-blue-700"
+                  uploading || !canEditPersonalInfo ? "opacity-50 cursor-not-allowed" : "hover:bg-blue-700"
                 }`}
               >
-                Change Picture
+                {uploading ? "Uploading..." : "Change Picture"}
               </label>
               <button
                 type="button"
                 onClick={handleRemoveProfilePicture}
-                disabled={!canEditPersonalInfo}
+                disabled={uploading || !canEditPersonalInfo}
                 className={`px-4 py-2 text-sm font-medium text-gray-700 bg-gray-200 rounded-md ${
-                  !canEditPersonalInfo ? "opacity-50 cursor-not-allowed" : "hover:bg-gray-300"
+                  uploading || !canEditPersonalInfo ? "opacity-50 cursor-not-allowed" : "hover:bg-gray-300"
                 }`}
               >
                 Remove
@@ -243,12 +333,21 @@ function SettingsPage() {
               <label className="block text-sm font-medium text-gray-700 mb-1">
                 Email Address
               </label>
-              <input
-                {...register("email", { required: "Email is required" })}
-                type="email"
-                disabled={true} // Email always read-only
-                className="w-full px-3 py-2 border border-gray-300 rounded-md bg-gray-100 cursor-not-allowed"
-              />
+              <div className="flex items-center">
+                <input
+                  {...register("email", { required: "Email is required" })}
+                  type="email"
+                  disabled={true} // Email always read-only
+                  className="flex-1 px-3 py-2 border border-gray-300 rounded-md bg-gray-100 cursor-not-allowed"
+                />
+                <button
+                  type="button"
+                  onClick={() => setShowChangeEmailModal(true)}
+                  className="ml-2 px-4 py-2 text-sm font-medium text-blue-600 bg-blue-50 rounded-md hover:bg-blue-100"
+                >
+                  Change Email
+                </button>
+              </div>
               {errors.email && (
                 <p className="text-sm text-red-600 mt-1">{errors.email.message}</p>
               )}
@@ -271,63 +370,6 @@ function SettingsPage() {
             </div>
           </div>
         </div>
-
-        {/* Security Section */}
-        {canEditSecurity && (
-          <div>
-            <h2 className="text-lg font-semibold text-gray-900 mb-4">Security</h2>
-            <div className="space-y-4">
-              <div>
-                <label className="block text-sm font-medium text-gray-700 mb-1">
-                  Current Password
-                </label>
-                <div className="relative">
-                  <input
-                    type={showCurrentPassword ? "text" : "password"}
-                    className="w-full px-3 py-2 pr-10 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500"
-                    placeholder="Enter current password"
-                  />
-                  <EyeIcon
-                    isVisible={showCurrentPassword}
-                    onClick={() => setShowCurrentPassword(!showCurrentPassword)}
-                  />
-                </div>
-              </div>
-              <div>
-                <label className="block text-sm font-medium text-gray-700 mb-1">
-                  New Password
-                </label>
-                <div className="relative">
-                  <input
-                    type={showNewPassword ? "text" : "password"}
-                    className="w-full px-3 py-2 pr-10 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500"
-                    placeholder="Enter new password"
-                  />
-                  <EyeIcon
-                    isVisible={showNewPassword}
-                    onClick={() => setShowNewPassword(!showNewPassword)}
-                  />
-                </div>
-              </div>
-              <div>
-                <label className="block text-sm font-medium text-gray-700 mb-1">
-                  Confirm New Password
-                </label>
-                <div className="relative">
-                  <input
-                    type={showConfirmPassword ? "text" : "password"}
-                    className="w-full px-3 py-2 pr-10 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500"
-                    placeholder="Confirm new password"
-                  />
-                  <EyeIcon
-                    isVisible={showConfirmPassword}
-                    onClick={() => setShowConfirmPassword(!showConfirmPassword)}
-                  />
-                </div>
-              </div>
-            </div>
-          </div>
-        )}
 
         {/* Two-Factor Authentication */}
         {canEditTwoFactor && (
@@ -362,6 +404,126 @@ function SettingsPage() {
           </button>
         </div>
       </form>
+    </div>
+
+    <React.Fragment>
+    {/* Change Password Section */}
+    <div className="max-w-4xl mx-auto mt-6 p-6 bg-white rounded-lg shadow-md">
+      <h2 className="text-lg font-semibold text-gray-900 mb-4">Change Password</h2>
+      <div className="space-y-4">
+        <div>
+          <label className="block text-sm font-medium text-gray-700 mb-1">
+            Current Password
+          </label>
+          <div className="relative">
+            <input
+              type={showCurrentPassword ? "text" : "password"}
+              value={passwordData.currentPassword}
+              onChange={(e) => setPasswordData({ ...passwordData, currentPassword: e.target.value })}
+              className="w-full px-3 py-2 pr-10 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500"
+              placeholder="Enter current password"
+            />
+            <EyeIcon
+              isVisible={showCurrentPassword}
+              onClick={() => setShowCurrentPassword(!showCurrentPassword)}
+            />
+          </div>
+        </div>
+        <div>
+          <label className="block text-sm font-medium text-gray-700 mb-1">
+            New Password
+          </label>
+          <div className="relative">
+            <input
+              type={showNewPassword ? "text" : "password"}
+              value={passwordData.newPassword}
+              onChange={(e) => setPasswordData({ ...passwordData, newPassword: e.target.value })}
+              className="w-full px-3 py-2 pr-10 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500"
+              placeholder="Enter new password"
+            />
+            <EyeIcon
+              isVisible={showNewPassword}
+              onClick={() => setShowNewPassword(!showNewPassword)}
+            />
+          </div>
+        </div>
+        <div>
+          <label className="block text-sm font-medium text-gray-700 mb-1">
+            Confirm New Password
+          </label>
+          <div className="relative">
+            <input
+              type={showConfirmPassword ? "text" : "password"}
+              value={passwordData.confirmPassword}
+              onChange={(e) => setPasswordData({ ...passwordData, confirmPassword: e.target.value })}
+              className="w-full px-3 py-2 pr-10 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500"
+              placeholder="Confirm new password"
+            />
+            <EyeIcon
+              isVisible={showConfirmPassword}
+              onClick={() => setShowConfirmPassword(!showConfirmPassword)}
+            />
+          </div>
+        </div>
+        <button
+          onClick={handlePasswordSubmit}
+          disabled={uploading}
+          className="px-4 py-2 text-white bg-blue-600 rounded-md hover:bg-blue-700 disabled:bg-gray-400"
+        >
+          Update Password
+        </button>
+      </div>
+    </div>
+
+    {/* Change Email Modal */}
+    <div className={`fixed inset-0 bg-gray-600 bg-opacity-50 flex items-center justify-center z-50 ${showChangeEmailModal ? '' : 'hidden'}`}>
+        <div className="bg-white p-6 rounded-lg shadow-lg w-full max-w-md">
+          <h3 className="text-lg font-semibold mb-4">Change Email</h3>
+          <form onSubmit={handleEmailSubmit} className="space-y-4">
+            <div>
+              <label className="block text-sm font-medium text-gray-700 mb-1">
+                New Email
+              </label>
+              <input
+                type="email"
+                value={emailData.newEmail}
+                onChange={(e) => setEmailData({ ...emailData, newEmail: e.target.value })}
+                className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500"
+                required
+              />
+            </div>
+            <div>
+              <label className="block text-sm font-medium text-gray-700 mb-1">
+                Password
+              </label>
+              <input
+                type="password"
+                value={emailData.password}
+                onChange={(e) => setEmailData({ ...emailData, password: e.target.value })}
+                className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500"
+                required
+              />
+            </div>
+            <div className="flex justify-end space-x-2">
+              <button
+                type="button"
+                onClick={() => setShowChangeEmailModal(false)}
+                className="px-4 py-2 text-gray-600 bg-gray-200 rounded-md hover:bg-gray-300"
+              >
+                Cancel
+              </button>
+              <button
+                type="submit"
+                className="px-4 py-2 text-white bg-blue-600 rounded-md hover:bg-blue-700"
+              >
+                Update Email
+              </button>
+            </div>
+          </form>
+        </div>
+      </div>
+
+    </React.Fragment>
     </div>
   );
 }

@@ -54,6 +54,16 @@ const userSchema = new mongoose.Schema(
       },
       // default: "Science", <--- REMOVED THIS LINE so students don't get a default department
     },
+    phoneNumber: {
+      type: String,
+      trim: true,
+      required: false,
+    },
+    profilePicture: {
+      type: String,
+      trim: true,
+      required: false,
+    },
   },
   {
     timestamps: true,

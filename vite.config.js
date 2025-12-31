@@ -1,9 +1,6 @@
 import { defineConfig } from "vite";
 import react from "@vitejs/plugin-react";
-
-// *** CHANGE THIS IMPORT LINE ***
-// import path from 'path'; // <-- Original line
-import { resolve } from "node:path"; // <-- New line: Import 'resolve' directly from 'node:path'
+import { resolve } from "node:path";
 
 // https://vitejs.dev/config/
 export default defineConfig({
@@ -11,20 +8,20 @@ export default defineConfig({
   server: {
     port: 5173,
     proxy: {
-      // string shorthand: /api -> http://localhost:5001/api
       "/api": {
-        target: "http://localhost:5001", // Your backend server
+        target: "http://localhost:5001",
         changeOrigin: true,
-        // secure: false, // If your backend is not https
-        // rewrite: (path) => path.replace(/^\/api/, '') // Uncomment if your backend routes don't start with /api
       },
     },
   },
   resolve: {
     alias: {
-      // *** CHANGE THIS LINE ***
-      // "@": path.resolve(__dirname, "./src"), // <-- Original usage
-      "@": resolve(__dirname, "./src"), // <-- New usage: Use the imported 'resolve' function directly
+      "@": resolve(__dirname, "./src"),
     },
+  },
+  // Add this to fix the Recharts dependency issue
+  optimizeDeps: {
+    include: ["recharts"],
+    force: false, // Set to true temporarily if issues persist
   },
 });

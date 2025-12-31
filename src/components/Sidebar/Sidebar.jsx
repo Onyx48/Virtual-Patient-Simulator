@@ -79,17 +79,13 @@ function Sidebar() {
 
   return (
     <aside className="fixed top-0 left-0 h-screen w-64 bg-[#0F0F0F] text-gray-400 flex flex-col transition-all duration-300 z-50 font-sans">
-      {/* Logo Area */}
-      <div className="h-16 flex items-center px-6 border-b border-gray-800">
-        <div className="flex items-center gap-2">
-          <div className="h-8 w-8 bg-orange-600 rounded flex items-center justify-center text-white font-bold">
-            SIT
-          </div>
-          <span className="text-white text-lg font-bold tracking-wide">
-            ADMIN
-          </span>
-        </div>
-      </div>
+       {/* Logo Area */}
+       <div className="h-16 flex items-center px-6 border-b border-gray-800">
+         <div className="flex items-center gap-2">
+           <div className="h-8 w-8 bg-orange-600 rounded flex items-center justify-center">
+           </div>
+         </div>
+       </div>
 
       {/* Main Menu */}
       <div className="flex-1 overflow-y-auto py-6 px-3 space-y-1 custom-scrollbar">

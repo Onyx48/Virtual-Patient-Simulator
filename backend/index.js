@@ -27,6 +27,9 @@ app.use(
 app.use(express.json());
 app.use(express.urlencoded({ extended: true }));
 
+// Serve static files for uploads
+app.use('/uploads', express.static('uploads'));
+
 // --- FIX: MOUNT ALL ROUTES ---
 app.use("/api/auth", authRoutes);
 app.use("/api/users", userRoutes); // <--- ADDED

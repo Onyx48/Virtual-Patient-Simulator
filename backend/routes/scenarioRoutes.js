@@ -13,9 +13,9 @@ const router = express.Router();
 const scenarioValidationRules = [
   body("scenarioName", "Scenario Name is required").notEmpty().trim(),
   body("description").optional().trim(),
-  body("status", "Invalid Status")
-    .optional()
-    .isIn(["Draft", "Published", "Archived"]),
+   body("status", "Invalid Status")
+     .optional()
+     .isIn(["Draft", "Published", "Archived", "success"]),
   body("permissions").optional().isIn(["Read Only", "Write Only", "Both"]),
 ];
 
@@ -131,6 +131,9 @@ router.post(
       apiKey,
     } = req.body;
 
+    console.log("POST /scenarios - Received body:", req.body);
+    console.log("User schoolId:", req.user.schoolId);
+
     // 2. Resolve assignedTo emails to user IDs
     let assignedUserIds = [];
     if (assignedTo && Array.isArray(assignedTo) && assignedTo.length > 0) {
@@ -146,15 +149,18 @@ router.post(
       // 3. ID Validation Logic (The Fix for 400 Bad Request)
       let customId = null;
       if (_id) {
+        console.log("Checking _id from AI:", _id);
         if (mongoose.Types.ObjectId.isValid(_id)) {
           // It is a valid Mongo ID, check for duplicates
           const existingScenario = await Scenario.findById(_id);
           if (existingScenario) {
+            console.log("Duplicate _id found:", _id);
             return res.status(400).json({
               message: "A scenario with this ID already exists.",
             });
           }
           customId = _id;
+          console.log("Using custom _id:", _id);
         } else {
           // It is NOT a valid Mongo ID. Log it and ignore it.
           // This allows Mongo to generate a fresh, valid ID automatically.
@@ -209,7 +215,9 @@ router.post(
       });
     } catch (err) {
       console.error("Create Scenario Error:", err);
+      console.log("Error details:", err);
       if (err.code === 11000) {
+        console.log("Duplicate key error:", err.keyValue);
         return res.status(400).json({
           message: "Duplicate scenario ID or Name detected.",
         });

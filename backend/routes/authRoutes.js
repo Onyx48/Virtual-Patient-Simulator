@@ -7,8 +7,40 @@ import { sendOTPEmail } from "../utils/emailService.js";
 import redisClient from "../utils/redisClient.js";
 import bcrypt from "bcryptjs";
 import jwt from "jsonwebtoken";
+import multer from "multer";
+import path from "path";
+import { protect } from "../middleware/authMiddleware.js";
 
 const router = express.Router();
+
+// Multer config for profile pictures
+const storage = multer.diskStorage({
+  destination: (req, file, cb) => {
+    cb(null, 'uploads/');
+  },
+  filename: (req, file, cb) => {
+    const uniqueSuffix = Date.now() + '-' + Math.round(Math.random() * 1E9);
+    cb(null, file.fieldname + '-' + uniqueSuffix + path.extname(file.originalname));
+  }
+});
+
+const fileFilter = (req, file, cb) => {
+  const allowedTypes = /jpeg|jpg|png|gif/;
+  const extname = allowedTypes.test(path.extname(file.originalname).toLowerCase());
+  const mimetype = allowedTypes.test(file.mimetype);
+
+  if (mimetype && extname) {
+    return cb(null, true);
+  } else {
+    cb(new Error('Only image files are allowed!'));
+  }
+};
+
+const upload = multer({
+  storage: storage,
+  limits: { fileSize: 2 * 1024 * 1024 }, // 2MB limit
+  fileFilter: fileFilter
+});
 
 const OTP_EXPIRY = parseInt(process.env.OTP_EXPIRY_SECONDS || "300", 10);
 const MAX_LOGIN_FAIL_ATTEMPTS = parseInt(
@@ -228,6 +260,8 @@ router.post(
         email: user.email,
         role: user.role,
         schoolId: user.schoolId,
+        phoneNumber: user.phoneNumber,
+        profilePicture: user.profilePicture,
         token: token,
       });
     } catch (err) {
@@ -310,5 +344,211 @@ router.post(
     }
   }
 );
+
+// @desc    Update user profile (name, phone)
+// @route   PUT /api/auth/profile
+// @access  Private
+router.put(
+  "/profile",
+  protect,
+  [
+    body("name", "Name is required").optional().notEmpty().trim(),
+    body("phoneNumber").optional().trim(),
+  ],
+  async (req, res) => {
+    const errors = validationResult(req);
+    if (!errors.isEmpty()) {
+      return res.status(400).json({ errors: errors.array() });
+    }
+
+    const { name, phoneNumber } = req.body;
+    const userId = req.user.id;
+
+    try {
+      const user = await User.findById(userId);
+      if (!user) {
+        return res.status(404).json({ message: "User not found" });
+      }
+
+      if (name !== undefined) user.name = name;
+      if (phoneNumber !== undefined) user.phoneNumber = phoneNumber;
+
+      await user.save();
+
+      res.json({
+        _id: user._id,
+        name: user.name,
+        email: user.email,
+        role: user.role,
+        phoneNumber: user.phoneNumber,
+        profilePicture: user.profilePicture,
+      });
+    } catch (error) {
+      console.error("Profile update error:", error);
+      res.status(500).json({ message: "Server Error" });
+    }
+  }
+);
+
+// @desc    Change user email
+// @route   PUT /api/auth/change-email
+// @access  Private
+router.put(
+  "/change-email",
+  protect,
+  [
+    body("newEmail", "Valid email is required").isEmail().normalizeEmail(),
+    body("password", "Password is required").exists(),
+  ],
+  async (req, res) => {
+    const errors = validationResult(req);
+    if (!errors.isEmpty()) {
+      return res.status(400).json({ errors: errors.array() });
+    }
+
+    const { newEmail, password } = req.body;
+    const userId = req.user.id;
+    const lowerNewEmail = newEmail.toLowerCase();
+
+    try {
+      const user = await User.findById(userId).select("+password");
+      if (!user) {
+        return res.status(404).json({ message: "User not found" });
+      }
+
+      const isMatch = await user.matchPassword(password);
+      if (!isMatch) {
+        return res.status(400).json({ message: "Incorrect password" });
+      }
+
+      // Check if new email is already taken
+      const existingUser = await User.findOne({ email: lowerNewEmail });
+      if (existingUser && existingUser._id.toString() !== userId) {
+        return res.status(400).json({ message: "Email already in use" });
+      }
+
+      user.email = lowerNewEmail;
+      await user.save();
+
+      res.json({
+        message: "Email updated successfully",
+        email: user.email,
+      });
+    } catch (error) {
+      console.error("Change email error:", error);
+      res.status(500).json({ message: "Server Error" });
+    }
+  }
+);
+
+// @desc    Change user password
+// @route   PUT /api/auth/change-password
+// @access  Private
+router.put(
+  "/change-password",
+  protect,
+  [
+    body("currentPassword", "Current password is required").exists(),
+    body("newPassword", "New password must be at least 6 characters").isLength({ min: 6 }),
+    body("confirmPassword", "Confirm password is required").exists(),
+  ],
+  async (req, res) => {
+    const errors = validationResult(req);
+    if (!errors.isEmpty()) {
+      return res.status(400).json({ errors: errors.array() });
+    }
+
+    const { currentPassword, newPassword, confirmPassword } = req.body;
+    const userId = req.user.id;
+
+    if (newPassword !== confirmPassword) {
+      return res.status(400).json({ message: "New passwords do not match" });
+    }
+
+    try {
+      const user = await User.findById(userId).select("+password");
+      if (!user) {
+        return res.status(404).json({ message: "User not found" });
+      }
+
+      const isMatch = await user.matchPassword(currentPassword);
+      if (!isMatch) {
+        return res.status(400).json({ message: "Incorrect current password" });
+      }
+
+      user.password = newPassword;
+      await user.save();
+
+      res.json({ message: "Password updated successfully" });
+    } catch (error) {
+      console.error("Change password error:", error);
+      res.status(500).json({ message: "Server Error" });
+    }
+  }
+);
+
+// @desc    Upload profile picture
+// @route   POST /api/auth/upload-profile-picture
+// @access  Private
+router.post(
+  "/upload-profile-picture",
+  protect,
+  upload.single('profilePicture'),
+  async (req, res) => {
+    const userId = req.user.id;
+
+    try {
+      if (!req.file) {
+        return res.status(400).json({ message: "No file uploaded" });
+      }
+
+      const user = await User.findById(userId);
+      if (!user) {
+        return res.status(404).json({ message: "User not found" });
+      }
+
+      // Remove old profile picture if exists (optional, for cleanup)
+      // For simplicity, just update the path
+
+      user.profilePicture = `/uploads/${req.file.filename}`;
+      await user.save();
+
+      res.json({
+        message: "Profile picture updated successfully",
+        profilePicture: user.profilePicture,
+      });
+    } catch (error) {
+      console.error("Upload profile picture error:", error);
+      res.status(500).json({ message: "Server Error" });
+    }
+  }
+);
+
+// @desc    Remove profile picture
+// @route   DELETE /api/auth/profile-picture
+// @access  Private
+router.delete("/profile-picture", protect, async (req, res) => {
+  const userId = req.user.id;
+
+  try {
+    const user = await User.findById(userId);
+    if (!user) {
+      return res.status(404).json({ message: "User not found" });
+    }
+
+    // Optional: delete file from filesystem
+    // For simplicity, just set to null
+
+    user.profilePicture = null;
+    await user.save();
+
+    res.json({
+      message: "Profile picture removed successfully",
+    });
+  } catch (error) {
+    console.error("Remove profile picture error:", error);
+    res.status(500).json({ message: "Server Error" });
+  }
+});
 
 export default router;

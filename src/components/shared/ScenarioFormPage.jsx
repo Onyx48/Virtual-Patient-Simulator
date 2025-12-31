@@ -4,6 +4,7 @@ import { useNavigate, useParams } from "react-router-dom";
 import { useForm } from "react-hook-form";
 import { useAuth } from "../../AuthContext";
 import axios from "axios";
+import { addScenario } from "../../redux/slices/scenarioSlice.js";
 import {
   ArrowLeft,
   Sparkles,
@@ -14,24 +15,6 @@ import {
 } from "lucide-react";
 // --- CONFIGURATION ---
 const AI_SERVICE_URL = "http://64.227.110.183:8888";
-// --- HELPER: ROBUST TOKEN GETTER ---
-const getAuthToken = () => {
-  // 1. Try finding 'token' string directly
-  let token = localStorage.getItem("token");
-  if (token) return token;
-  // 2. Try finding 'userInfo' object (common in MERN apps)
-  const userInfo = localStorage.getItem("userInfo");
-  if (userInfo) {
-    try {
-      const parsed = JSON.parse(userInfo);
-      // Check if token exists inside the object
-      if (parsed.token) return parsed.token;
-    } catch (e) {
-      console.warn("Failed to parse userInfo for token");
-    }
-  }
-  return null;
-};
 // --- INTERNAL COMPONENT: ERROR POPUP ---
 const ErrorModal = ({ isOpen, message, onClose }) => {
   if (!isOpen) return null;
@@ -72,6 +55,7 @@ function ScenarioFormPage() {
   const { user } = useAuth();
   // Access Redux just for the list data
   const { scenarios } = useSelector((state) => state.scenarios);
+  const dispatch = useDispatch();
   // --- 1. DETERMINE MODE (DB EDIT vs NEW) ---
   const selectedScenario = id
     ? scenarios.find((s) => s._id === id || s.id === id)
@@ -244,30 +228,8 @@ function ScenarioFormPage() {
     }
   };
   // --- 6. SUBMIT HANDLER (UPDATED TOKEN LOGIC) ---
-   const onSubmit = async (data) => {
+  const onSubmit = async (data) => {
     setIsSaving(true);
-    // Use the robust helper function to find the token
-    const token = getAuthToken();
-
-    if (!token) {
-      console.error(
-        "Token missing in localStorage. Checked 'token' and 'userInfo'."
-      );
-      setErrorPopup({
-        open: true,
-        message:
-          "Authentication token missing. Please log out and log back in.",
-      });
-      setIsSaving(false);
-      return;
-    }
-
-    const config = {
-      headers: {
-        Authorization: `Bearer ${token}`,
-        "Content-Type": "application/json",
-      },
-    };
 
     const finalData = {
       ...data,
@@ -283,20 +245,35 @@ function ScenarioFormPage() {
       finalData._id = aiGeneratedId;
     }
 
-    console.log("Submitting to DB via Direct Axios:", finalData);
-
     try {
       if (isDbEdit) {
+        // For edit, keep direct axios since no Redux update thunk
+        const token = localStorage.getItem("token") || (localStorage.getItem("userInfo") && JSON.parse(localStorage.getItem("userInfo"))?.token);
+        if (!token) {
+          throw new Error("Authentication token missing. Please log out and log back in.");
+        }
+        const config = {
+          headers: {
+            Authorization: `Bearer ${token}`,
+            "Content-Type": "application/json",
+          },
+        };
         await axios.put(`/api/scenarios/${id}`, finalData, config);
       } else {
-        await axios.post("/api/scenarios", finalData, config);
+        await dispatch(addScenario(finalData)).unwrap();
       }
       // Navigate on success
       navigate("/scenarios");
     } catch (err) {
       console.error("Failed to save to DB:", err);
-      const errMsg =
-        err.response?.data?.message || err.message || "Unknown error occurred";
+      let errMsg = "Unknown error occurred";
+      if (err.response?.data?.errors) {
+        errMsg = err.response.data.errors.map(e => e.msg).join(", ");
+      } else if (err.response?.data?.message) {
+        errMsg = err.response.data.message;
+      } else {
+        errMsg = err.message;
+      }
       setErrorPopup({ open: true, message: errMsg });
     } finally {
       setIsSaving(false);
