@@ -1,58 +1,74 @@
-import { createAsyncThunk, createSlice } from '@reduxjs/toolkit';
-import axios from 'axios';
-import { getAuthHeaders } from '../../lib/utils.js';
+import { createAsyncThunk, createSlice } from "@reduxjs/toolkit";
+import axios from "axios";
+import { getAuthHeaders } from "../../lib/utils.js";
 
 // Async thunks for scenarios
 export const fetchScenarios = createAsyncThunk(
-  'scenarios/fetchScenarios',
+  "scenarios/fetchScenarios",
   async (_, { rejectWithValue }) => {
     try {
-      const response = await axios.get('/api/scenarios', getAuthHeaders());
+      const response = await axios.get("/api/scenarios", getAuthHeaders());
       return response.data;
     } catch (error) {
-      return rejectWithValue(error.response?.data || 'Failed to fetch scenarios');
+      return rejectWithValue(
+        error.response?.data || "Failed to fetch scenarios"
+      );
     }
   }
 );
 
 export const addScenario = createAsyncThunk(
-  'scenarios/addScenario',
+  "scenarios/addScenario",
   async (scenarioData, { rejectWithValue }) => {
     try {
-      const response = await axios.post('/api/scenarios', scenarioData, getAuthHeaders());
-      return response.data;
+      const response = await axios.post(
+        "/api/scenarios",
+        scenarioData,
+        getAuthHeaders()
+      );
+      // RETURN ONLY THE SCENARIO OBJECT
+      return response.data.scenario;
     } catch (error) {
-      return rejectWithValue(error.response?.data || 'Failed to add scenario');
+      return rejectWithValue(error.response?.data || "Failed to add scenario");
     }
   }
 );
 
 export const updateScenario = createAsyncThunk(
-  'scenarios/updateScenario',
+  "scenarios/updateScenario",
   async ({ id, updates }, { rejectWithValue }) => {
     try {
-      const response = await axios.put(`/api/scenarios/${id}`, updates, getAuthHeaders());
-      return response.data;
+      const response = await axios.put(
+        `/api/scenarios/${id}`,
+        updates,
+        getAuthHeaders()
+      );
+      // RETURN ONLY THE SCENARIO OBJECT
+      return response.data.scenario;
     } catch (error) {
-      return rejectWithValue(error.response?.data || 'Failed to update scenario');
+      return rejectWithValue(
+        error.response?.data || "Failed to update scenario"
+      );
     }
   }
 );
 
 export const deleteScenario = createAsyncThunk(
-  'scenarios/deleteScenario',
+  "scenarios/deleteScenario",
   async (id, { rejectWithValue }) => {
     try {
       await axios.delete(`/api/scenarios/${id}`, getAuthHeaders());
       return id;
     } catch (error) {
-      return rejectWithValue(error.response?.data || 'Failed to delete scenario');
+      return rejectWithValue(
+        error.response?.data || "Failed to delete scenario"
+      );
     }
   }
 );
 
 const scenarioSlice = createSlice({
-  name: 'scenarios',
+  name: "scenarios",
   initialState: {
     scenarios: [],
     selectedScenario: null,
@@ -85,16 +101,21 @@ const scenarioSlice = createSlice({
         state.scenarios.push(action.payload);
       })
       .addCase(updateScenario.fulfilled, (state, action) => {
-        const index = state.scenarios.findIndex(s => s.id === action.payload.id);
+        const index = state.scenarios.findIndex(
+          (s) => s._id === action.payload._id || s.id === action.payload._id
+        );
         if (index !== -1) {
           state.scenarios[index] = action.payload;
         }
       })
       .addCase(deleteScenario.fulfilled, (state, action) => {
-        state.scenarios = state.scenarios.filter(s => s.id !== action.payload);
+        state.scenarios = state.scenarios.filter(
+          (s) => (s._id || s.id) !== action.payload
+        );
       });
   },
 });
 
-export const { setSelectedScenario, clearSelectedScenario } = scenarioSlice.actions;
+export const { setSelectedScenario, clearSelectedScenario } =
+  scenarioSlice.actions;
 export default scenarioSlice.reducer;

@@ -2,7 +2,7 @@ import React, { useState } from "react";
 import { useForm } from "react-hook-form";
 import { XMarkIcon } from "@heroicons/react/24/outline";
 
-function StudentModal({ onSave, onClose, studentData }) {
+function StudentModal({ onSave, onClose, studentData, role, defaultSchoolName }) {
   const isEdit = !!studentData;
   const [isSubmitting, setIsSubmitting] = useState(false);
 
@@ -16,14 +16,12 @@ function StudentModal({ onSave, onClose, studentData }) {
           studentName: studentData.name,
           emailAddress: studentData.email,
           schoolName: studentData.schoolName,
-          progress: studentData.progress,
         }
       : {
           studentName: "",
           emailAddress: "",
           password: "",
-          schoolName: "",
-          progress: "",
+          schoolName: role === 'educator' ? defaultSchoolName : "",
         },
   });
 
@@ -36,8 +34,7 @@ function StudentModal({ onSave, onClose, studentData }) {
       name: data.studentName,
       email: data.emailAddress,
       password: data.password,
-      schoolName: data.schoolName,
-      progress: data.progress,
+      schoolName: !isEdit && role === 'educator' ? defaultSchoolName : data.schoolName,
     };
 
     await onSave(submissionData);
@@ -112,29 +109,20 @@ function StudentModal({ onSave, onClose, studentData }) {
         )}
 
         <div className="grid grid-cols-2 gap-5">
-          <div className="space-y-1.5">
-            <label className="block text-sm font-semibold text-gray-700">
-              School Name
-            </label>
-            <input
-              type="text"
-              {...register("schoolName")}
-              className="w-full px-4 py-2.5 rounded-lg border border-gray-300 focus:ring-2 focus:ring-orange-500 focus:border-transparent outline-none transition-all text-sm"
-              placeholder="School Name"
-            />
-          </div>
-
-          <div className="space-y-1.5">
-            <label className="block text-sm font-semibold text-gray-700">
-              Progress (%)
-            </label>
-            <input
-              type="text"
-              {...register("progress")}
-              className="w-full px-4 py-2.5 rounded-lg border border-gray-300 focus:ring-2 focus:ring-orange-500 focus:border-transparent outline-none transition-all text-sm"
-              placeholder="e.g. 75%"
-            />
-          </div>
+          {!(role === 'educator' && !isEdit) && (
+            <div className="space-y-1.5 col-span-2">
+              <label className="block text-sm font-semibold text-gray-700">
+                School Name
+              </label>
+              <input
+                type="text"
+                {...register("schoolName")}
+                readOnly={role === 'educator'}
+                className="w-full px-4 py-2.5 rounded-lg border border-gray-300 focus:ring-2 focus:ring-orange-500 focus:border-transparent outline-none transition-all text-sm"
+                placeholder="School Name"
+              />
+            </div>
+          )}
         </div>
 
         <div className="pt-4 flex items-center justify-end gap-3">

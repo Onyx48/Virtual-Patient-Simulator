@@ -43,7 +43,16 @@ const userSchema = new mongoose.Schema(
     supervisor: {
       type: mongoose.Schema.Types.ObjectId,
       ref: "User",
-      default: null, // Links educator to school_admin who created them
+      default: null, // Links educator to school_admin or student to educator
+    },
+    department: {
+      type: String,
+      enum: {
+        values: ["Science", "History", "English", "Mathematics"],
+        message:
+          "{VALUE} is not a valid department. Must be Science, History, English, or Mathematics.",
+      },
+      // default: "Science", <--- REMOVED THIS LINE so students don't get a default department
     },
   },
   {
@@ -75,4 +84,4 @@ userSchema.methods.matchPassword = async function (enteredPassword) {
 };
 
 const User = mongoose.model("User", userSchema);
-export default User; // <--- THIS LINE IS CRITICAL
+export default User;

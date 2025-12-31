@@ -4,8 +4,13 @@
 
 const rolePermissions = {
   // Actions and the roles allowed to perform them
-  manageScenarios: ["educator"], // Create, edit, delete scenarios
-  viewScenarios: ["student", "educator", "school_admin", "superadmin"], // View/list scenarios (read-only for student)
+
+  // STRICT CHANGE: Only educators can create/edit/delete scenarios
+  manageScenarios: ["educator"],
+
+  // Everyone can still view/list scenarios (read-only for student)
+  viewScenarios: ["student", "educator", "school_admin", "superadmin"],
+
   manageStudents: ["educator", "superadmin"], // Manage students (scoped)
   viewStudents: ["educator", "school_admin", "superadmin"], // View students (scoped)
   manageEducators: ["school_admin", "superadmin"], // Manage educators (scoped to school for school_admin)

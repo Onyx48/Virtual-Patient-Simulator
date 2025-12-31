@@ -2,7 +2,6 @@ import React, { useState, useEffect, useMemo } from "react";
 import axios from "axios";
 import {
   MagnifyingGlassIcon,
-  FunnelIcon,
   PlusIcon,
   PencilSquareIcon,
   TrashIcon,
@@ -10,11 +9,11 @@ import {
   ChevronRightIcon,
 } from "@heroicons/react/24/outline";
 
-// Import Modal (Sibling import since they are in the same folder)
+// Import Modal
 import EducatorModal from "./EducatorModal";
 import ConfirmationModal from "./ui/ConfirmationModal.jsx";
-import { toast } from 'react-hot-toast';
-import { useAuth } from '../AuthContext';
+import { toast } from "react-hot-toast";
+import { useAuth } from "../AuthContext";
 
 // Helper for Auth Headers
 const getAuthHeaders = () => {
@@ -28,13 +27,14 @@ function EducatorsPage() {
   const [educators, setEducators] = useState([]);
   const [loading, setLoading] = useState(true);
   const [searchTerm, setSearchTerm] = useState("");
+  const [departmentFilter, setDepartmentFilter] = useState("");
 
   // Modal State
   const [isModalOpen, setIsModalOpen] = useState(false);
   const [editingEducator, setEditingEducator] = useState(null);
   const [isConfirmModalOpen, setIsConfirmModalOpen] = useState(false);
-  const [confirmTitle, setConfirmTitle] = useState('');
-  const [confirmMessage, setConfirmMessage] = useState('');
+  const [confirmTitle, setConfirmTitle] = useState("");
+  const [confirmMessage, setConfirmMessage] = useState("");
   const [onConfirmAction, setOnConfirmAction] = useState(() => {});
 
   // Pagination State
@@ -56,8 +56,7 @@ function EducatorsPage() {
         visualId: `VS${user._id.slice(-6).toUpperCase()}`,
         name: user.name,
         email: user.email,
-        // Fallback to schoolName if department isn't available
-        department: user.department || user.schoolId?.schoolName || "Science",
+        department: user.department, // Ensure this maps correctly
       }));
       setEducators(mappedData);
     } catch (error) {
@@ -83,13 +82,14 @@ function EducatorsPage() {
   };
 
   const handleDelete = (id) => {
-    setConfirmTitle('Delete Educator');
-    setConfirmMessage('Are you sure you want to delete this educator?');
+    setConfirmTitle("Delete Educator");
+    setConfirmMessage("Are you sure you want to delete this educator?");
     setOnConfirmAction(() => async () => {
       try {
         await axios.delete(`/api/users/${id}`, getAuthHeaders());
         // Optimistic UI update
         setEducators((prev) => prev.filter((e) => e.id !== id));
+        toast.success("Educator deleted successfully");
       } catch (error) {
         toast.error(
           "Failed to delete educator: " +
@@ -113,6 +113,7 @@ function EducatorsPage() {
           },
           getAuthHeaders()
         );
+        toast.success("Educator updated successfully");
       } else {
         // Add New Educator
         await axios.post(
@@ -126,6 +127,7 @@ function EducatorsPage() {
           },
           getAuthHeaders()
         );
+        toast.success("Educator created successfully");
       }
       // Refresh list
       await fetchEducators();
@@ -139,12 +141,16 @@ function EducatorsPage() {
 
   // --- Filter & Pagination ---
   const filteredData = useMemo(() => {
-    return educators.filter(
-      (e) =>
-        e.name.toLowerCase().includes(searchTerm.toLowerCase()) ||
-        e.email.toLowerCase().includes(searchTerm.toLowerCase())
-    );
-  }, [educators, searchTerm]);
+    return educators
+      .filter(
+        (e) =>
+          e.name.toLowerCase().includes(searchTerm.toLowerCase()) ||
+          e.email.toLowerCase().includes(searchTerm.toLowerCase())
+      )
+      .filter(
+        (e) => departmentFilter === "" || e.department === departmentFilter
+      );
+  }, [educators, searchTerm, departmentFilter]);
 
   const paginatedData = useMemo(() => {
     const start = (currentPage - 1) * itemsPerPage;
@@ -178,11 +184,35 @@ function EducatorsPage() {
             />
           </div>
 
-          {/* Filter Button */}
-          <button className="flex items-center gap-2 px-4 py-2.5 border border-gray-200 rounded-lg text-sm font-medium text-gray-600 hover:bg-gray-50 transition-colors">
-            <FunnelIcon className="h-5 w-5" />
-            Filters
-          </button>
+          {/* Department Filter */}
+          <div className="relative">
+            <select
+              value={departmentFilter}
+              onChange={(e) => setDepartmentFilter(e.target.value)}
+              className="flex items-center gap-2 px-4 py-2.5 border border-gray-200 rounded-lg text-sm font-medium text-gray-600 hover:bg-gray-50 transition-colors appearance-none bg-white cursor-pointer"
+            >
+              <option value="">All Departments</option>
+              <option value="Science">Science</option>
+              <option value="History">History</option>
+              <option value="English">English</option>
+              <option value="Mathematics">Mathematics</option>
+            </select>
+            <div className="pointer-events-none absolute inset-y-0 right-0 flex items-center px-3 text-gray-500">
+              <svg
+                className="h-4 w-4"
+                fill="none"
+                stroke="currentColor"
+                viewBox="0 0 24 24"
+              >
+                <path
+                  strokeLinecap="round"
+                  strokeLinejoin="round"
+                  strokeWidth="2"
+                  d="M19 9l-7 7-7-7"
+                />
+              </svg>
+            </div>
+          </div>
         </div>
 
         {/* Action Button */}
@@ -256,26 +286,24 @@ function EducatorsPage() {
                   <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-600">
                     {educator.department}
                   </td>
-                   <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500">
-                     <div className="flex items-center gap-4">
-                       {user?.role !== "school_admin" && (
-                         <button
-                           onClick={() => handleEdit(educator)}
-                           className="flex items-center gap-1 text-gray-500 hover:text-gray-900 transition-colors"
-                         >
-                           <PencilSquareIcon className="w-4 h-4" />
-                           Edit
-                         </button>
-                       )}
-                       <button
-                         onClick={() => handleDelete(educator.id)}
-                         className="flex items-center gap-1 text-red-400 hover:text-red-600 transition-colors"
-                       >
-                         <TrashIcon className="w-4 h-4" />
-                         Delete
-                       </button>
-                     </div>
-                   </td>
+                  <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500">
+                    <div className="flex items-center gap-4">
+                      <button
+                        onClick={() => handleEdit(educator)}
+                        className="flex items-center gap-1 text-gray-500 hover:text-gray-900 transition-colors"
+                      >
+                        <PencilSquareIcon className="w-4 h-4" />
+                        Edit
+                      </button>
+                      <button
+                        onClick={() => handleDelete(educator.id)}
+                        className="flex items-center gap-1 text-red-400 hover:text-red-600 transition-colors"
+                      >
+                        <TrashIcon className="w-4 h-4" />
+                        Delete
+                      </button>
+                    </div>
+                  </td>
                 </tr>
               ))
             )}

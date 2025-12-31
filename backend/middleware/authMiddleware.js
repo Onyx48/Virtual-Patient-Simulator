@@ -11,7 +11,7 @@ const protect = async (req, res, next) => {
     try {
       token = req.headers.authorization.split(" ")[1];
       const decoded = jwt.verify(token, process.env.JWT_SECRET);
-      req.user = await User.findById(decoded.id).select("-password").populate('schoolId'); // Attach user to request, exclude password, populate school
+      req.user = await User.findById(decoded.id).select("-password").populate('schoolId').populate('supervisor'); // Attach user to request, exclude password, populate school and supervisor
       if (!req.user) {
         return res
           .status(401)

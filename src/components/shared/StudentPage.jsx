@@ -14,6 +14,7 @@ import {
 import StudentModal from "../StudentModal";
 import AssignScenariosModal from "./AssignScenariosModal";
 import { toast } from 'react-hot-toast';
+import { useAuth } from '../../AuthContext';
 
 // Helper for Auth Headers
 const getAuthHeaders = () => {
@@ -23,6 +24,7 @@ const getAuthHeaders = () => {
 
 function StudentPage({ role }) {
   // Accepting role as prop if specific logic is needed later
+  const { user } = useAuth();
   // --- State Management ---
   const [students, setStudents] = useState([]);
   const [loading, setLoading] = useState(true);
@@ -348,11 +350,13 @@ function StudentPage({ role }) {
 
       {/* Modals */}
       {isStudentModalOpen && role !== "school_admin" && (
-        <div className="fixed inset-0 z-50 bg-black/40 backdrop-blur-sm flex justify-center items-center p-4">
+        <div className="fixed inset-0 z-50 bg-black/40 backdrop-blur-sm flex justify-center items-center">
           <StudentModal
             studentData={editingStudent}
             onSave={handleSaveStudent}
             onClose={() => setIsStudentModalOpen(false)}
+            role={role}
+            defaultSchoolName={user?.schoolName || ''}
           />
         </div>
       )}

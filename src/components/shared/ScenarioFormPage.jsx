@@ -3,6 +3,7 @@ import { useDispatch, useSelector } from "react-redux";
 import { useNavigate, useParams } from "react-router-dom";
 import { useForm } from "react-hook-form";
 import { useAuth } from "../../AuthContext";
+import axios from "axios";
 import {
   ArrowLeft,
   Sparkles,
@@ -11,9 +12,26 @@ import {
   X,
   AlertCircle,
 } from "lucide-react";
-import axios from "axios";
 // --- CONFIGURATION ---
 const AI_SERVICE_URL = "http://64.227.110.183:8888";
+// --- HELPER: ROBUST TOKEN GETTER ---
+const getAuthToken = () => {
+  // 1. Try finding 'token' string directly
+  let token = localStorage.getItem("token");
+  if (token) return token;
+  // 2. Try finding 'userInfo' object (common in MERN apps)
+  const userInfo = localStorage.getItem("userInfo");
+  if (userInfo) {
+    try {
+      const parsed = JSON.parse(userInfo);
+      // Check if token exists inside the object
+      if (parsed.token) return parsed.token;
+    } catch (e) {
+      console.warn("Failed to parse userInfo for token");
+    }
+  }
+  return null;
+};
 // --- INTERNAL COMPONENT: ERROR POPUP ---
 const ErrorModal = ({ isOpen, message, onClose }) => {
   if (!isOpen) return null;
@@ -47,24 +65,7 @@ const ErrorModal = ({ isOpen, message, onClose }) => {
     </div>
   );
 };
-// --- HELPER: ROBUST TOKEN GETTER ---
-const getAuthToken = () => {
-  // 1. Try finding 'token' string directly
-  let token = localStorage.getItem("token");
-  if (token) return token;
-  // 2. Try finding 'userInfo' object (common in MERN apps)
-  const userInfo = localStorage.getItem("userInfo");
-  if (userInfo) {
-    try {
-      const parsed = JSON.parse(userInfo);
-      // Check if token exists inside the object
-      if (parsed.token) return parsed.token;
-    } catch (e) {
-      console.warn("Failed to parse userInfo for token");
-    }
-  }
-  return null;
-};
+
 function ScenarioFormPage() {
   const navigate = useNavigate();
   const { id } = useParams();
@@ -314,7 +315,6 @@ function ScenarioFormPage() {
         message={errorPopup.message}
         onClose={() => setErrorPopup({ ...errorPopup, open: false })}
       />
-      code Code
       {/* Header */}
       <div className="w-full max-w-4xl mb-6 flex items-center justify-between">
         <button

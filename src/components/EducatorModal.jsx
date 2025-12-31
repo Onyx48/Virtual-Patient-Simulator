@@ -15,12 +15,14 @@ function EducatorModal({ onSave, onClose, educatorData }) {
       ? {
           educatorName: educatorData.name,
           emailAddress: educatorData.email,
-          department: educatorData.department,
+          // Use existing department or fallback to Science
+          department: educatorData.department || "Science",
         }
       : {
           educatorName: "",
           emailAddress: "",
           password: "",
+          // CRITICAL FIX: Ensure default is set here so it's never undefined
           department: "Science",
         },
   });
@@ -31,7 +33,7 @@ function EducatorModal({ onSave, onClose, educatorData }) {
       id: educatorData?.id,
       educatorName: data.educatorName,
       emailAddress: data.emailAddress,
-      password: data.password, // Only used on backend if creating new
+      password: data.password,
       department: data.department,
     };
 
@@ -47,7 +49,7 @@ function EducatorModal({ onSave, onClose, educatorData }) {
             {isEdit ? "Edit Educator" : "Add New Educator"}
           </h2>
           <span className="bg-gray-100 text-gray-600 text-xs px-2 py-0.5 rounded-full font-medium">
-            Unsaved
+            {isEdit ? "Editing" : "New"}
           </span>
         </div>
 
@@ -120,7 +122,10 @@ function EducatorModal({ onSave, onClose, educatorData }) {
           </label>
           <div className="relative">
             <select
-              {...register("department")}
+              {...register("department", {
+                required: "Department is required",
+              })}
+              // REMOVED: value={watch("department")} to fix the selection bug
               className="w-full px-4 py-2.5 rounded-lg border border-gray-300 focus:ring-2 focus:ring-orange-500 focus:border-transparent outline-none transition-all text-sm appearance-none bg-white cursor-pointer"
             >
               <option value="Science">Science</option>
