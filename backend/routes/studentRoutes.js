@@ -10,6 +10,17 @@ const router = express.Router();
 
 // POST /api/students - Create a new student (User + Student profile) by Educator
 // @access Private (Educator)
+// Grade options for random assignment
+const GRADE_OPTIONS = [
+  'Grade 1', 'Grade 2', 'Grade 3', 'Grade 4', 'Grade 5',
+  'Grade 6', 'Grade 7', 'Grade 8', 'Grade 9', 'Grade 10',
+  'Grade 11', 'Grade 12', 'Beginner', 'Intermediate', 'Advanced'
+];
+
+function getRandomGrade() {
+  return GRADE_OPTIONS[Math.floor(Math.random() * GRADE_OPTIONS.length)];
+}
+
 router.post("/", protect, checkAccess("manageStudents"), async (req, res) => {
   const { name, email, password, schoolName } = req.body;
 
@@ -66,6 +77,7 @@ router.post("/", protect, checkAccess("manageStudents"), async (req, res) => {
       user: user._id,
       educatorId: new mongoose.Types.ObjectId(req.user._id), // Force ObjectId conversion
       school: schoolName,
+      grade: getRandomGrade(), // Assign random grade for mock data
     });
     await student.save();
     console.log(
@@ -110,11 +122,10 @@ router.get("/", protect, checkAccess("viewStudents"), async (req, res) => {
 
     console.log("GET /api/students - Scope:", req.scope, "Query:", query);
 
-    // Populate user details (name, email) from the referenced User document
-    const students = await Student.find(query).populate(
-      "user",
-      "name email role"
-    );
+    // Populate user details (name, email) and assigned scenarios from the referenced documents
+    const students = await Student.find(query)
+      .populate("user", "name email role")
+      .populate("assignedScenarios", "scenarioName description");
     console.log("Students found:", students.length);
     res.json(students);
   } catch (err) {
@@ -166,7 +177,9 @@ router.get(
     try {
       const studentProfile = await Student.findOne({
         user: req.params.userId,
-      }).populate("user", "name email role");
+      })
+        .populate("user", "name email role")
+        .populate("assignedScenarios", "scenarioName description");
       if (!studentProfile) {
         return res
           .status(404)
@@ -189,23 +202,22 @@ router.get(
 // PUT /api/students/:id - Update a student's profile data (e.g., grade, school) by Student Profile _id
 // @access Private (Educator, School Admin, Superadmin)
 router.put("/:id", protect, checkAccess("manageStudents"), async (req, res) => {
-  const { grade, school, enrollmentDate /* other updatable fields */ } =
-    req.body;
   try {
-    const studentProfile = await Student.findById(req.params.id).populate(
+    // First, check if the student exists and scope
+    const existingStudent = await Student.findById(req.params.id).populate(
       "user",
       "schoolId"
     );
 
-    if (!studentProfile) {
+    if (!existingStudent) {
       return res.status(404).json({ message: "Student profile not found" });
     }
 
     // Check scope for school_admin
     if (
       req.scope.schoolId &&
-      studentProfile.user.schoolId &&
-      studentProfile.user.schoolId.toString() !== req.scope.schoolId.toString()
+      existingStudent.user.schoolId &&
+      existingStudent.user.schoolId.toString() !== req.scope.schoolId.toString()
     ) {
       return res
         .status(403)
@@ -214,19 +226,14 @@ router.put("/:id", protect, checkAccess("manageStudents"), async (req, res) => {
         });
     }
 
-    // Update only provided fields
-    if (grade !== undefined) studentProfile.grade = grade;
-    if (school !== undefined) studentProfile.school = school;
-    if (enrollmentDate !== undefined)
-      studentProfile.enrollmentDate = enrollmentDate;
-    // ... update other fields
-
-    const updatedStudentProfile = await studentProfile.save();
-    // Populate user details for the response
-    const populatedProfile = await Student.findById(
-      updatedStudentProfile._id
+    // Use findByIdAndUpdate to support MongoDB operators like $addToSet, $pull
+    const updatedStudent = await Student.findByIdAndUpdate(
+      req.params.id,
+      req.body,
+      { new: true }
     ).populate("user", "name email role");
-    res.json(populatedProfile);
+
+    res.json(updatedStudent);
   } catch (err) {
     res.status(500).json({ message: err.message });
   }

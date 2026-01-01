@@ -40,7 +40,7 @@ function ScenariosPage() {
         (s) =>
           s.scenarioName.toLowerCase().includes(lowerTerm) ||
           s.description.toLowerCase().includes(lowerTerm) ||
-          s.creator.toLowerCase().includes(lowerTerm)
+          s.educator.toLowerCase().includes(lowerTerm)
       );
     }
 

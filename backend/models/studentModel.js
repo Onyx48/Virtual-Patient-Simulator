@@ -23,6 +23,10 @@ const studentSchema = new mongoose.Schema({
     type: Date,
     default: Date.now,
   },
+  assignedScenarios: [{
+    type: mongoose.Schema.Types.ObjectId,
+    ref: "Scenario"
+  }],
   // Add other student-specific fields here (e.g., subjects, guardianInfo)
 }, { timestamps: true });
 

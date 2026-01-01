@@ -3,6 +3,7 @@ import { useForm } from "react-hook-form";
 import { XMarkIcon } from "@heroicons/react/24/outline";
 
 function StudentModal({ onSave, onClose, studentData, role, defaultSchoolName }) {
+  console.log("StudentModal studentData:", studentData);
   const isEdit = !!studentData;
   const [isSubmitting, setIsSubmitting] = useState(false);
 
@@ -16,12 +17,14 @@ function StudentModal({ onSave, onClose, studentData, role, defaultSchoolName })
           studentName: studentData.name,
           emailAddress: studentData.email,
           schoolName: studentData.schoolName,
+          grade: studentData.progress,
         }
       : {
           studentName: "",
           emailAddress: "",
           password: "",
-          schoolName: role === 'educator' ? defaultSchoolName : "",
+          schoolName: role === "educator" ? defaultSchoolName : "",
+          grade: "",
         },
   });
 
@@ -34,7 +37,7 @@ function StudentModal({ onSave, onClose, studentData, role, defaultSchoolName })
       name: data.studentName,
       email: data.emailAddress,
       password: data.password,
-      schoolName: !isEdit && role === 'educator' ? defaultSchoolName : data.schoolName,
+      schoolName: !isEdit && role === "educator" ? defaultSchoolName : data.schoolName,
     };
 
     await onSave(submissionData);

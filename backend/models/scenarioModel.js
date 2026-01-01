@@ -4,7 +4,7 @@ const scenarioSchema = new mongoose.Schema(
   {
     scenarioName: { type: String, required: true, trim: true },
     description: { type: String, trim: true },
-    creator: {
+    educator: {
       type: mongoose.Schema.Types.ObjectId,
       ref: "User",
       required: true,
@@ -21,7 +21,7 @@ const scenarioSchema = new mongoose.Schema(
     },
     status: {
       type: String,
-      enum: ["Draft", "Published", "Archived"],
+      enum: ["Draft", "Published", "Archived", "success"],
       default: "Draft",
     },
     permissions: {

@@ -1,9 +1,12 @@
 import React, { useState, useEffect } from "react";
 import axios from "axios";
+import { useDispatch } from "react-redux";
 import { XMarkIcon, PlusIcon, MinusIcon } from "@heroicons/react/24/outline";
 import { toast } from 'react-hot-toast';
+import { assignScenarios } from "../../redux/slices/scenarioSlice";
 
 function AssignScenariosModal({ onClose, onAssignSuccess }) {
+  const dispatch = useDispatch();
   const [scenarios, setScenarios] = useState([]);
   const [students, setStudents] = useState([]);
   const [loading, setLoading] = useState(true);
@@ -30,7 +33,7 @@ function AssignScenariosModal({ onClose, onAssignSuccess }) {
 
         const initialSelections = {};
         scenariosRes.data.forEach((scenario) => {
-          initialSelections[scenario._id] = scenario.assignedTo || [];
+          initialSelections[scenario._id] = (scenario.assignedTo || []).map(u => u._id);
         });
         setSelections(initialSelections);
 
@@ -82,21 +85,37 @@ function AssignScenariosModal({ onClose, onAssignSuccess }) {
   const handleAssign = () => {
     const changes = [];
     scenarios.forEach((scenario) => {
-      const currentAssigned = scenario.assignedTo || [];
+      const currentAssigned = (scenario.assignedTo || []).map(u => u._id);
       const newAssigned = selections[scenario._id] || [];
-      const added = newAssigned.filter((id) => !currentAssigned.includes(id));
-      const removed = currentAssigned.filter((id) => !newAssigned.includes(id));
-      if (added.length > 0 || removed.length > 0) {
+        const added = newAssigned.filter((userId) => !currentAssigned.includes(userId));
+        const removed = currentAssigned.filter((userId) => !newAssigned.includes(userId));
+        if (added.length > 0 || removed.length > 0) {
+          const assignedToIds = newAssigned;
+          console.log("Assigned to IDs for scenario", scenario._id, ":", assignedToIds);
+          const studentUpdates = [];
+          added.forEach((userId) => {
+            const student = students.find(s => s.user._id === userId);
+            if (student) {
+              studentUpdates.push({ studentId: student._id, addScenarios: [scenario._id], removeScenarios: [] });
+            }
+          });
+          removed.forEach((userId) => {
+            const student = students.find(s => s.user._id === userId);
+            if (student) {
+              studentUpdates.push({ studentId: student._id, addScenarios: [], removeScenarios: [scenario._id] });
+            }
+          });
         changes.push({
           scenarioId: scenario._id,
           scenarioName: scenario.scenarioName,
+          assignedToIds,
+          studentUpdates,
           addedStudents: added.map(
-            (id) => students.find((s) => s._id === id)?.user?.name || id
+            (userId) => students.find((s) => s.user._id === userId)?.user?.name || userId
           ),
           removedStudents: removed.map(
-            (id) => students.find((s) => s._id === id)?.user?.name || id
+            (userId) => students.find((s) => s.user._id === userId)?.user?.name || userId
           ),
-          newAssigned,
         });
       }
     });
@@ -113,14 +132,7 @@ function AssignScenariosModal({ onClose, onAssignSuccess }) {
   const confirmAssign = async () => {
     setShowConfirm(false);
     try {
-      const promises = assignmentSummary.map((change) =>
-        axios.put(
-          `/api/scenarios/${change.scenarioId}`,
-          { assignedTo: change.newAssigned },
-          getAuthHeaders()
-        )
-      );
-      await Promise.all(promises);
+      await dispatch(assignScenarios(assignmentSummary)).unwrap();
       if (onAssignSuccess) onAssignSuccess();
       onClose();
     } catch (error) {
@@ -153,10 +165,10 @@ function AssignScenariosModal({ onClose, onAssignSuccess }) {
                   setScenarios(scenariosRes.data);
                   setStudents(studentsRes.data);
 
-                  const initialSelections = {};
-                  scenariosRes.data.forEach((scenario) => {
-                    initialSelections[scenario._id] = scenario.assignedTo || [];
-                  });
+                   const initialSelections = {};
+                   scenariosRes.data.forEach((scenario) => {
+                     initialSelections[scenario._id] = (scenario.assignedTo || []).map(u => u._id);
+                   });
                   setSelections(initialSelections);
 
                   const initialExpanded = {};
@@ -248,14 +260,14 @@ function AssignScenariosModal({ onClose, onAssignSuccess }) {
                           key={student._id}
                           className="flex items-center gap-3 p-2 rounded hover:bg-gray-50 cursor-pointer select-none"
                         >
-                          <input
-                            type="checkbox"
-                            checked={(selections[scenario._id] || []).includes(
-                              student._id
-                            )}
-                            onChange={() =>
-                              handleStudentToggle(scenario._id, student._id)
-                            }
+                           <input
+                             type="checkbox"
+                             checked={(selections[scenario._id] || []).includes(
+                               student.user?._id
+                             )}
+                             onChange={() =>
+                               handleStudentToggle(scenario._id, student.user?._id)
+                             }
                             className="w-4 h-4 text-orange-600 border-gray-300 rounded focus:ring-orange-500"
                           />
                           <span className="text-sm text-gray-700">

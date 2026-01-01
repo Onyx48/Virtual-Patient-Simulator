@@ -11,7 +11,7 @@ const router = express.Router();
 
 // --- Validation Rules ---
 const scenarioValidationRules = [
-  body("scenarioName", "Scenario Name is required").notEmpty().trim(),
+  body("scenarioName").optional().notEmpty().trim(),
   body("description").optional().trim(),
    body("status", "Invalid Status")
      .optional()
@@ -39,7 +39,7 @@ router.get("/", protect, checkAccess("viewScenarios"), async (req, res) => {
     if (req.scope) {
       if (req.scope.educatorId) {
         // Educator sees scenarios they created
-        query.creator = req.scope.educatorId;
+        query.educator = req.scope.educatorId;
       } else if (req.scope.schoolId) {
         // School Admin sees scenarios in their school
         query.schoolId = req.scope.schoolId;
@@ -49,9 +49,16 @@ router.get("/", protect, checkAccess("viewScenarios"), async (req, res) => {
       }
     }
 
+    console.log("Scope:", req.scope);
+    console.log("Query:", query);
+
     const scenarios = await Scenario.find(query)
-      .populate("creator", "name email")
+      .populate("educator", "name email")
+      .populate("assignedTo", "name")
       .sort({ createdAt: -1 });
+
+    console.log("Found scenarios count:", scenarios.length);
+    console.log("Fetched scenarios with assignedTo:", scenarios.map(s => ({ id: s._id, assignedTo: s.assignedTo })));
 
     res.json(scenarios);
   } catch (err) {
@@ -73,7 +80,7 @@ router.get("/:id", protect, checkAccess("viewScenarios"), async (req, res) => {
     }
 
     const scenario = await Scenario.findById(req.params.id).populate(
-      "creator",
+      "educator",
       "name email"
     );
 
@@ -183,7 +190,7 @@ router.post(
       const scenarioData = {
         scenarioName,
         description,
-        creator: req.user._id, // Enforce logged-in user as creator
+        educator: req.user._id, // Enforce logged-in user as educator
         schoolId: userSchoolId, // Use extracted School ID
         status: status || "Draft",
         permissions: permissions || "Read Only",
@@ -207,7 +214,8 @@ router.post(
       await newScenario.save();
 
       // Populate for immediate return
-      await newScenario.populate("creator", "name email");
+      await newScenario.populate("educator", "name email");
+      await newScenario.populate("assignedTo", "name");
 
       res.status(201).json({
         message: "Scenario added successfully.",
@@ -259,11 +267,14 @@ router.put(
       apiKey,
     } = req.body;
 
-    // 2. Resolve Assigned Users
+    // 2. Validate Assigned User IDs
     let assignedUserIds = [];
     if (assignedTo && Array.isArray(assignedTo)) {
-      const users = await User.find({ email: { $in: assignedTo } });
-      assignedUserIds = users.map((u) => u._id);
+      const invalidIds = assignedTo.filter(id => !mongoose.Types.ObjectId.isValid(id));
+      if (invalidIds.length > 0) {
+        return res.status(400).json({ message: "Invalid user IDs in assignedTo" });
+      }
+      assignedUserIds = assignedTo;
     }
 
     try {
@@ -279,8 +290,8 @@ router.put(
         return res.status(404).json({ message: "Scenario not found." });
 
       // 3. Ownership Check
-      // Ensure the logged-in user is the creator
-      if (scenario.creator.toString() !== req.user._id.toString()) {
+      // Ensure the logged-in user is the educator
+      if (scenario.educator.toString() !== req.user._id.toString()) {
         return res
           .status(403)
           .json({ message: "You are not authorized to edit this scenario." });
@@ -296,24 +307,25 @@ router.put(
           .json({ message: "Access denied: Scenario not in your school" });
       }
 
-      // 4. Update Fields
-      scenario.scenarioName = scenarioName;
-      scenario.description = description;
-      scenario.status = status || scenario.status;
-      scenario.permissions = permissions || scenario.permissions;
-      scenario.assignedTo = assignedTo ? assignedUserIds : scenario.assignedTo;
-      scenario.template = template;
-      scenario.scenarioPrompt = scenarioPrompt;
-      scenario.aiAvatarRole = aiAvatarRole;
-      scenario.aiInstructions = aiInstructions;
-      scenario.aiQuestions = aiQuestions;
-      scenario.difficulty = difficulty;
-      scenario.animationTriggers =
-        animationTriggers || scenario.animationTriggers;
-      if (apiKey) scenario.apiKey = apiKey;
+      // 4. Update Fields (only if provided)
+      if (scenarioName !== undefined) scenario.scenarioName = scenarioName;
+      if (description !== undefined) scenario.description = description;
+      if (status !== undefined) scenario.status = status;
+      if (permissions !== undefined) scenario.permissions = permissions;
+      if (assignedTo !== undefined) scenario.assignedTo = assignedUserIds;
+      if (template !== undefined) scenario.template = template;
+      if (scenarioPrompt !== undefined) scenario.scenarioPrompt = scenarioPrompt;
+      if (aiAvatarRole !== undefined) scenario.aiAvatarRole = aiAvatarRole;
+      if (aiInstructions !== undefined) scenario.aiInstructions = aiInstructions;
+      if (aiQuestions !== undefined) scenario.aiQuestions = aiQuestions;
+      if (difficulty !== undefined) scenario.difficulty = difficulty;
+      if (animationTriggers !== undefined) scenario.animationTriggers = animationTriggers;
+      if (apiKey !== undefined) scenario.apiKey = apiKey;
 
       await scenario.save();
-      await scenario.populate("creator", "name email");
+      console.log("Updated scenario assignedTo:", scenario.assignedTo);
+      await scenario.populate("educator", "name email");
+      await scenario.populate("assignedTo", "name");
 
       res.status(200).json({
         message: "Scenario updated successfully.",
@@ -350,7 +362,7 @@ router.delete(
         return res.status(404).json({ message: "Scenario not found." });
 
       // Ownership Check
-      if (scenario.creator.toString() !== req.user._id.toString()) {
+      if (scenario.educator.toString() !== req.user._id.toString()) {
         return res
           .status(403)
           .json({ message: "You are not authorized to delete this scenario." });

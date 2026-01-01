@@ -15,7 +15,7 @@ import SchoolsPage from "../../roles/superadmin/schools/Schools";
 import SchoolFormPage from "../../roles/superadmin/schools/SchoolFormPage";
 
 // Scenarios Pages
-import ScenariosPage from "../../roles/educator/scenarios/Scenario.jsx";
+import ScenariosPage from "../../roles/educator/scenarios/index.jsx";
 import SchoolAdminScenariosPage from "../../roles/school_admin/scenarios/index.jsx";
 import StudentScenariosPage from "../StudentScenariosPage.jsx";
 import StudentScenarioDetails from "../../roles/student/scenarios/StudentScenarioDetails.jsx";

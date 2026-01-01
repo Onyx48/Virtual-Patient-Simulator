@@ -67,6 +67,68 @@ export const deleteScenario = createAsyncThunk(
   }
 );
 
+export const assignScenarios = createAsyncThunk(
+  "scenarios/assignScenarios",
+  async (assignmentPayload, { dispatch, rejectWithValue }) => {
+    try {
+      const promises = [];
+
+      assignmentPayload.forEach((change) => {
+        // Update scenario with IDs
+        promises.push(
+          axios.put(
+            `/api/scenarios/${change.scenarioId}`,
+            { assignedTo: change.assignedToIds },
+            getAuthHeaders()
+          )
+        );
+
+        // Update students
+        change.studentUpdates.forEach((update) => {
+          const updateData = {};
+          if (update.addScenarios.length > 0) {
+            updateData.$addToSet = { assignedScenarios: { $each: update.addScenarios } };
+          }
+          if (update.removeScenarios.length > 0) {
+            updateData.$pull = { assignedScenarios: { $in: update.removeScenarios } };
+          }
+          if (Object.keys(updateData).length > 0) {
+            promises.push(
+              axios.put(
+                `/api/students/${update.studentId}`,
+                updateData,
+                getAuthHeaders()
+              )
+            );
+          }
+        });
+      });
+
+       await Promise.all(promises);
+
+       // Update Redux state immediately with the new assignments
+       // Note: We can't easily populate user objects here without additional API calls,
+       // so we'll rely on the fetchScenarios() call to get populated data
+
+       // Also dispatch fetchScenarios as backup to ensure populated data
+       dispatch(fetchScenarios());
+
+       // Dispatch custom event to notify student components to refetch
+       if (typeof window !== 'undefined') {
+         window.dispatchEvent(new CustomEvent('scenarioAssignmentsChanged'));
+       }
+
+       // Also dispatch fetchScenarios to ensure Redux state is up to date
+       dispatch(fetchScenarios());
+
+       return { message: "Assignments updated successfully" };
+    } catch (error) {
+      console.error("Assign scenarios error:", error.response?.data || error.message);
+      return rejectWithValue(error.response?.data || "Failed to update assignments");
+    }
+  }
+);
+
 const scenarioSlice = createSlice({
   name: "scenarios",
   initialState: {

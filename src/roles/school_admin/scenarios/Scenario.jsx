@@ -51,7 +51,7 @@ function ScenarioPage() {
         (scenario) =>
           scenario.scenarioName.toLowerCase().includes(lowerCaseSearchTerm) ||
           scenario.description.toLowerCase().includes(lowerCaseSearchTerm) ||
-          scenario.creator.toLowerCase().includes(lowerCaseSearchTerm)
+          scenario.educator.toLowerCase().includes(lowerCaseSearchTerm)
       );
     }
 
@@ -66,11 +66,11 @@ function ScenarioPage() {
             matchesFilters = false;
           }
         }
-        if (filterCriteria.creator && filterCriteria.creator !== "") {
+        if (filterCriteria.educator && filterCriteria.educator !== "") {
           if (
-            !scenario.creator
+            !scenario.educator
               .toLowerCase()
-              .includes(filterCriteria.creator.toLowerCase())
+              .includes(filterCriteria.educator.toLowerCase())
           ) {
             matchesFilters = false;
           }

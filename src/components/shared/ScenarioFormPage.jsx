@@ -233,7 +233,6 @@ function ScenarioFormPage() {
 
     const finalData = {
       ...data,
-      creator: user?.name || "Unknown",
       apiKey: currentApiKey,
       animationTriggers: {
         shoulder: shoulderTags,

@@ -17,7 +17,7 @@ function ScenariosPage({ scenarios, onAdd, onEdit, canEdit = true, canAdd = true
     scenarios,
     searchTerm,
     filterCriteria,
-    ['scenarioName', 'description', 'creator']
+    ['scenarioName', 'description', 'educator']
   );
 
   // Sort scenarios

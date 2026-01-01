@@ -34,7 +34,9 @@ function ScenarioTable({ data, onEditClick, canEdit = true }) {
 
   return (
     <div className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-4 gap-6">
-      {data.map((scenario, index) => (
+      {data.map((scenario, index) => {
+        console.log("Scenario assignedTo:", scenario.assignedTo);
+        return (
         <div
           key={scenario.id || scenario._id}
           className="bg-white rounded-2xl border border-gray-100 shadow-sm hover:shadow-md transition-shadow p-5 flex flex-col justify-between h-full"
@@ -79,8 +81,8 @@ function ScenarioTable({ data, onEditClick, canEdit = true }) {
               </span>
               <span className="text-gray-300">•</span>
               <span className="text-gray-500">
-                {/* Fallback to static number if assignedTo is missing, matching screenshot style */}
-                {scenario.assignedTo?.length || 23} STUDENT ACCESS
+                {/* Show real assigned student count, 0 if none */}
+                {scenario.assignedTo?.length || 0} STUDENT ACCESS
               </span>
             </div>
           </div>
@@ -109,8 +111,9 @@ function ScenarioTable({ data, onEditClick, canEdit = true }) {
             </button>
           </div>
         </div>
-      ))}
-
+        );
+      })}
+      
       {/* --- Empty State --- */}
       {data.length === 0 && (
         <div className="col-span-full flex flex-col items-center justify-center py-20 text-gray-400">

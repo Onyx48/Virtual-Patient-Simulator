@@ -1,3 +1,3 @@
-redis-server & 
+#!/bin/bash
 
-node index.js
+node index.js && pnpm run dev

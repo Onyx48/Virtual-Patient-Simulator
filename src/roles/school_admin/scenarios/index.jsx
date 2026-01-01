@@ -40,7 +40,7 @@ function SchoolAdminScenariosPage() {
         (s) =>
           s.scenarioName?.toLowerCase().includes(lowerTerm) ||
           s.description?.toLowerCase().includes(lowerTerm) ||
-          (s.creator?.name || "").toLowerCase().includes(lowerTerm)
+          (s.educator?.name || "").toLowerCase().includes(lowerTerm)
       );
     }
 
@@ -51,12 +51,12 @@ function SchoolAdminScenariosPage() {
       );
     }
 
-    // 3. Creator Filter (Optional text input match)
-    if (filterCriteria.creator) {
+    // 3. Educator Filter (Optional text input match)
+    if (filterCriteria.educator) {
       currentData = currentData.filter((s) =>
-        (s.creator?.name || "")
+        (s.educator?.name || "")
           .toLowerCase()
-          .includes(filterCriteria.creator.toLowerCase())
+          .includes(filterCriteria.educator.toLowerCase())
       );
     }
 
@@ -71,8 +71,8 @@ function SchoolAdminScenariosPage() {
         let aValue = a[sortConfig.key];
         let bValue = b[sortConfig.key];
 
-        // Handle Creator field which is an object
-        if (sortConfig.key === "creator") {
+        // Handle Educator field which is an object
+        if (sortConfig.key === "educator") {
           aValue = typeof aValue === "object" ? aValue?.name : aValue;
           bValue = typeof bValue === "object" ? bValue?.name : bValue;
         }

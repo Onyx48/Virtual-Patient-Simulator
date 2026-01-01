@@ -11,6 +11,18 @@ const router = express.Router();
 // Debugging: Check if User model is loaded correctly
 console.log("User Model Status:", User ? "Loaded" : "FAILED IMPORT");
 
+
+// Grade options for random assignment
+const GRADE_OPTIONS = [
+  "Grade 1", "Grade 2", "Grade 3", "Grade 4", "Grade 5",
+  "Grade 6", "Grade 7", "Grade 8", "Grade 9", "Grade 10",
+  "Grade 11", "Grade 12", "Beginner", "Intermediate", "Advanced"
+];
+
+function getRandomGrade() {
+  return GRADE_OPTIONS[Math.floor(Math.random() * GRADE_OPTIONS.length)];
+}
+
 // @desc    Get all users (scoped)
 // @route   GET /api/users
 // @access  Private (Educator, School Admin, Superadmin)
@@ -47,7 +59,7 @@ router.get("/", protect, checkAccess("manageUsers"), async (req, res) => {
 router.post("/", protect, checkAccess("manageUsers"), async (req, res) => {
   try {
     // 1. Destructure inputs
-    const { name, email, password, role, schoolId, department, grade } =
+    const { name, email, password, role, schoolId, department } =
       req.body;
     console.log("Creating user. Department:", department, "Role:", role);
 
@@ -183,7 +195,7 @@ router.post("/", protect, checkAccess("manageUsers"), async (req, res) => {
           user: newUser._id,
           // If creator is educator, assign them as educatorId immediately
           educatorId: req.user.role === "educator" ? req.user._id : null,
-          grade: grade || "Not Assigned",
+          grade: getRandomGrade(),
           school: schoolNameStr,
         };
 

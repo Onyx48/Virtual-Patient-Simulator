@@ -17,8 +17,8 @@ function StudentTable({ data, onEditClick, onDeleteClick, onViewTranscriptClick,
             <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider cursor-pointer" onClick={() => handleSort('emailAddress')}>
               Email
             </th>
-            <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider cursor-pointer" onClick={() => handleSort('schoolName')}>
-              School
+            <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+              Assigned Scenarios
             </th>
             <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
               Actions
@@ -26,11 +26,14 @@ function StudentTable({ data, onEditClick, onDeleteClick, onViewTranscriptClick,
           </tr>
         </thead>
         <tbody className="bg-white divide-y divide-gray-200">
-          {data.map((student) => (
+          {data.map((student) => {
+            console.log("Student assignedScenarios:", student.assignedScenarios);
+            return (
             <tr key={student.id}>
               <td className="px-6 py-4 whitespace-nowrap text-sm font-medium text-gray-900">{student.studentName}</td>
               <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500">{student.emailAddress}</td>
               <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500">{student.schoolName}</td>
+              <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500">{student.assignedScenarios?.length || 0}</td>
               <td className="px-6 py-4 whitespace-nowrap text-sm font-medium">
                 <div className="flex gap-2">
                   {canEdit && onEditClick && (
@@ -68,7 +71,8 @@ function StudentTable({ data, onEditClick, onDeleteClick, onViewTranscriptClick,
                 </div>
               </td>
             </tr>
-          ))}
+            );
+          })}
         </tbody>
       </table>
     </div>

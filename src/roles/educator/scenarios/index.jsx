@@ -48,7 +48,7 @@ function ScenariosPage() {
         (scenario) =>
           scenario.scenarioName?.toLowerCase().includes(lowerCaseSearchTerm) ||
           scenario.description?.toLowerCase().includes(lowerCaseSearchTerm) ||
-          scenario.creator?.name?.toLowerCase().includes(lowerCaseSearchTerm) // Handling populated creator object
+          scenario.educator?.name?.toLowerCase().includes(lowerCaseSearchTerm) // Handling populated educator object
       );
     }
 
@@ -173,13 +173,13 @@ function ScenariosPage() {
         onSort={handleSort}
       />
 
-      {/* Only the Assign Modal remains (if you use it for students) */}
-      {/* {isAssignModalOpen && (
-        <AssignScenariosModal
-          onClose={() => setIsAssignModalOpen(false)}
-          onAssignSuccess={() => dispatch(fetchScenarios())}
-        />
-      )} */}
+       {/* Assign Scenarios Modal */}
+       {isAssignModalOpen && (
+         <AssignScenariosModal
+           onClose={() => setIsAssignModalOpen(false)}
+           onAssignSuccess={() => dispatch(fetchScenarios())}
+         />
+       )}
     </div>
   );
 }

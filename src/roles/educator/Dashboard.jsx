@@ -69,7 +69,13 @@ function EducatorDashboard() {
     const fetchStudents = async () => {
       try {
         const response = await axios.get("/api/students", getAuthHeaders());
-        setStudents(response.data);
+        // Map Backend Data to UI Structure
+        const mappedData = response.data.map((student) => ({
+          ...student,
+          studentName: student.user?.name || "Unnamed Student",
+          emailAddress: student.user?.email || "No Email",
+        }));
+        setStudents(mappedData);
       } catch (error) {
         console.error("Error fetching students:", error);
       }
@@ -271,7 +277,7 @@ function EducatorDashboard() {
               </div>
             </div>
             <div className="flex-1 w-full min-h-0">
-              <ResponsiveContainer width="100%" height="100%">
+              <ResponsiveContainer width="100%" height="100%" minWidth={300} minHeight={200}>
                 <BarChart
                   data={ACTIVITY_DATA}
                   barGap={4}
@@ -333,7 +339,7 @@ function EducatorDashboard() {
             </h3>
             <div className="flex-1 relative flex items-center justify-center">
               <div className="w-full h-[200px]">
-                <ResponsiveContainer width="100%" height="100%">
+                <ResponsiveContainer width="100%" height="100%" minWidth={200} minHeight={200}>
                   <PieChart>
                     <Pie
                       data={POPULARITY_DATA}
@@ -413,7 +419,7 @@ function EducatorDashboard() {
                 <tbody className="divide-y divide-gray-50">
                   {recentStudents.map((student, idx) => (
                     <tr
-                      key={student.id}
+                      key={student._id}
                       className="hover:bg-gray-50/80 transition-colors"
                     >
                       <td className="px-2 py-3.5 text-xs font-semibold text-gray-900 flex items-center gap-2">
@@ -427,11 +433,11 @@ function EducatorDashboard() {
                       </td>
                       <td className="px-2 py-3.5 text-xs text-gray-700 font-medium">
                         78%
-                      </td>{" "}
+                      </td>
                       {/* Placeholder: Add progress to your JSON if needed */}
                       <td className="px-2 py-3.5 text-xs text-gray-700 font-medium">
                         85
-                      </td>{" "}
+                      </td>
                       {/* Placeholder: Add score to your JSON if needed */}
                     </tr>
                   ))}
@@ -454,9 +460,9 @@ function EducatorDashboard() {
               </button>
             </div>
             <div className="space-y-3">
-              {recentScenarios.map((scenario) => (
-                <div
-                  key={scenario.id}
+               {recentScenarios.map((scenario) => (
+                 <div
+                   key={scenario._id}
                   className="border border-gray-100 rounded-xl p-4 hover:border-gray-200 hover:shadow-sm transition-all cursor-pointer bg-white"
                 >
                   <div className="flex justify-between items-start mb-2">
