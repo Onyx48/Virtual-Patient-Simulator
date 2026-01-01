@@ -14,7 +14,7 @@ import {
   AlertCircle,
 } from "lucide-react";
 // --- CONFIGURATION ---
-const AI_SERVICE_URL = "http://64.227.110.183:8888";
+const AI_SERVICE_URL = import.meta.env.VITE_AI_SERVICE_URL || "http://localhost:8888";
 // --- INTERNAL COMPONENT: ERROR POPUP ---
 const ErrorModal = ({ isOpen, message, onClose }) => {
   if (!isOpen) return null;

@@ -19,9 +19,8 @@ export default defineConfig({
       "@": resolve(__dirname, "./src"),
     },
   },
-  // Add this to fix the Recharts dependency issue
   optimizeDeps: {
     include: ["recharts"],
-    force: false, // Set to true temporarily if issues persist
+    force: false,
   },
 });
