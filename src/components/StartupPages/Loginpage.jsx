@@ -138,7 +138,7 @@ function LoginPage() {
                         className="h-4 w-4 text-custom-orange bg-gray-800 border-gray-600 rounded focus:ring-custom-orange"/>
                     <label htmlFor="remember-me" className="ml-2 block text-sm text-gray-300">Remember Me</label>
                 </div>
-                <Link to="/forgot-password" className="text-sm text-gray-400 hover:underline hover:text-gray-100">Forgot Password?</Link>
+                {/* <Link to="/forgot-password" className="text-sm text-gray-400 hover:underline hover:text-gray-100">Forgot Password?</Link> */}
             </div>
             
             <div className="px-4 pb-2 pt-4">
@@ -148,12 +148,12 @@ function LoginPage() {
                 {isLoading ? 'Signing In...' : 'Sign In'}
               </button>
             </div>
-            <div className="mt-8 text-center text-sm text-gray-400">
+            {/* <div className="mt-8 text-center text-sm text-gray-400">
               Don't have an account?{' '}
               <Link to="/signup" className="font-semibold text-custom-orange hover:underline">
                 Sign up
               </Link>
-            </div>
+            </div> */}
           </form>
         </div>
       </div>

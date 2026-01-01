@@ -57,14 +57,38 @@ function App() {
         <Router>
           <Routes>
             {/* Public Routes for Authentication Flows */}
-            <Route
-              path="/login"
+            {/* <Route
+              path="/signup"
               element={
                 <PublicRoute>
-                  <LoginPage />
+                  <SignupPage />
                 </PublicRoute>
               }
             />
+            <Route
+              path="/forgot-password"
+              element={
+                <PublicRoute>
+                  <ForgotPasswordPage />
+                </PublicRoute>
+              }
+            />
+            <Route
+              path="/verify-otp"
+              element={
+                <PublicRoute>
+                  <OtpVerificationPage />
+                </PublicRoute>
+              }
+            />
+            <Route
+              path="/reset-password/:token?"
+              element={
+                <PublicRoute>
+                  <ResetPasswordPage />
+                </PublicRoute>
+              }
+            /> */}
             <Route
               path="/signup"
               element={
@@ -94,6 +118,15 @@ function App() {
               element={
                 <PublicRoute>
                   <ResetPasswordPage />
+                </PublicRoute>
+              }
+            />
+
+            <Route
+              path="/login"
+              element={
+                <PublicRoute>
+                  <LoginPage />
                 </PublicRoute>
               }
             />

@@ -9,7 +9,6 @@ const initialUserData = {
   fullName: "John Doe",
   email: "johndoe123@gmail.com",
   phoneNumber: "+123456789",
-  twoFactorEnabled: true,
 };
 
 const EditIcon = () => (
@@ -81,25 +80,7 @@ const EyeIcon = ({ isVisible, onClick }) => (
   </button>
 );
 
-const ToggleSwitch = ({ enabled, onToggle, disabled }) => (
-  <button
-    type="button"
-    onClick={disabled ? undefined : onToggle}
-    disabled={disabled}
-    className={`relative inline-flex flex-shrink-0 h-6 w-11 border-2 border-transparent rounded-full cursor-pointer transition-colors ease-in-out duration-200 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-blue-500 ${
-      enabled && !disabled ? "bg-blue-600" : "bg-gray-200"
-    } ${disabled ? "cursor-not-allowed opacity-50" : ""}`}
-    role="switch"
-    aria-checked={enabled}
-  >
-    <span
-      aria-hidden="true"
-      className={`pointer-events-none inline-block h-5 w-5 rounded-full bg-white shadow transform ring-0 transition ease-in-out duration-200 ${
-        enabled && !disabled ? "translate-x-5" : "translate-x-0"
-      }`}
-    ></span>
-  </button>
-);
+
 
 function SettingsPage() {
   const { user, updateProfile } = useAuth();
@@ -116,13 +97,8 @@ function SettingsPage() {
     password: '',
   });
 
-  // Role-based permissions
-  const isSuperadmin = user?.role === 'superadmin';
-
   // All roles can edit personal info
   const canEditPersonalInfo = true;
-  // Can edit two-factor
-  const canEditTwoFactor = isSuperadmin;
 
   const {
     register,
@@ -138,8 +114,6 @@ function SettingsPage() {
   const [showNewPassword, setShowNewPassword] = useState(false);
   const [showConfirmPassword, setShowConfirmPassword] = useState(false);
 
-  const twoFactorEnabled = watch("twoFactorEnabled");
-
   useEffect(() => {
     if (user) {
       setUserData({
@@ -147,12 +121,10 @@ function SettingsPage() {
         fullName: user.name || initialUserData.fullName,
         email: user.email || initialUserData.email,
         phoneNumber: user.phoneNumber || initialUserData.phoneNumber,
-        twoFactorEnabled: user.twoFactorEnabled ?? initialUserData.twoFactorEnabled,
       });
       setValue("fullName", user.name || initialUserData.fullName);
       setValue("email", user.email || initialUserData.email);
       setValue("phoneNumber", user.phoneNumber || initialUserData.phoneNumber);
-      setValue("twoFactorEnabled", user.twoFactorEnabled ?? initialUserData.twoFactorEnabled);
     }
   }, [user, setValue]);
 
@@ -371,23 +343,7 @@ function SettingsPage() {
           </div>
         </div>
 
-        {/* Two-Factor Authentication */}
-        {canEditTwoFactor && (
-          <div>
-            <h2 className="text-lg font-semibold text-gray-900 mb-4">Two-Factor Authentication</h2>
-            <div className="flex items-center justify-between">
-              <div>
-                <p className="text-sm text-gray-700">Enable two-factor authentication</p>
-                <p className="text-xs text-gray-500">Add an extra layer of security to your account</p>
-              </div>
-              <ToggleSwitch
-                enabled={twoFactorEnabled}
-                onToggle={() => setValue("twoFactorEnabled", !twoFactorEnabled)}
-                disabled={!canEditTwoFactor}
-              />
-            </div>
-          </div>
-        )}
+
 
         {/* Save Button */}
         <div className="flex justify-end">
