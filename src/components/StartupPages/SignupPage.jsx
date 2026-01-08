@@ -1,9 +1,9 @@
 // src/components/StartupPages/SignupPage.jsx
 import React, { useState } from "react";
 import { Link, useNavigate } from "react-router-dom";
-import signupImage from "./login-bg.jpg"; // Ensure path is correct
+import signupImage from "./Login-bg.jpg"; // Ensure path is correct
 import { useAuth } from "../../AuthContext"; // Import useAuth
-import { toast } from 'react-hot-toast';
+import { toast } from "react-hot-toast";
 
 // ... (validateName, validateEmail, validatePasswordSignup, errorIcon remain the same) ...
 const validateName = (name) => {

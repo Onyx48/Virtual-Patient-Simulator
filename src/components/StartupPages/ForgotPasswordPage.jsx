@@ -1,6 +1,6 @@
 import React, { useState } from "react";
 import { Link, useNavigate } from "react-router-dom";
-import formBgImage from "./login-bg.jpg"; // Reusing the same image
+import formBgImage from "./Login-bg.jpg"; // Reusing the same image
 import axios from "axios";
 
 function ForgotPasswordPage() {

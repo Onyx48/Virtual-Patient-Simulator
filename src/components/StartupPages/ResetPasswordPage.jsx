@@ -2,7 +2,7 @@
 import React, { useState } from "react";
 import { useLocation, useNavigate, useParams } from "react-router-dom";
 import axios from "axios";
-import formBgImage from "./login-bg.jpg"; // Ensure path is correct
+import formBgImage from "./Login-bg.jpg"; // Ensure path is correct
 // ... (errorIcon and validation functions for password)
 
 function ResetPasswordPage() {
