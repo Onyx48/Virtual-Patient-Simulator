@@ -4,7 +4,8 @@
   "version": "0.0.0",
   "type": "module",
   "scripts": {
-    "dev": "concurrently \"cd backend && node index.js\" \"vite\"",
+    "dev": "vite",
+    "dev:both": "concurrently \"cd backend && node index.js\" \"vite\"",
     "backend": "cd backend && node index.js",
     "frontend": "vite",
     "build": "vite build",

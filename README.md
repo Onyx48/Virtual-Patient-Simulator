@@ -1,11 +1,17 @@
-first node index.js then pnpm run dev
+backend only
 
 ```sh
 node index.js
 ```
 
+frontend only
 ```sh
 pnpm run dev
+```
+
+frontend + backend
+```sh
+pnpm run dev:both
 ```
 
 open git bash
