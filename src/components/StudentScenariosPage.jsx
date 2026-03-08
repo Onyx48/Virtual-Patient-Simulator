@@ -4,6 +4,7 @@ import axios from "axios";
 import { getAuthHeaders } from "../lib/utils.js";
 import ScenarioManagementControlsStudent from "../roles/student/scenarios/ScenarioManagementControlsStudent.jsx";
 import ScenrioGridStudent from "../roles/student/scenarios/ScenrioGridStudent.jsx";
+import toast from "react-hot-toast";
 
 function StudentScenariosPage() {
   const { user } = useAuth();
@@ -16,13 +17,12 @@ function StudentScenariosPage() {
     const fetchScenarios = async () => {
       try {
         const response = await axios.get("/api/scenarios", getAuthHeaders());
-        // Scenarios are already filtered server-side for students
         const mappedScenarios = response.data.map((scenario) => ({
           id: scenario._id,
           scenarioName: scenario.scenarioName,
           description: scenario.description,
           difficulty: scenario.difficulty,
-          highestScore: "N/A", // Mock or fetch from results
+          highestScore: "N/A",
           status: scenario.status,
         }));
         setScenarios(mappedScenarios);
@@ -35,22 +35,44 @@ function StudentScenariosPage() {
     if (user) fetchScenarios();
   }, [user]);
 
-  // Filter and sort scenarios
+  const handleStartNow = async (scenarioId) => {
+    try {
+      const response = await axios.post(
+        "/api/sessions/start",
+        { scenario_id: scenarioId },
+        getAuthHeaders(),
+      );
+      const redirectUrl = response.data?.redirect_url;
+      if (!redirectUrl) {
+        throw new Error("Redirect URL missing in response");
+      }
+      window.open(redirectUrl, "_blank", "noopener,noreferrer");
+    } catch (error) {
+      console.error("Error starting session:", error);
+      const message =
+        error?.response?.data?.message || "Failed to start session.";
+      toast.error(message);
+    }
+  };
+
   const processedScenarios = useMemo(() => {
     let filtered = scenarios;
     if (searchTerm) {
-      filtered = filtered.filter(s =>
-        s.scenarioName.toLowerCase().includes(searchTerm.toLowerCase()) ||
-        s.description.toLowerCase().includes(searchTerm.toLowerCase())
+      filtered = filtered.filter(
+        (s) =>
+          s.scenarioName.toLowerCase().includes(searchTerm.toLowerCase()) ||
+          s.description.toLowerCase().includes(searchTerm.toLowerCase()),
       );
     }
-    // Simple sort logic
     if (sortConfig === "Highest") {
-      filtered = [...filtered].sort((a, b) => (b.highestScore || 0) - (a.highestScore || 0));
+      filtered = [...filtered].sort(
+        (a, b) => (b.highestScore || 0) - (a.highestScore || 0),
+      );
     } else if (sortConfig === "Lowest") {
-      filtered = [...filtered].sort((a, b) => (a.highestScore || 0) - (b.highestScore || 0));
+      filtered = [...filtered].sort(
+        (a, b) => (a.highestScore || 0) - (b.highestScore || 0),
+      );
     } else if (sortConfig === "Recent") {
-      // Assuming no date, keep as is
     }
     return filtered;
   }, [scenarios, searchTerm, sortConfig]);
@@ -69,7 +91,10 @@ function StudentScenariosPage() {
         sortConfig={sortConfig}
         onSortChange={setSortConfig}
       />
-      <ScenrioGridStudent data={processedScenarios} />
+      <ScenrioGridStudent
+        data={processedScenarios}
+        onStartNow={handleStartNow}
+      />
     </div>
   );
 }

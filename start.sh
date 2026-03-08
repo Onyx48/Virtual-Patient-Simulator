@@ -2,4 +2,4 @@
 
 pnpm i 
 
-node index.js & pnpm run dev
+node backend/index.js & pnpm run dev

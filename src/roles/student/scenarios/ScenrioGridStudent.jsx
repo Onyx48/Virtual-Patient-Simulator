@@ -2,8 +2,19 @@ import React from "react";
 import { Target } from "lucide-react";
 import { useNavigate } from "react-router-dom";
 
-function ScenarioGridStudent({ data }) {
+function ScenarioGridStudent({ data, onStartNow }) {
   const navigate = useNavigate();
+
+  const handleStart = (scenarioId) => {
+    if (onStartNow) {
+      return onStartNow(scenarioId);
+    }
+    navigate(`/student/scenario/${scenarioId}`);
+  };
+
+  const handleCardClick = (scenarioId) => {
+    navigate(`/student/scenario/${scenarioId}`);
+  };
 
   // Helper: Get text color based on difficulty
   const getDifficultyColor = (level) => {
@@ -45,6 +56,15 @@ function ScenarioGridStudent({ data }) {
       {data.map((scenario, index) => (
         <div
           key={scenario.id || index}
+          role="button"
+          tabIndex={0}
+          onClick={() => handleCardClick(scenario.id)}
+          onKeyDown={(event) => {
+            if (event.key === "Enter" || event.key === " ") {
+              event.preventDefault();
+              handleCardClick(scenario.id);
+            }
+          }}
           className="bg-white rounded-3xl p-6 shadow-sm border border-gray-100 hover:shadow-lg transition-shadow flex flex-col h-full"
         >
           {/* Header: Icon, Score, Difficulty */}
@@ -95,13 +115,19 @@ function ScenarioGridStudent({ data }) {
             {scenario.status === "Completed" ? (
               <div className="flex gap-3">
                 <button
-                  onClick={() => navigate(`/student/scenario/${scenario.id}`)}
+                  onClick={(event) => {
+                    event.stopPropagation();
+                    navigate(`/student/scenario/${scenario.id}`);
+                  }}
                   className="flex-1 py-3 rounded-xl border border-gray-200 text-xs font-bold text-gray-700 hover:bg-gray-50 transition-colors"
                 >
                   Results
                 </button>
                 <button
-                  // Add logic to restart scenario
+                  onClick={(event) => {
+                    event.stopPropagation();
+                    handleStart(scenario.id);
+                  }}
                   className="flex-1 py-3 rounded-xl bg-gray-100 text-xs font-bold text-gray-600 hover:bg-gray-200 transition-colors"
                 >
                   Start Again
@@ -109,7 +135,10 @@ function ScenarioGridStudent({ data }) {
               </div>
             ) : (
               <button
-                onClick={() => navigate(`/student/scenario/${scenario.id}`)}
+                onClick={(event) => {
+                  event.stopPropagation();
+                  handleStart(scenario.id);
+                }}
                 className="w-full py-3.5 rounded-xl bg-black text-white text-xs font-bold hover:bg-gray-800 transition-colors shadow-md"
               >
                 Start Now

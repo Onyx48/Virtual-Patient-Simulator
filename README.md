@@ -1,7 +1,13 @@
 backend only
 
 ```sh
-node index.js
+node backend/index.js
+```
+
+or
+
+```sh
+pnpm run backend
 ```
 
 frontend only

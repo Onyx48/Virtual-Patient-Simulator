@@ -1,8 +1,10 @@
 import React, { useState } from "react";
-import { useNavigate } from "react-router-dom";
+import { useNavigate, useParams } from "react-router-dom";
 import { ChevronLeft, Bell, MessageSquare } from "lucide-react";
+import axios from "axios";
+import toast from "react-hot-toast";
+import { getAuthHeaders } from "../../../lib/utils.js";
 
-// --- MOCK DATA (Matches your Screenshot) ---
 const MOCK_QUESTIONS = [
   {
     id: 1,
@@ -38,6 +40,7 @@ const MOCK_DETAILS = {
 
 function StudentScenarioDetails({ onBack }) {
   const navigate = useNavigate();
+  const { id: scenarioId } = useParams();
   const [activeAttempt, setActiveAttempt] = useState(1);
   const [isMockTestActive, setIsMockTestActive] = useState(false);
   const [mockAnswers, setMockAnswers] = useState({});
@@ -45,6 +48,32 @@ function StudentScenarioDetails({ onBack }) {
 
   // Use mock data for UI visualization
   const data = MOCK_DETAILS;
+
+  const handleStartSession = async () => {
+    const idToUse = scenarioId || data.id;
+    if (!idToUse) {
+      toast.error("Scenario ID is missing.");
+      return;
+    }
+
+    try {
+      const response = await axios.post(
+        "/api/sessions/start",
+        { scenario_id: idToUse },
+        getAuthHeaders(),
+      );
+      const redirectUrl = response.data?.redirect_url;
+      if (!redirectUrl) {
+        throw new Error("Redirect URL missing in response");
+      }
+      window.open(redirectUrl, "_blank", "noopener,noreferrer");
+    } catch (error) {
+      console.error("Error starting session:", error);
+      const message =
+        error?.response?.data?.message || "Failed to start session.";
+      toast.error(message);
+    }
+  };
 
   return (
     <div className="min-h-screen bg-[#F9FAFB] p-6 font-sans">
@@ -62,19 +91,19 @@ function StudentScenarioDetails({ onBack }) {
       <div className="max-w-5xl mx-auto space-y-6">
         {/* Navigation & Start Button */}
         <div className="flex justify-between items-center mb-2">
-           <button
-             onClick={() => onBack ? onBack() : navigate(-1)}
-             className="flex items-center px-4 py-2 bg-white border border-gray-200 rounded-lg text-sm font-bold text-gray-600 hover:bg-gray-50 transition-colors shadow-sm"
-           >
+          <button
+            onClick={() => (onBack ? onBack() : navigate(-1))}
+            className="flex items-center px-4 py-2 bg-white border border-gray-200 rounded-lg text-sm font-bold text-gray-600 hover:bg-gray-50 transition-colors shadow-sm"
+          >
             <ChevronLeft className="w-4 h-4 mr-1" /> Go Back
           </button>
-           <button
-             onClick={() => setIsMockTestActive(true)}
-             className="px-6 py-2.5 bg-[#F59E0B] hover:bg-amber-600 text-white text-sm font-bold rounded-lg shadow-md transition-colors"
-           >
-             Start Mock Test
-           </button>
-         </div>
+          <button
+            onClick={handleStartSession}
+            className="px-6 py-2.5 bg-[#F59E0B] hover:bg-amber-600 text-white text-sm font-bold rounded-lg shadow-md transition-colors"
+          >
+            Start Mock Test
+          </button>
+        </div>
 
         {/* Mock Test Section */}
         {isMockTestActive && !mockScore && (
@@ -91,7 +120,9 @@ function StudentScenarioDetails({ onBack }) {
             <div className="space-y-6">
               {MOCK_QUESTIONS.map((q) => (
                 <div key={q.id} className="border-b border-gray-100 pb-4">
-                  <p className="font-semibold text-gray-900 mb-3">{q.question}</p>
+                  <p className="font-semibold text-gray-900 mb-3">
+                    {q.question}
+                  </p>
                   <div className="space-y-2">
                     {q.options.map((option, idx) => (
                       <label key={idx} className="flex items-center">
@@ -99,7 +130,12 @@ function StudentScenarioDetails({ onBack }) {
                           type="radio"
                           name={`question-${q.id}`}
                           value={idx}
-                          onChange={(e) => setMockAnswers({ ...mockAnswers, [q.id]: parseInt(e.target.value) })}
+                          onChange={(e) =>
+                            setMockAnswers({
+                              ...mockAnswers,
+                              [q.id]: parseInt(e.target.value),
+                            })
+                          }
                           className="mr-2"
                         />
                         <span className="text-sm text-gray-700">{option}</span>
@@ -110,8 +146,13 @@ function StudentScenarioDetails({ onBack }) {
               ))}
               <button
                 onClick={() => {
-                  const correct = MOCK_QUESTIONS.reduce((acc, q) => acc + (mockAnswers[q.id] === q.correct ? 1 : 0), 0);
-                  setMockScore(Math.round((correct / MOCK_QUESTIONS.length) * 100));
+                  const correct = MOCK_QUESTIONS.reduce(
+                    (acc, q) => acc + (mockAnswers[q.id] === q.correct ? 1 : 0),
+                    0,
+                  );
+                  setMockScore(
+                    Math.round((correct / MOCK_QUESTIONS.length) * 100),
+                  );
                 }}
                 className="px-6 py-2 bg-[#F59E0B] text-white rounded-lg hover:bg-amber-600"
               >
@@ -123,8 +164,12 @@ function StudentScenarioDetails({ onBack }) {
 
         {mockScore !== null && (
           <div className="bg-white rounded-2xl p-8 shadow-[0_2px_10px_-3px_rgba(6,81,237,0.1)] border border-gray-100">
-            <h3 className="text-lg font-bold text-gray-900 mb-4">Mock Test Result</h3>
-            <p className="text-xl font-semibold text-[#F59E0B]">Score: {mockScore}%</p>
+            <h3 className="text-lg font-bold text-gray-900 mb-4">
+              Mock Test Result
+            </h3>
+            <p className="text-xl font-semibold text-[#F59E0B]">
+              Score: {mockScore}%
+            </p>
             <button
               onClick={() => {
                 setIsMockTestActive(false);
