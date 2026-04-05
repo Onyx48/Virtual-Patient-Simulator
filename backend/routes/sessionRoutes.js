@@ -103,6 +103,7 @@ router.post(
         student_id: studentProfile._id.toString(),
         educator_id: studentProfile.educatorId.toString(),
         company_id: companyId,
+        scenario_id: scenario_id,
       };
 
       const key = getJweKey();
