@@ -26,28 +26,11 @@ import ScenarioManagementControlsStudent from "./scenarios/ScenarioManagementCon
 import ScenarioTableStudent from "./scenarios/ScenrioGridStudent";
 import StudentScenarioDetails from "./scenarios/StudentScenarioDetails";
 
+// Dynamic notices - could be fetched from API in future
 const notices = [
   {
-    title: "New Scenario Available",
-    sub: '"Cardiac Assessment"',
-    icon: "alert",
-    color: "bg-red-100 text-red-500",
-  },
-  {
-    title: "Upcoming Group Play Session",
-    sub: "March 5th, 2025, At 3 PM",
-    icon: "calendar",
-    color: "bg-orange-100 text-orange-500",
-  },
-  {
-    title: "Update",
-    sub: "System Maintenance On March 7th, 2025",
-    icon: "bell",
-    color: "bg-gray-200 text-gray-600",
-  },
-  {
-    title: "Exciting Team-Building Event!",
-    sub: "April 10th, 2025, At 2 PM",
+    title: "Welcome to Your Dashboard",
+    sub: "Complete scenarios to track your progress",
     icon: "star",
     color: "bg-yellow-100 text-yellow-500",
   },

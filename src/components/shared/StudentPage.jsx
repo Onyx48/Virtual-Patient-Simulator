@@ -49,17 +49,17 @@ function StudentPage({ role }) {
       // The backend automatically filters this based on the logged-in user's role/scope
       const response = await axios.get("/api/students", getAuthHeaders());
 
-      // Map Backend Data to UI Structure
+      // Map Backend Data to UI Structure (now from User collection with stats)
       const mappedData = response.data.map((student) => ({
-        id: student._id, // Internal ID
+        id: student._id, // Internal ID (from User _id)
         visualId: `VS${student._id.slice(-6).toUpperCase()}`, // Visual ID (VS987654)
-        user_id: student.user?._id,
-        name: student.user?.name || "Unknown",
-        email: student.user?.email || "No Email",
-        schoolName: student.school || "Unassigned",
-        progress: student.grade || "Not Assigned", // Mapping Grade to Progress
-        assignedScenariosCount: student.assignedScenarios?.length || 0,
-        isAssigned: (student.assignedScenarios?.length || 0) > 0,
+        user_id: student._id, // User ID directly from User collection
+        name: student.name || "Unknown",
+        email: student.email || "No Email",
+        schoolName: student.schoolId?.schoolName || "Unassigned",
+        progress: student.bestScore !== null ? `${Math.round(student.bestScore * 100)}%` : "Not Assigned",
+        assignedScenariosCount: student.assignedScenariosCount || 0,
+        isAssigned: (student.assignedScenariosCount || 0) > 0,
         originalData: student,
       }));
       setStudents(mappedData);
@@ -103,7 +103,7 @@ function StudentPage({ role }) {
   const handleSaveStudent = async (formData) => {
     try {
       if (formData.id) {
-        // Update Existing
+        // Update Existing - only update user fields (name, email)
         if (formData.user_id) {
           await axios.put(
             `/api/users/${formData.user_id}`,
@@ -114,16 +114,8 @@ function StudentPage({ role }) {
             getAuthHeaders()
           );
         }
-        await axios.put(
-          `/api/students/${formData.id}`,
-          {
-            grade: formData.grade,
-            school: formData.schoolName,
-          },
-          getAuthHeaders()
-        );
       } else {
-        // Create New
+        // Create New - only send user fields, backend handles schoolId and supervisor
         await axios.post(
           "/api/users",
           {
@@ -131,8 +123,6 @@ function StudentPage({ role }) {
             email: formData.email,
             password: formData.password,
             role: "student",
-            grade: formData.grade,
-            schoolId: formData.schoolName,
           },
           getAuthHeaders()
         );

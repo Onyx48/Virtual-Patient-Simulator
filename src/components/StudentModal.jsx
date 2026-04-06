@@ -17,7 +17,7 @@ function StudentModal({ onSave, onClose, studentData, role, defaultSchoolName })
           studentName: studentData.name,
           emailAddress: studentData.email,
           schoolName: studentData.schoolName,
-          grade: studentData.progress,
+          grade: "",
         }
       : {
           studentName: "",
@@ -38,6 +38,7 @@ function StudentModal({ onSave, onClose, studentData, role, defaultSchoolName })
       email: data.emailAddress,
       password: data.password,
       schoolName: !isEdit && role === "educator" ? defaultSchoolName : data.schoolName,
+      grade: data.grade,
     };
 
     await onSave(submissionData);

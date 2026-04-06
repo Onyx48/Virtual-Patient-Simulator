@@ -66,11 +66,7 @@ const schoolValidationRules = [
 // @desc    Get all schools (with optional filters)
 // @route   GET /api/schools
 // @access  Private (Superadmin, Educator, School Admin)
-router.get(
-  "/",
-  protect,
-  checkAccess('viewSchools'),
-  async (req, res) => {
+router.get("/", protect, checkAccess("viewSchools"), async (req, res) => {
   try {
     let query = {};
     // Implement filters if passed in query params (e.g., /api/schools?status=Active)
@@ -84,66 +80,60 @@ router.get(
       availableForSchoolAdmin,
     } = req.query;
 
-      if (status) query.status = status;
-      if (subscription) query.subscription = subscription;
-      if (permissions) query.permissions = permissions;
+    if (status) query.status = status;
+    if (subscription) query.subscription = subscription;
+    if (permissions) query.permissions = permissions;
 
-      if (startDateAfter) {
-        const date = parseDateString(startDateAfter);
-        if (date) query.startDate = { $gte: date };
-      }
-      if (expireDateBefore) {
-        const date = parseDateString(expireDateBefore);
-        if (date) query.expireDate = { $lte: date };
-      }
-
-      if (searchTerm) {
-        const searchRegex = new RegExp(searchTerm, "i"); // Case-insensitive search
-        query.$or = [
-          { schoolName: searchRegex },
-          { email: searchRegex },
-          { description: searchRegex },
-        ];
-      }
-
-      if (availableForSchoolAdmin === 'true') {
-        query['assignedAdmin.id'] = null;
-      }
-
-      const schools = await School.find(query).sort({ schoolName: 1 }); // Sort by name by default
-      res.json(schools);
-    } catch (err) {
-      console.error("Get Schools Error:", err);
-      res.status(500).json({ message: "Server error fetching schools." });
+    if (startDateAfter) {
+      const date = parseDateString(startDateAfter);
+      if (date) query.startDate = { $gte: date };
     }
+    if (expireDateBefore) {
+      const date = parseDateString(expireDateBefore);
+      if (date) query.expireDate = { $lte: date };
+    }
+
+    if (searchTerm) {
+      const searchRegex = new RegExp(searchTerm, "i"); // Case-insensitive search
+      query.$or = [
+        { schoolName: searchRegex },
+        { email: searchRegex },
+        { description: searchRegex },
+      ];
+    }
+
+    if (availableForSchoolAdmin === "true") {
+      query["assignedAdmin.id"] = null;
+    }
+
+    const schools = await School.find(query).sort({ schoolName: 1 }); // Sort by name by default
+    res.json(schools);
+  } catch (err) {
+    console.error("Get Schools Error:", err);
+    res.status(500).json({ message: "Server error fetching schools." });
   }
-);
+});
 
 // @desc    Get single school by ID
 // @route   GET /api/schools/:id
 // @access  Private (Superadmin, Educator, School Admin)
-router.get(
-  "/:id",
-  protect,
-  checkAccess('viewSchools'),
-  async (req, res) => {
-    try {
-      const school = await School.findById(req.params.id);
-      if (!school) {
-        return res.status(404).json({ message: "School not found." });
-      }
-      res.json(school);
-    } catch (err) {
-      console.error("Get School by ID Error:", err);
-      if (err.kind === "ObjectId") {
-        return res
-          .status(404)
-          .json({ message: "School not found (Invalid ID)." });
-      }
-      res.status(500).json({ message: "Server error fetching school." });
+router.get("/:id", protect, checkAccess("viewSchools"), async (req, res) => {
+  try {
+    const school = await School.findById(req.params.id);
+    if (!school) {
+      return res.status(404).json({ message: "School not found." });
     }
+    res.json(school);
+  } catch (err) {
+    console.error("Get School by ID Error:", err);
+    if (err.kind === "ObjectId") {
+      return res
+        .status(404)
+        .json({ message: "School not found (Invalid ID)." });
+    }
+    res.status(500).json({ message: "Server error fetching school." });
   }
-);
+});
 
 // @desc    Create a new school
 // @route   POST /api/schools
@@ -151,7 +141,7 @@ router.get(
 router.post(
   "/",
   protect,
-  checkAccess('manageSchools'),
+  checkAccess("manageSchools"),
   schoolValidationRules,
   async (req, res) => {
     const errors = validationResult(req);
@@ -207,7 +197,7 @@ router.post(
       }
       res.status(500).json({ message: "Server error creating school." });
     }
-  }
+  },
 );
 
 // @desc    Update a school
@@ -216,7 +206,7 @@ router.post(
 router.put(
   "/:id",
   protect,
-  checkAccess('manageSchools'),
+  checkAccess("manageSchools"),
   schoolValidationRules,
   async (req, res) => {
     const errors = validationResult(req);
@@ -261,11 +251,9 @@ router.put(
     } catch (err) {
       console.error("Update School Error:", err);
       if (err.code === 11000) {
-        return res
-          .status(400)
-          .json({
-            message: "Another school with this name or email already exists.",
-          });
+        return res.status(400).json({
+          message: "Another school with this name or email already exists.",
+        });
       }
       if (err.name === "ValidationError") {
         const validationMessages = Object.values(err.errors)
@@ -275,28 +263,33 @@ router.put(
       }
       res.status(500).json({ message: "Server error updating school." });
     }
-  }
+  },
 );
 
 // @desc    Delete a school
 // @route   DELETE /api/schools/:id
 // @access  Private (Superadmin only)
-router.delete("/:id", protect, checkAccess('manageSchools'), async (req, res) => {
-  try {
-    const school = await School.findByIdAndDelete(req.params.id);
-    if (!school) {
-      return res.status(404).json({ message: "School not found." });
+router.delete(
+  "/:id",
+  protect,
+  checkAccess("manageSchools"),
+  async (req, res) => {
+    try {
+      const school = await School.findByIdAndDelete(req.params.id);
+      if (!school) {
+        return res.status(404).json({ message: "School not found." });
+      }
+      res.status(200).json({ message: "School deleted successfully." });
+    } catch (err) {
+      console.error("Delete School Error:", err);
+      if (err.kind === "ObjectId") {
+        return res
+          .status(404)
+          .json({ message: "School not found (Invalid ID)." });
+      }
+      res.status(500).json({ message: "Server error deleting school." });
     }
-    res.status(200).json({ message: "School deleted successfully." });
-  } catch (err) {
-    console.error("Delete School Error:", err);
-    if (err.kind === "ObjectId") {
-      return res
-        .status(404)
-        .json({ message: "School not found (Invalid ID)." });
-    }
-    res.status(500).json({ message: "Server error deleting school." });
-  }
-});
+  },
+);
 
 export default router;

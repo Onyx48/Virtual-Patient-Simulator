@@ -30,29 +30,6 @@ import {
   fetchScenarios,
 } from "../../redux/slices/scenarioSlice";
 
-// --- MOCK DATA FOR CHARTS (Visual Design Only) ---
-const ACTIVITY_DATA = [
-  { name: "Jan", completed: 45, active: 30, inactive: 15 },
-  { name: "Feb", completed: 55, active: 35, inactive: 10 },
-  { name: "Mar", completed: 60, active: 30, inactive: 10 },
-  { name: "Apr", completed: 75, active: 45, inactive: 5 },
-  { name: "May", completed: 65, active: 50, inactive: 8 },
-  { name: "Jun", completed: 80, active: 65, inactive: 15 },
-  { name: "Jul", completed: 70, active: 60, inactive: 10 },
-  { name: "Aug", completed: 85, active: 70, inactive: 12 },
-  { name: "Sep", completed: 60, active: 55, inactive: 15 },
-  { name: "Oct", completed: 50, active: 40, inactive: 10 },
-  { name: "Nov", completed: 70, active: 60, inactive: 5 },
-  { name: "Dec", completed: 90, active: 80, inactive: 5 },
-];
-
-const POPULARITY_DATA = [
-  { name: "Emergency Response", value: 35, color: "#6b7280" },
-  { name: "Clinical Diagnosis", value: 30, color: "#d97706" },
-  { name: "Medical Ethics", value: 15, color: "#a16207" },
-  { name: "Patient Assessment", value: 20, color: "#e5e7eb" },
-];
-
 function EducatorDashboard() {
   const { user } = useAuth();
   const navigate = useNavigate();
@@ -61,26 +38,57 @@ function EducatorDashboard() {
 
   // --- STUDENT STATE ---
   const [students, setStudents] = useState([]);
+  
+  // --- ANALYTICS STATE ---
+  const [activityData, setActivityData] = useState([]);
+  const [teachingEffectiveness, setTeachingEffectiveness] = useState(null);
+  const [popularityData, setPopularityData] = useState([]);
+  const [educatorStats, setEducatorStats] = useState(null);
 
-  // Fetch scenarios and students on mount
+  // Fetch scenarios, students, and analytics on mount
   useEffect(() => {
     dispatch(fetchScenarios());
+    
     // Fetch students
     const fetchStudents = async () => {
       try {
         const response = await axios.get("/api/students", getAuthHeaders());
-        // Map Backend Data to UI Structure
         const mappedData = response.data.map((student) => ({
           ...student,
-          studentName: student.user?.name || "Unnamed Student",
-          emailAddress: student.user?.email || "No Email",
+          studentName: student.name || "Unnamed Student",
+          emailAddress: student.email || "No Email",
+          assignedScenariosCount: student.assignedScenariosCount || 0,
+          bestScore: student.bestScore || null,
+          avgScore: student.avgScore || null,
+          totalSessions: student.totalSessions || 0,
         }));
         setStudents(mappedData);
       } catch (error) {
         console.error("Error fetching students:", error);
       }
     };
+
+    // Fetch analytics data
+    const fetchAnalytics = async () => {
+      try {
+        const [activityRes, effectivenessRes, popularityRes, statsRes] = await Promise.all([
+          axios.get("/api/dashboard/monthly-activity", getAuthHeaders()),
+          axios.get("/api/dashboard/teaching-effectiveness", getAuthHeaders()),
+          axios.get("/api/dashboard/scenario-popularity", getAuthHeaders()),
+          axios.get("/api/dashboard/educator-stats", getAuthHeaders()),
+        ]);
+        
+        setActivityData(activityRes.data);
+        setTeachingEffectiveness(effectivenessRes.data);
+        setPopularityData(popularityRes.data);
+        setEducatorStats(statsRes.data);
+      } catch (error) {
+        console.error("Error fetching analytics:", error);
+      }
+    };
+
     fetchStudents();
+    fetchAnalytics();
   }, [dispatch]);
 
 
@@ -162,16 +170,22 @@ function EducatorDashboard() {
                   </div>
                 </div>
                 <div>
-                  <div className="text-4xl font-bold tracking-tight">91.2%</div>
+                  <div className="text-4xl font-bold tracking-tight">
+                    {teachingEffectiveness?.effectiveness || 0}%
+                  </div>
                   <div className="text-xs text-white/80 mt-1">
-                    Monthly Performance Overview
+                    Completion Rate
                   </div>
                 </div>
               </div>
             </div>
             <div className="relative z-10 mt-6 pt-4 border-t border-white/20">
               <p className="text-xs font-medium leading-relaxed text-white/90">
-                Student engagement rose 32% this month, great improvement!
+                {teachingEffectiveness?.engagementChange > 0 ? (
+                  <>Student engagement rose {teachingEffectiveness.engagementChange}% this month, great improvement!</>
+                ) : (
+                  <>Engagement change: {teachingEffectiveness?.engagementChange || 0}%</>
+                )}
               </p>
             </div>
           </div>
@@ -187,8 +201,9 @@ function EducatorDashboard() {
                 <div className="text-3xl font-bold text-gray-900">
                   {totalStudents}
                 </div>
-                <div className="flex items-center gap-1.5 text-xs font-medium text-green-500 mt-2">
-                  <ArrowUpRight size={16} /> <span>+12% increased</span>
+                <div className={`flex items-center gap-1.5 text-xs font-medium mt-2 ${educatorStats?.studentGrowth >= 0 ? 'text-green-500' : 'text-red-500'}`}>
+                  {educatorStats?.studentGrowth >= 0 ? <ArrowUpRight size={16} /> : <ArrowDownRight size={16} />} 
+                  <span>{Math.abs(educatorStats?.studentGrowth || 0)}% {educatorStats?.studentGrowth >= 0 ? 'increased' : 'decreased'}</span>
                   <span className="text-gray-400 font-normal">
                     vs last month
                   </span>
@@ -212,8 +227,9 @@ function EducatorDashboard() {
                     {activeScenariosCount} Active
                   </span>
                 </div>
-                <div className="flex items-center gap-1.5 text-xs font-medium text-green-500 mt-2">
-                  <ArrowUpRight size={16} /> <span>+5 increased</span>
+                <div className={`flex items-center gap-1.5 text-xs font-medium mt-2 ${educatorStats?.scenarioGrowth >= 0 ? 'text-green-500' : 'text-red-500'}`}>
+                  {educatorStats?.scenarioGrowth >= 0 ? <ArrowUpRight size={16} /> : <ArrowDownRight size={16} />} 
+                  <span>{Math.abs(educatorStats?.scenarioGrowth || 0)} {educatorStats?.scenarioGrowth >= 0 ? 'increased' : 'decreased'}</span>
                   <span className="text-gray-400 font-normal">
                     vs last month
                   </span>
@@ -225,9 +241,10 @@ function EducatorDashboard() {
             <div className="bg-white p-6 rounded-2xl shadow-sm border border-gray-100 flex flex-col justify-between">
               <p className="text-gray-500 text-sm font-medium">Avg. Progress</p>
               <div className="mt-2">
-                <div className="text-3xl font-bold text-gray-900">78%</div>
-                <div className="flex items-center gap-1.5 text-xs font-medium text-red-500 mt-2">
-                  <ArrowDownRight size={16} /> <span>-5.4% decreased</span>
+                <div className="text-3xl font-bold text-gray-900">{educatorStats?.avgProgress || 0}%</div>
+                <div className={`flex items-center gap-1.5 text-xs font-medium mt-2 ${educatorStats?.avgProgressChange >= 0 ? 'text-green-500' : 'text-red-500'}`}>
+                  {educatorStats?.avgProgressChange >= 0 ? <ArrowUpRight size={16} /> : <ArrowDownRight size={16} />} 
+                  <span>{Math.abs(educatorStats?.avgProgressChange || 0)}% {educatorStats?.avgProgressChange >= 0 ? 'increased' : 'decreased'}</span>
                   <span className="text-gray-400 font-normal">
                     vs last month
                   </span>
@@ -241,12 +258,9 @@ function EducatorDashboard() {
                 Avg. Time Spent
               </p>
               <div className="mt-2">
-                <div className="text-3xl font-bold text-gray-900">3h 20m</div>
+                <div className="text-3xl font-bold text-gray-900">{educatorStats?.avgTimeSpent || 0}h {Math.round((educatorStats?.avgTimeSpent % 1) * 60) || 0}m</div>
                 <div className="flex items-center gap-1.5 text-xs font-medium text-green-500 mt-2">
-                  <ArrowUpRight size={16} /> <span>22.4% increased</span>
-                  <span className="text-gray-400 font-normal">
-                    vs last month
-                  </span>
+                  <ArrowUpRight size={16} /> <span>Based on sessions</span>
                 </div>
               </div>
             </div>
@@ -276,10 +290,10 @@ function EducatorDashboard() {
                 </div>
               </div>
             </div>
-            <div className="flex-1 w-full min-h-0">
+                <div className="flex-1 w-full min-h-0">
               <ResponsiveContainer width="100%" height="100%" minWidth={300} minHeight={200}>
                 <BarChart
-                  data={ACTIVITY_DATA}
+                  data={activityData}
                   barGap={4}
                   margin={{ top: 10, right: 10, left: -20, bottom: 0 }}
                 >
@@ -342,7 +356,7 @@ function EducatorDashboard() {
                 <ResponsiveContainer width="100%" height="100%" minWidth={200} minHeight={200}>
                   <PieChart>
                     <Pie
-                      data={POPULARITY_DATA}
+                      data={popularityData}
                       cx="50%"
                       cy="50%"
                       innerRadius={60}
@@ -351,7 +365,7 @@ function EducatorDashboard() {
                       stroke="none"
                       paddingAngle={2}
                     >
-                      {POPULARITY_DATA.map((entry, index) => (
+                      {popularityData.map((entry, index) => (
                         <Cell key={`cell-${index}`} fill={entry.color} />
                       ))}
                     </Pie>
@@ -362,13 +376,15 @@ function EducatorDashboard() {
                 </ResponsiveContainer>
                 <div className="absolute inset-0 flex items-center justify-center pointer-events-none">
                   <div className="bg-white shadow-sm border border-gray-100 rounded-full w-10 h-10 flex items-center justify-center">
-                    <span className="text-xs font-bold text-gray-800">35</span>
+                    <span className="text-xs font-bold text-gray-800">
+                      {popularityData.reduce((sum, item) => sum + item.value, 0)}
+                    </span>
                   </div>
                 </div>
               </div>
             </div>
             <div className="grid grid-cols-2 gap-y-2 gap-x-1 mt-4">
-              {POPULARITY_DATA.map((item) => (
+              {popularityData.slice(0, 4).map((item) => (
                 <div key={item.name} className="flex items-center gap-1.5">
                   <span
                     className="w-2 h-2 rounded-full flex-shrink-0"
@@ -432,13 +448,15 @@ function EducatorDashboard() {
                         {student.emailAddress}
                       </td>
                       <td className="px-2 py-3.5 text-xs text-gray-700 font-medium">
-                        78%
+                        {student.bestScore !== null 
+                          ? `${Math.round(student.bestScore * 100)}%` 
+                          : "-"}
                       </td>
-                      {/* Placeholder: Add progress to your JSON if needed */}
                       <td className="px-2 py-3.5 text-xs text-gray-700 font-medium">
-                        85
+                        {student.avgScore !== null 
+                          ? `${Math.round(student.avgScore * 100)}%` 
+                          : "-"}
                       </td>
-                      {/* Placeholder: Add score to your JSON if needed */}
                     </tr>
                   ))}
                 </tbody>

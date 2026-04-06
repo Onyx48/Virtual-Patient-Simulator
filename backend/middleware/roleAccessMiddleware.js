@@ -26,10 +26,7 @@ export const checkAccess = (action) => {
       req.scope.schoolId = req.user.schoolId._id; // Filter to admin's school
     } else if (userRole === "educator") {
       req.scope.educatorId = req.user._id; // Educators see only their own scenarios
-      const effectiveSchoolId =
-        req.user.schoolId ||
-        (req.user.supervisor ? req.user.supervisor.schoolId : null);
-      if (effectiveSchoolId) req.scope.schoolId = effectiveSchoolId._id; // Also filter by school
+      req.scope.schoolId = req.user.schoolId ? req.user.schoolId._id : null; // Educators have schoolId directly
     } else if (userRole === "student") {
       req.scope.userId = req.user._id; // Filter to own data
     }

@@ -140,13 +140,10 @@ router.post("/", protect, checkAccess("manageUsers"), async (req, res) => {
 
     // 9. Determine Supervisor and Department
 
-    // --- SUPERVISOR LOGIC FIXED ---
+    // --- SUPERVISOR LOGIC ---
+    // Only students get supervisor field (their educator)
     let supervisor = null;
-    if (req.user.role === "school_admin" && normalizedRole === "educator") {
-      // If School Admin creates Educator, they are the supervisor
-      supervisor = req.user._id;
-    } else if (req.user.role === "educator" && normalizedRole === "student") {
-      // If Educator creates Student, they are the supervisor
+    if (req.user.role === "educator" && normalizedRole === "student") {
       supervisor = req.user._id;
     }
 
@@ -162,7 +159,7 @@ router.post("/", protect, checkAccess("manageUsers"), async (req, res) => {
       password,
       role: normalizedRole,
       schoolId: finalSchoolId,
-      supervisor: supervisor, // Updated supervisor logic
+      supervisor: supervisor,
       department: finalDepartment, // Updated department logic
     };
 

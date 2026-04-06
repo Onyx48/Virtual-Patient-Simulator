@@ -27,38 +27,39 @@ function SchoolAdminDashboard() {
   useEffect(() => {
     const fetchStats = async () => {
       try {
-        // Fetch scenarios, educators, students for the school
-        const [scenariosRes, educatorsRes, studentsRes] = await Promise.all([
-          axios.get("/api/scenarios", getAuthHeaders()),
-          axios.get("/api/users?role=educator", getAuthHeaders()),
-          axios.get("/api/users?role=student", getAuthHeaders()),
+        // Fetch stats and chart data from API
+        const [dashboardRes] = await Promise.all([
+          axios.get("/api/dashboard/school-admin-stats", getAuthHeaders()),
         ]);
 
-         setStats({
-           scenarios: scenariosRes.data.length,
-           educators: educatorsRes.data.length,
-           students: studentsRes.data.length,
-         });
+        setStats({
+          scenarios: dashboardRes.data.totalScenarios || 0,
+          educators: dashboardRes.data.totalEducators || 0,
+          students: dashboardRes.data.totalStudents || 0,
+        });
 
-         // Chart data for scenarios
-         setChartData([
-           { name: "April", value: scenariosRes.data.length },
-           { name: "May", value: scenariosRes.data.length + 10 },
-         ]);
-
-         // Chart data for educators
-         setEducatorChartData([
-           { name: "April", value: educatorsRes.data.length },
-           { name: "May", value: educatorsRes.data.length + 2 },
-         ]);
-
-         // Chart data for students
-         setStudentChartData([
-           { name: "April", value: studentsRes.data.length },
-           { name: "May", value: studentsRes.data.length + 5 },
-         ]);
+        // Use real chart data from API
+        setChartData(dashboardRes.data.chartData || []);
+        setEducatorChartData(dashboardRes.data.chartData || []);
+        setStudentChartData(dashboardRes.data.chartData || []);
       } catch (err) {
         console.error("Error fetching stats:", err);
+        
+        // Fallback: fetch basic stats
+        try {
+          const [scenariosRes, educatorsRes, studentsRes] = await Promise.all([
+            axios.get("/api/scenarios", getAuthHeaders()),
+            axios.get("/api/users?role=educator", getAuthHeaders()),
+            axios.get("/api/users?role=student", getAuthHeaders()),
+          ]);
+          setStats({
+            scenarios: scenariosRes.data.length,
+            educators: educatorsRes.data.length,
+            students: studentsRes.data.length,
+          });
+        } catch (fallbackErr) {
+          console.error("Fallback stats error:", fallbackErr);
+        }
       } finally {
         setLoading(false);
       }

@@ -102,7 +102,7 @@ router.post(
         scenario_id: scenario_id,
       };
 
-      console.log("JWE Payload:", JSON.stringify(payload, null, 2));
+      // console.log("JWE Payload:", JSON.stringify(payload, null, 2));
 
       const key = getJweKey();
 
@@ -164,6 +164,35 @@ router.get("/by-student/:studentId/:scenarioId", protect, async (req, res) => {
   } catch (err) {
     console.error("Get Sessions Error:", err);
     res.status(500).json({ message: "Server error fetching sessions." });
+  }
+});
+
+router.get("/student/:studentId", protect, checkAccess("viewStudents"), async (req, res) => {
+  try {
+    const { studentId } = req.params;
+    
+    if (!studentId) {
+      return res.status(400).json({ message: "Student ID is required" });
+    }
+
+    // Scope check - educators can only see their own students
+    if (req.scope.educatorId) {
+      const student = await User.findById(studentId);
+      if (!student || student.supervisor?.toString() !== req.scope.educatorId.toString()) {
+        return res.status(403).json({ message: "Access denied: Not your student" });
+      }
+    }
+
+    // Get sessions for this student with scenario details
+    const sessions = await Session.find({ student_id: studentId })
+      .sort({ createdAt: -1 })
+      .limit(20)
+      .populate("scenario_id", "scenarioName");
+
+    res.json(sessions);
+  } catch (err) {
+    console.error("Get Student Sessions Error:", err);
+    res.status(500).json({ message: "Server error fetching student sessions." });
   }
 });
 

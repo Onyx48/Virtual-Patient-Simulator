@@ -94,13 +94,13 @@ function AssignScenariosModal({ onClose, onAssignSuccess }) {
           console.log("Assigned to IDs for scenario", scenario._id, ":", assignedToIds);
           const studentUpdates = [];
           added.forEach((userId) => {
-            const student = students.find(s => s.user._id === userId);
+            const student = students.find(s => s._id === userId);
             if (student) {
               studentUpdates.push({ studentId: student._id, addScenarios: [scenario._id], removeScenarios: [] });
             }
           });
           removed.forEach((userId) => {
-            const student = students.find(s => s.user._id === userId);
+            const student = students.find(s => s._id === userId);
             if (student) {
               studentUpdates.push({ studentId: student._id, addScenarios: [], removeScenarios: [scenario._id] });
             }
@@ -111,10 +111,10 @@ function AssignScenariosModal({ onClose, onAssignSuccess }) {
           assignedToIds,
           studentUpdates,
           addedStudents: added.map(
-            (userId) => students.find((s) => s.user._id === userId)?.user?.name || userId
+            (userId) => students.find((s) => s._id === userId)?.name || userId
           ),
           removedStudents: removed.map(
-            (userId) => students.find((s) => s.user._id === userId)?.user?.name || userId
+            (userId) => students.find((s) => s._id === userId)?.name || userId
           ),
         });
       }
@@ -263,15 +263,15 @@ function AssignScenariosModal({ onClose, onAssignSuccess }) {
                            <input
                              type="checkbox"
                              checked={(selections[scenario._id] || []).includes(
-                               student.user?._id
+                               student._id
                              )}
                              onChange={() =>
-                               handleStudentToggle(scenario._id, student.user?._id)
+                               handleStudentToggle(scenario._id, student._id)
                              }
                             className="w-4 h-4 text-orange-600 border-gray-300 rounded focus:ring-orange-500"
                           />
                           <span className="text-sm text-gray-700">
-                            {student.user?.name || "Unnamed Student"}
+                            {student.name || "Unnamed Student"}
                           </span>
                         </label>
                         ))}

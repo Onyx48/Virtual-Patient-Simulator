@@ -115,7 +115,7 @@ function EducatorsPage() {
         );
         toast.success("Educator updated successfully");
       } else {
-        // Add New Educator
+        // Add New Educator - school_admin creates educator in their school
         await axios.post(
           "/api/users",
           {
@@ -124,6 +124,7 @@ function EducatorsPage() {
             password: formData.password,
             role: "educator",
             department: formData.department,
+            schoolId: user.schoolId, // school_admin's schoolId
           },
           getAuthHeaders()
         );

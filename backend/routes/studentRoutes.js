@@ -99,35 +99,75 @@ router.post("/", protect, checkAccess("manageStudents"), async (req, res) => {
   }
 });
 
-// GET /api/students - Get all student profiles (with user details)
+// GET /api/students - Get all student profiles (from User collection) with stats
 // @access Private (Educator, School Admin, Superadmin)
 router.get("/", protect, checkAccess("viewStudents"), async (req, res) => {
   try {
-    let query = {};
+    let students = [];
+    const Scenario = (await import("../models/scenarioModel.js")).default;
+    const Session = (await import("../models/sessionModel.js")).default;
 
-    // Apply scope filtering
+    // Apply scope filtering - query User collection directly
     if (req.scope.educatorId) {
-      query.educatorId = req.scope.educatorId; // Educator sees only their students
+      // Educator sees their students (via supervisor field)
+      students = await User.find({ 
+        role: "student", 
+        supervisor: req.scope.educatorId 
+      }).populate("schoolId", "schoolName");
     } else if (req.scope.schoolId) {
-      // For school_admin, find students whose user belongs to their school
-      // This works by finding all User IDs first
-      const studentUsers = await User.find({
-        role: "student",
-        schoolId: req.scope.schoolId,
-      }).select("_id");
-      query.user = { $in: studentUsers.map((u) => u._id) };
-
-      // Removed the 'educatorId: { $exists: true }' restriction so School Admins see all students
+      // School admin sees all students in their school
+      students = await User.find({ 
+        role: "student", 
+        schoolId: req.scope.schoolId 
+      }).populate("schoolId", "schoolName");
+    } else {
+      // Superadmin sees all students
+      students = await User.find({ role: "student" })
+        .populate("schoolId", "schoolName");
     }
 
-    console.log("GET /api/students - Scope:", req.scope, "Query:", query);
+    if (students.length === 0) {
+      return res.json(students);
+    }
 
-    // Populate user details (name, email) and assigned scenarios from the referenced documents
-    const students = await Student.find(query)
-      .populate("user", "name email role")
-      .populate("assignedScenarios", "scenarioName description");
-    console.log("Students found:", students.length);
-    res.json(students);
+    const studentIds = students.map(s => s._id);
+
+    // Fetch assigned scenarios count per student from Scenario collection
+    const scenarioStats = await Scenario.aggregate([
+      { $match: { assignedTo: { $in: studentIds } } },
+      { $unwind: "$assignedTo" },
+      { $group: { 
+        _id: "$assignedTo", 
+        assignedScenariosCount: { $sum: 1 }
+      }}
+    ]);
+
+    // Fetch best scores per student from Session collection
+    const sessionStats = await Session.aggregate([
+      { $match: { student_id: { $in: studentIds.map(id => id.toString()) } } },
+      { $group: { 
+        _id: "$student_id", 
+        bestScore: { $max: "$score" },
+        avgScore: { $avg: "$score" },
+        totalSessions: { $sum: 1 }
+      }}
+    ]);
+
+    // Map stats to students
+    const studentsWithStats = students.map(student => {
+      const scenarioStat = scenarioStats.find(s => s._id.toString() === student._id.toString());
+      const sessionStat = sessionStats.find(s => s._id === student._id.toString());
+      return {
+        ...student.toObject(),
+        assignedScenariosCount: scenarioStat?.assignedScenariosCount || 0,
+        bestScore: sessionStat?.bestScore || null,
+        avgScore: sessionStat?.avgScore || null,
+        totalSessions: sessionStat?.totalSessions || 0
+      };
+    });
+
+    console.log("GET /api/students - Scope:", req.scope, "Students found:", studentsWithStats.length);
+    res.json(studentsWithStats);
   } catch (err) {
     console.error("Error in GET:", err);
     res.status(500).json({ message: err.message });

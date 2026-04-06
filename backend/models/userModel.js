@@ -43,7 +43,7 @@ const userSchema = new mongoose.Schema(
     supervisor: {
       type: mongoose.Schema.Types.ObjectId,
       ref: "User",
-      default: null, // Links educator to school_admin or student to educator
+      default: null, // Links student to educator
     },
     department: {
       type: String,
