@@ -19,13 +19,16 @@ export const checkAccess = (action) => {
     if (userRole === "school_admin") {
       if (!req.user.schoolId) {
         return res.status(403).json({
-          message: "School admin account is not assigned to a school. Please contact superadmin.",
+          message:
+            "School admin account is not assigned to a school. Please contact superadmin.",
         });
       }
       req.scope.schoolId = req.user.schoolId._id; // Filter to admin's school
     } else if (userRole === "educator") {
       req.scope.educatorId = req.user._id; // Educators see only their own scenarios
-      const effectiveSchoolId = req.user.schoolId || (req.user.supervisor ? req.user.supervisor.schoolId : null);
+      const effectiveSchoolId =
+        req.user.schoolId ||
+        (req.user.supervisor ? req.user.supervisor.schoolId : null);
       if (effectiveSchoolId) req.scope.schoolId = effectiveSchoolId._id; // Also filter by school
     } else if (userRole === "student") {
       req.scope.userId = req.user._id; // Filter to own data

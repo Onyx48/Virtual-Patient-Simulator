@@ -3,7 +3,7 @@ import mongoose from "mongoose";
 import { EncryptJWT } from "jose";
 import { createSecretKey } from "crypto";
 import Scenario from "../models/scenarioModel.js";
-import Student from "../models/studentModel.js";
+import Session from "../models/sessionModel.js";
 import { protect } from "../middleware/authMiddleware.js";
 import { checkAccess } from "../middleware/roleAccessMiddleware.js";
 
@@ -81,14 +81,10 @@ router.post(
           .json({ message: "Scenario API key is missing." });
       }
 
-      const studentProfile = await Student.findOne({
-        user: req.user._id,
-      }).select("_id educatorId");
-      if (!studentProfile) {
-        return res.status(404).json({ message: "Student profile not found." });
-      }
+      const student_id = req.user._id.toString();
+      const educator_id = req.user.supervisor?._id?.toString();
 
-      if (!studentProfile.educatorId) {
+      if (!educator_id) {
         return res
           .status(400)
           .json({ message: "Assigned educator is missing for student." });
@@ -100,11 +96,13 @@ router.post(
       const payload = {
         api_key: scenario.apiKey,
         session_id: sessionId,
-        student_id: studentProfile._id.toString(),
-        educator_id: studentProfile.educatorId.toString(),
+        student_id: student_id,
+        educator_id: educator_id,
         company_id: companyId,
         scenario_id: scenario_id,
       };
+
+      console.log("JWE Payload:", JSON.stringify(payload, null, 2));
 
       const key = getJweKey();
 
@@ -129,5 +127,65 @@ router.post(
     }
   },
 );
+
+router.get("/by-student/:studentId/:scenarioId", protect, async (req, res) => {
+  try {
+    const { studentId, scenarioId } = req.params;
+    const page = parseInt(req.query.page) || 1;
+    const limit = 5;
+    const skip = (page - 1) * limit;
+
+    if (!studentId || !scenarioId) {
+      return res
+        .status(400)
+        .json({ message: "Student ID and Scenario ID are required" });
+    }
+
+    const query = {
+      student_id: studentId,
+      scenario_id: scenarioId,
+    };
+
+    const [sessions, total] = await Promise.all([
+      Session.find(query)
+        .sort({ createdAt: -1 })
+        .skip(skip)
+        .limit(limit)
+        .select("transcription feedback score createdAt"),
+      Session.countDocuments(query),
+    ]);
+
+    res.json({
+      sessions,
+      totalCount: total,
+      hasMore: skip + sessions.length < total,
+      currentPage: page,
+    });
+  } catch (err) {
+    console.error("Get Sessions Error:", err);
+    res.status(500).json({ message: "Server error fetching sessions." });
+  }
+});
+
+router.get("/:sessionId", protect, async (req, res) => {
+  try {
+    const { sessionId } = req.params;
+
+    if (!sessionId) {
+      return res.status(400).json({ message: "Session ID is required" });
+    }
+
+    const session = await Session.findById(sessionId);
+
+    if (!session) {
+      return res.status(404).json({ message: "Session not found" });
+    }
+
+    res.json(session);
+  } catch (err) {
+    console.error("Get Session By ID Error:", err);
+    res.status(500).json({ message: "Server error fetching session." });
+  }
+});
 
 export default router;

@@ -14,11 +14,6 @@ const scenarioSchema = new mongoose.Schema(
       ref: "School",
       required: true,
     },
-    schoolId: {
-      type: mongoose.Schema.Types.ObjectId,
-      ref: "School",
-      required: true,
-    },
     status: {
       type: String,
       enum: ["Draft", "Published", "Archived", "success"],
@@ -31,7 +26,6 @@ const scenarioSchema = new mongoose.Schema(
     },
     assignedTo: [{ type: mongoose.Schema.Types.ObjectId, ref: "User" }],
 
-    // AI & Config Fields
     template: { type: String },
     scenarioPrompt: { type: String },
     aiAvatarRole: { type: String },
@@ -39,7 +33,6 @@ const scenarioSchema = new mongoose.Schema(
     aiQuestions: { type: String },
     difficulty: { type: String, default: "Medium" },
 
-    // Storing the API Key associated with the AI generation
     apiKey: { type: String },
 
     animationTriggers: {
@@ -49,7 +42,7 @@ const scenarioSchema = new mongoose.Schema(
   },
   {
     timestamps: true,
-  }
+  },
 );
 
 const Scenario = mongoose.model("Scenario", scenarioSchema);

@@ -2,6 +2,7 @@ import express from "express";
 import School from "../models/schoolModel.js";
 import Scenario from "../models/scenarioModel.js";
 import User from "../models/userModel.js";
+import Session from "../models/sessionModel.js";
 import { protect } from "../middleware/authMiddleware.js";
 import { checkAccess } from "../middleware/roleAccessMiddleware.js";
 
@@ -76,6 +77,91 @@ router.get(
     } catch (error) {
       console.error("Error fetching detailed school data:", error);
       res.status(500).json({ message: "Server error fetching school details" });
+    }
+  }
+);
+
+// GET /api/dashboard/student-stats - Get student dashboard statistics
+router.get(
+  "/student-stats",
+  protect,
+  checkAccess("viewDashboard"),
+  async (req, res) => {
+    try {
+      const studentId = req.user._id.toString();
+
+      console.log("DEBUG student-stats - studentId:", studentId);
+      console.log("DEBUG student-stats - user:", req.user.name);
+
+      // Get all scenarios assigned to this student
+      const assignedScenarios = await Scenario.find({
+        assignedTo: studentId,
+      }).select("_id scenarioName");
+
+      console.log("DEBUG student-stats - assignedScenarios count:", assignedScenarios.length);
+
+      const totalAssigned = assignedScenarios.length;
+
+      if (totalAssigned === 0) {
+        return res.json({
+          completedCount: 0,
+          availableCount: 0,
+          averageScore: null,
+          scenarioScores: [],
+          totalAssigned: 0,
+        });
+      }
+
+      // Get all sessions for this student (student_id is stored as string)
+      const sessions = await Session.find({ student_id: studentId });
+      console.log("DEBUG student-stats - sessions found:", sessions.length);
+
+      // Find best score per scenario
+      const scenarioBestScores = {};
+      const completedScenarioIds = new Set();
+
+      sessions.forEach((session) => {
+        const scenarioId = session.scenario_id.toString();
+        if (!scenarioBestScores[scenarioId] || session.score > scenarioBestScores[scenarioId].score) {
+          scenarioBestScores[scenarioId] = {
+            score: session.score,
+            sessionId: session._id,
+          };
+        }
+        completedScenarioIds.add(scenarioId);
+      });
+
+      // Build scenario scores array with scenario names
+      const scenarioScores = assignedScenarios.map((scenario) => {
+        const bestScore = scenarioBestScores[scenario._id.toString()];
+        return {
+          scenarioId: scenario._id,
+          scenarioName: scenario.scenarioName,
+          bestScore: bestScore ? bestScore.score : null,
+          isCompleted: completedScenarioIds.has(scenario._id.toString()),
+        };
+      });
+
+      // Calculate stats
+      const completedCount = completedScenarioIds.size;
+      const availableCount = totalAssigned - completedCount;
+
+      // Calculate average score from best scores (only completed scenarios)
+      const scores = Object.values(scenarioBestScores).map((s) => s.score);
+      const averageScore = scores.length > 0
+        ? Math.round((scores.reduce((a, b) => a + b, 0) / scores.length) * 100)
+        : null;
+
+      res.json({
+        completedCount,
+        availableCount,
+        averageScore,
+        scenarioScores,
+        totalAssigned,
+      });
+    } catch (error) {
+      console.error("Error fetching student stats:", error);
+      res.status(500).json({ message: "Server error fetching student stats" });
     }
   }
 );

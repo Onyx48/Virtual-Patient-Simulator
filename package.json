@@ -25,6 +25,7 @@
     "express": "^4.21.2",
     "express-validator": "^7.2.1",
     "ioredis": "^5.6.1",
+    "jose": "^5.2.4",
     "jsonwebtoken": "^9.0.2",
     "lucide-react": "^0.510.0",
     "mongoose": "^8.15.1",
@@ -39,9 +40,9 @@
     "react-redux": "^9.2.0",
     "react-router-dom": "^7.6.0",
     "recharts": "^3.6.0",
+    "redux-persist": "^6.0.0",
     "tailwind-merge": "^3.3.0",
-    "tailwindcss-animate": "^1.0.7",
-    "jose": "^5.2.4"
+    "tailwindcss-animate": "^1.0.7"
   },
   "devDependencies": {
     "@eslint/js": "^9.25.0",
