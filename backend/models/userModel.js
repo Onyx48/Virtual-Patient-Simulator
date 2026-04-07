@@ -38,12 +38,12 @@ const userSchema = new mongoose.Schema(
     schoolId: {
       type: mongoose.Schema.Types.ObjectId,
       ref: "School",
-      required: false, // Only for educator and school_admin
+      required: false,
     },
     supervisor: {
       type: mongoose.Schema.Types.ObjectId,
       ref: "User",
-      default: null, // Links student to educator
+      default: null,
     },
     department: {
       type: String,
@@ -52,7 +52,6 @@ const userSchema = new mongoose.Schema(
         message:
           "{VALUE} is not a valid department. Must be Science, History, English, or Mathematics.",
       },
-      // default: "Science", <--- REMOVED THIS LINE so students don't get a default department
     },
     phoneNumber: {
       type: String,
@@ -67,10 +66,9 @@ const userSchema = new mongoose.Schema(
   },
   {
     timestamps: true,
-  }
+  },
 );
 
-// Hash password before saving
 userSchema.pre("save", async function (next) {
   if (!this.isModified("password")) {
     return next();
@@ -84,7 +82,6 @@ userSchema.pre("save", async function (next) {
   }
 });
 
-// Verify password
 userSchema.methods.matchPassword = async function (enteredPassword) {
   try {
     return await bcrypt.compare(enteredPassword, this.password);

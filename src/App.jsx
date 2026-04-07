@@ -6,54 +6,51 @@ import {
   Navigate,
   Outlet,
 } from "react-router-dom";
-import { Provider } from 'react-redux';
-import { store } from './redux/store';
+import { Provider } from "react-redux";
+import { store } from "./redux/store";
 import { AuthProvider, useAuth } from "./AuthContext";
-import { Toaster } from 'react-hot-toast';
+import { Toaster } from "react-hot-toast";
 
-// Import Startup Pages (Public Routes)
 import LoginPage from "./components/StartupPages/LoginPage";
 import SignupPage from "./components/StartupPages/SignupPage";
 import ForgotPasswordPage from "./components/StartupPages/ForgotPasswordPage";
-import OtpVerificationPage from "./components/OtpverificationPage"; // Check path, previously outside StartupPages
+import OtpVerificationPage from "./components/OtpverificationPage";
 import ResetPasswordPage from "./components/StartupPages/ResetPasswordPage";
 
-// Import Main App Layout Component
-import Container from "./components/Container/Container"; // This is your main app shell
+import Container from "./components/Container/Container";
 
-// ProtectedRoute and PublicRoute components (remain largely the same)
 const ProtectedRoute = ({ children }) => {
   const { user, loading } = useAuth();
-  if (loading) return <div>Loading application...</div>;
-  return user ? children : <Navigate to="/login" replace />;
+  if (loading) return <div className="min-h-screen bg-gray-50" />;
+  if (!user) return <Navigate to="/login" replace />;
+  return children;
 };
 
 const PublicRoute = ({ children }) => {
   const { user, loading } = useAuth();
-  if (loading) return <div>Loading application...</div>;
-  return user ? <Navigate to="/" replace /> : children;
+  if (loading) return <div className="min-h-screen bg-gray-50" />;
+  if (user) return <Navigate to="/" replace />;
+  return children;
 };
 
-// Main App component that includes the sidebar/header and the main content routes
-// This component will contain the structure (Sidebar, Header) and render ContentArea
-// We do NOT use <Outlet /> here, as ContentArea will handle its own <Routes>
 const AuthenticatedAppLayout = () => {
-  return (
-    <Container /> // Container now renders Header, Sidebar, and ContentArea internally
-  );
+  return <Container />;
 };
 
 function App() {
   return (
     <Provider store={store}>
       <AuthProvider>
-        <Toaster position="top-right" toastOptions={{
-          style: {
-            background: '#fef3c7',
-            color: '#f97316',
-            border: '1px solid #f97316',
-          },
-        }} />
+        <Toaster
+          position="top-right"
+          toastOptions={{
+            style: {
+              background: "#fef3c7",
+              color: "#f97316",
+              border: "1px solid #f97316",
+            },
+          }}
+        />
         <Router>
           <Routes>
             {/* Public Routes for Authentication Flows */}
@@ -131,9 +128,6 @@ function App() {
               }
             />
 
-            {/* Protected Routes for the Main Application */}
-            {/* This route will match any path that starts with '/', ensuring only logged-in users access the main app */}
-            {/* The ContentArea within Container will then define its own internal Routes */}
             <Route
               path="/*"
               element={
@@ -142,11 +136,6 @@ function App() {
                 </ProtectedRoute>
               }
             />
-
-            {/* Fallback for any unmatched route (optional, can be a 404 page) */}
-            {/* If the above '/*' doesn't catch it because of deeper nesting, this could be reached if unauthenticated */}
-            {/* For a full app, you might have a dedicated 404 page here */}
-            {/* <Route path="*" element={<Navigate to="/login" replace />} /> */}
           </Routes>
         </Router>
       </AuthProvider>

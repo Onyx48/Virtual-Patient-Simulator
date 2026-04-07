@@ -1,5 +1,4 @@
-// src/lib/hooks/usePagination.js
-import { useState, useMemo } from 'react';
+import { useState, useMemo } from "react";
 
 export function usePagination(data, itemsPerPage = 5) {
   const [currentPage, setCurrentPage] = useState(1);

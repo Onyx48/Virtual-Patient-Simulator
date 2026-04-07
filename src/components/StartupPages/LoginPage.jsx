@@ -1,8 +1,9 @@
 // src/components/StartupPages/LoginPage.jsx
 import React, { useState } from "react";
 import { Link, useNavigate } from "react-router-dom";
-import loginImage from "./Login-bg.jpg"; // Ensure path is correct from StartupPages dir
-import { useAuth } from "../../AuthContext"; // Assuming AuthContext is in src/context
+import loginImage from "./Login-bg.jpg";
+import { useAuth } from "../../AuthContext";
+import { toast } from "react-hot-toast";
 
 // ... (validateEmail, validatePassword, errorIcon remain the same) ...
 const validateEmail = (emailToValidate) => {
@@ -64,17 +65,14 @@ function LoginPage() {
         // Or, you can navigate explicitly after login is confirmed by AuthContext.
         // navigate('/'); // Navigation will be handled by PublicRoute/ProtectedRoute
       } catch (err) {
-        // AuthContext.login should throw an error that we can catch here
-        const errorMessage =
+        const message =
           err.response?.data?.message ||
+          err.response?.data?.error ||
+          err.response?.data?.msg ||
           err.message ||
-          "Login failed. Please check your credentials.";
-        setApiError(errorMessage);
-        // You could try to be more specific if the backend returns distinct error types
-        // For example, if it's specifically an email or password issue.
-        // For now, a general API error is fine.
-        // setEmailError(errorMessage); // Could set this if the error is clearly email-related
-        // setPasswordError(" ");      // Or this if password-related
+          "Invalid email or password";
+        setApiError(message);
+        toast.error(message);
       } finally {
         setIsLoading(false);
       }

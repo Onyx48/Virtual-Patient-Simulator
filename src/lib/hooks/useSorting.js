@@ -1,5 +1,4 @@
-// src/lib/hooks/useSorting.js
-import { useState, useMemo } from 'react';
+import { useState, useMemo } from "react";
 
 export function useSorting(data, initialSort = null) {
   const [sortConfig, setSortConfig] = useState(initialSort);
@@ -20,9 +19,7 @@ export function useSorting(data, initialSort = null) {
   const handleSort = (key) => {
     setSortConfig((prev) => {
       if (prev?.key === key) {
-        return prev.direction === "asc"
-          ? { key, direction: "desc" }
-          : null; // Reset to no sort
+        return prev.direction === "asc" ? { key, direction: "desc" } : null;
       }
       return { key, direction: "asc" };
     });

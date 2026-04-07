@@ -1,9 +1,8 @@
 // WHOLE_PROJECT/routes/schoolRoutes.js
 import express from "express";
 import { body, validationResult } from "express-validator";
-import School from "../models/schoolModel.js"; // Adjust path
-import User from "../models/userModel.js";
-import { protect } from "../middleware/authMiddleware.js"; // Adjust path
+import School from "../models/schoolModel.js";
+import { protect } from "../middleware/authMiddleware.js";
 import { checkAccess } from "../middleware/roleAccessMiddleware.js";
 
 const router = express.Router();
@@ -12,7 +11,7 @@ const router = express.Router();
 const parseDateString = (dateString) => {
   if (!dateString) return null;
   const [day, month, year] = dateString.split("/").map(Number);
-  return new Date(year, month - 1, day); // Month is 0-indexed in Date constructor
+  return new Date(year, month - 1, day);
 };
 
 // --- Validation Middleware ---
@@ -27,7 +26,7 @@ const schoolValidationRules = [
     "Basic",
     "Free",
   ]),
-  body("duration", "Invalid Duration").optional().isIn(["1 Year", "6 Months"]), // Adjust based on your options
+  body("duration", "Invalid Duration").optional().isIn(["1 Year", "6 Months"]),
   body("startDate", "Start Date is required")
     .isString()
     .custom((value) => {
@@ -44,7 +43,6 @@ const schoolValidationRules = [
       if (!isNaN(parseDateString(value).getTime())) return true;
       throw new Error("Invalid Expire Date");
     }),
-  // Custom validator to ensure expireDate is after startDate
   body("expireDate").custom((expireDate, { req }) => {
     const startDate = parseDateString(req.body.startDate);
     const endDate = parseDateString(expireDate);
@@ -61,15 +59,9 @@ const schoolValidationRules = [
   ]),
 ];
 
-// --- Routes ---
-
-// @desc    Get all schools (with optional filters)
-// @route   GET /api/schools
-// @access  Private (Superadmin, Educator, School Admin)
 router.get("/", protect, checkAccess("viewSchools"), async (req, res) => {
   try {
     let query = {};
-    // Implement filters if passed in query params (e.g., /api/schools?status=Active)
     const {
       status,
       subscription,
@@ -94,7 +86,7 @@ router.get("/", protect, checkAccess("viewSchools"), async (req, res) => {
     }
 
     if (searchTerm) {
-      const searchRegex = new RegExp(searchTerm, "i"); // Case-insensitive search
+      const searchRegex = new RegExp(searchTerm, "i");
       query.$or = [
         { schoolName: searchRegex },
         { email: searchRegex },
@@ -106,7 +98,7 @@ router.get("/", protect, checkAccess("viewSchools"), async (req, res) => {
       query["assignedAdmin.id"] = null;
     }
 
-    const schools = await School.find(query).sort({ schoolName: 1 }); // Sort by name by default
+    const schools = await School.find(query).sort({ schoolName: 1 });
     res.json(schools);
   } catch (err) {
     console.error("Get Schools Error:", err);
@@ -114,9 +106,6 @@ router.get("/", protect, checkAccess("viewSchools"), async (req, res) => {
   }
 });
 
-// @desc    Get single school by ID
-// @route   GET /api/schools/:id
-// @access  Private (Superadmin, Educator, School Admin)
 router.get("/:id", protect, checkAccess("viewSchools"), async (req, res) => {
   try {
     const school = await School.findById(req.params.id);
@@ -135,9 +124,6 @@ router.get("/:id", protect, checkAccess("viewSchools"), async (req, res) => {
   }
 });
 
-// @desc    Create a new school
-// @route   POST /api/schools
-// @access  Private (Superadmin only)
 router.post(
   "/",
   protect,
@@ -168,13 +154,12 @@ router.post(
         email,
         subscriptionType,
         duration,
-        // Convert date strings to Date objects for storage
         startDate: parseDateString(startDate),
         expireDate: parseDateString(expireDate),
         status,
         permissions,
-        subscription: duration ? `Subscription (${duration})` : "", // Ensure consistency with frontend format
-        timeSpent: "0h", // Default value for new schools
+        subscription: duration ? `Subscription (${duration})` : "",
+        timeSpent: "0h",
       });
 
       await newSchool.save();
@@ -184,7 +169,6 @@ router.post(
     } catch (err) {
       console.error("Create School Error:", err);
       if (err.code === 11000) {
-        // Duplicate key error (e.g., schoolName or email)
         return res
           .status(400)
           .json({ message: "School with this name or email already exists." });
@@ -200,9 +184,6 @@ router.post(
   },
 );
 
-// @desc    Update a school
-// @route   PUT /api/schools/:id
-// @access  Private (Superadmin only)
 router.put(
   "/:id",
   protect,
@@ -242,9 +223,9 @@ router.put(
       school.expireDate = parseDateString(expireDate);
       school.status = status;
       school.permissions = permissions;
-      school.subscription = duration ? `Subscription (${duration})` : ""; // Ensure consistency
+      school.subscription = duration ? `Subscription (${duration})` : "";
 
-      await school.save(); // save() will trigger Mongoose schema validation and pre/post hooks
+      await school.save();
       res
         .status(200)
         .json({ message: "School updated successfully.", school: school });
@@ -266,9 +247,6 @@ router.put(
   },
 );
 
-// @desc    Delete a school
-// @route   DELETE /api/schools/:id
-// @access  Private (Superadmin only)
 router.delete(
   "/:id",
   protect,

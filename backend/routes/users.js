@@ -1,7 +1,6 @@
 // WHOLE_PROJECT/routes/users.js
 import express from "express";
 import User from "../models/userModel.js";
-import Student from "../models/studentModel.js";
 import School from "../models/schoolModel.js";
 import { protect } from "../middleware/authMiddleware.js";
 import { checkAccess } from "../middleware/roleAccessMiddleware.js";
@@ -10,18 +9,6 @@ const router = express.Router();
 
 // Debugging: Check if User model is loaded correctly
 console.log("User Model Status:", User ? "Loaded" : "FAILED IMPORT");
-
-
-// Grade options for random assignment
-const GRADE_OPTIONS = [
-  "Grade 1", "Grade 2", "Grade 3", "Grade 4", "Grade 5",
-  "Grade 6", "Grade 7", "Grade 8", "Grade 9", "Grade 10",
-  "Grade 11", "Grade 12", "Beginner", "Intermediate", "Advanced"
-];
-
-function getRandomGrade() {
-  return GRADE_OPTIONS[Math.floor(Math.random() * GRADE_OPTIONS.length)];
-}
 
 // @desc    Get all users (scoped)
 // @route   GET /api/users
@@ -177,34 +164,7 @@ router.post("/", protect, checkAccess("manageUsers"), async (req, res) => {
       });
     }
 
-    // 11. Handle Student Profile Creation
-    if (normalizedRole === "student") {
-      const studentProfileExists = await Student.findOne({ user: newUser._id });
-      if (!studentProfileExists) {
-        // Fetch school name for the profile
-        let schoolNameStr = "Unknown School";
-        if (finalSchoolId) {
-          const sObj = await School.findById(finalSchoolId);
-          if (sObj) schoolNameStr = sObj.schoolName;
-        }
-
-        const studentData = {
-          user: newUser._id,
-          // If creator is educator, assign them as educatorId immediately
-          educatorId: req.user.role === "educator" ? req.user._id : null,
-          grade: getRandomGrade(),
-          school: schoolNameStr,
-        };
-
-        const studentProfile = new Student(studentData);
-        await studentProfile.save();
-        console.log(
-          `Student profile created. Linked to Educator: ${studentData.educatorId}`
-        );
-      }
-    }
-
-    // 12. Response
+    // 11. Response
     const userResponse = {
       _id: newUser._id,
       name: newUser.name,
@@ -308,19 +268,7 @@ router.put("/:id", protect, checkAccess("manageUsers"), async (req, res) => {
         });
       }
 
-      const oldRole = user.role;
-      if (normalizedRole !== oldRole) {
-        user.role = normalizedRole;
-        // Handle profile cleanup/creation based on role change
-        if (oldRole === "student" && normalizedRole !== "student") {
-          await Student.findOneAndDelete({ user: user._id });
-        } else if (oldRole !== "student" && normalizedRole === "student") {
-          const existingProfile = await Student.findOne({ user: user._id });
-          if (!existingProfile) {
-            await new Student({ user: user._id }).save();
-          }
-        }
-      }
+      user.role = normalizedRole;
     }
 
     // Check for school_admin uniqueness if role is school_admin and schoolId is provided
@@ -399,9 +347,6 @@ router.delete("/:id", protect, checkAccess("manageUsers"), async (req, res) => {
       });
     }
 
-    if (user.role === "student") {
-      await Student.findOneAndDelete({ user: user._id });
-    }
     if (user.role === "school_admin" && user.schoolId) {
       await School.findByIdAndUpdate(user.schoolId, {
         assignedAdmin: { id: null, name: "", email: "" },

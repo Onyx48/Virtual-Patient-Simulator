@@ -26,7 +26,6 @@ import ScenarioManagementControlsStudent from "./scenarios/ScenarioManagementCon
 import ScenarioTableStudent from "./scenarios/ScenrioGridStudent";
 import StudentScenarioDetails from "./scenarios/StudentScenarioDetails";
 
-// Dynamic notices - could be fetched from API in future
 const notices = [
   {
     title: "Welcome to Your Dashboard",
@@ -67,21 +66,23 @@ function StudentDashboard() {
         const allScenarios = scenariosResponse.data;
         const assignedScenarios = allScenarios.filter(
           (scenario) =>
-            scenario.assignedTo && scenario.assignedTo.some(a => a._id === user._id)
+            scenario.assignedTo &&
+            scenario.assignedTo.some((a) => a._id === user._id),
         );
 
         const mapped = assignedScenarios.map((scenario) => {
           const scenarioStat = stats.scenarioScores.find(
-            (s) => s.scenarioId === scenario._id
+            (s) => s.scenarioId === scenario._id,
           );
           return {
             id: scenario._id,
             scenarioName: scenario.scenarioName,
             description: scenario.description || "",
             difficulty: scenario.difficulty || "Medium",
-            highestScore: scenarioStat?.bestScore !== null
-              ? Math.round(scenarioStat.bestScore * 100)
-              : null,
+            highestScore:
+              scenarioStat?.bestScore !== null
+                ? Math.round(scenarioStat.bestScore * 100)
+                : null,
             status: scenarioStat?.isCompleted ? "Completed" : "Available",
           };
         });
@@ -99,7 +100,7 @@ function StudentDashboard() {
     let filtered = scenariosList;
     if (searchTerm) {
       filtered = filtered.filter((s) =>
-        s.scenarioName.toLowerCase().includes(searchTerm.toLowerCase())
+        s.scenarioName.toLowerCase().includes(searchTerm.toLowerCase()),
       );
     }
     if (sortConfig) {
@@ -140,7 +141,6 @@ function StudentDashboard() {
     <div className="p-8 bg-gray-50 min-h-screen font-sans">
       {currentView === "dashboard" && (
         <React.Fragment>
-          {/* 1. WELCOME SECTION */}
           <div className="mb-8">
             <h2 className="text-2xl font-bold text-gray-800">
               Welcome Back, {user.name.split(" ")[0]}!
@@ -152,13 +152,16 @@ function StudentDashboard() {
             </p>
           </div>
 
-          {/* 2. STATS CARDS ROW */}
           <div className="grid grid-cols-1 md:grid-cols-3 gap-6 mb-8">
             <StatCard
               title="Completed Scenarios"
               value={studentStats.completedCount}
               sub={hasRealData ? "Total assigned" : "No scenarios yet"}
-              subValue={studentStats.totalAssigned > 0 ? studentStats.totalAssigned : null}
+              subValue={
+                studentStats.totalAssigned > 0
+                  ? studentStats.totalAssigned
+                  : null
+              }
             />
             <StatCard
               title="Available Scenarios"
@@ -168,14 +171,16 @@ function StudentDashboard() {
             />
             <StatCard
               title="Avg Score"
-              value={studentStats.averageScore !== null ? `${studentStats.averageScore}%` : "N/A"}
+              value={
+                studentStats.averageScore !== null
+                  ? `${studentStats.averageScore}%`
+                  : "N/A"
+              }
               sub={hasRealData ? "Across all completed" : "No scores yet"}
             />
           </div>
 
-          {/* 3. CHARTS ROW */}
           <div className="grid grid-cols-1 lg:grid-cols-3 gap-6 mb-8">
-            {/* Chart 1: Learning Content (Gauge Style) */}
             <div className="bg-white p-6 rounded-xl shadow-sm border border-gray-100 flex flex-col justify-between">
               <h3 className="font-semibold text-gray-800 mb-4">
                 Learning Content
@@ -205,7 +210,9 @@ function StudentDashboard() {
                     </ResponsiveContainer>
 
                     <div className="absolute top-2/3 left-1/2 transform -translate-x-1/2 -translate-y-1/2 text-center mt-6">
-                      <div className="text-xs text-gray-400">Total Scenarios</div>
+                      <div className="text-xs text-gray-400">
+                        Total Scenarios
+                      </div>
                       <div className="text-3xl font-bold text-gray-800">
                         {studentStats.totalAssigned}
                       </div>
@@ -240,7 +247,6 @@ function StudentDashboard() {
               )}
             </div>
 
-            {/* Chart 2: Performance Trend (Bar Chart) */}
             <div className="bg-white p-6 rounded-xl shadow-sm border border-gray-100 lg:col-span-2">
               <div className="flex justify-between items-center mb-6">
                 <h3 className="font-semibold text-gray-800">
@@ -279,21 +285,25 @@ function StudentDashboard() {
                           boxShadow: "0 4px 6px -1px rgb(0 0 0 / 0.1)",
                         }}
                       />
-                      <Bar dataKey="score" fill="#ea580c" radius={[4, 4, 0, 0]} />
+                      <Bar
+                        dataKey="score"
+                        fill="#ea580c"
+                        radius={[4, 4, 0, 0]}
+                      />
                     </BarChart>
                   </ResponsiveContainer>
                 </div>
               ) : (
                 <div className="h-60 flex items-center justify-center">
-                  <p className="text-gray-400 text-sm">No scores available yet</p>
+                  <p className="text-gray-400 text-sm">
+                    No scores available yet
+                  </p>
                 </div>
               )}
             </div>
           </div>
 
-          {/* 4. BOTTOM SECTION: TABLE & NOTICES */}
           <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
-            {/* Table: Scenarios */}
             <div className="bg-white p-6 rounded-xl shadow-sm border border-gray-100 lg:col-span-2">
               <div className="flex justify-between items-center mb-4">
                 <h3 className="font-semibold text-gray-800">Scenarios</h3>
@@ -351,7 +361,10 @@ function StudentDashboard() {
                       ))
                     ) : (
                       <tr>
-                        <td colSpan="3" className="p-8 text-center text-gray-400">
+                        <td
+                          colSpan="3"
+                          className="p-8 text-center text-gray-400"
+                        >
                           No scenarios assigned yet
                         </td>
                       </tr>
@@ -361,7 +374,6 @@ function StudentDashboard() {
               </div>
             </div>
 
-            {/* List: Notice Board */}
             <div className="bg-white p-6 rounded-xl shadow-sm border border-gray-100">
               <h3 className="font-semibold text-gray-800 mb-4">Notice Board</h3>
               <div className="space-y-5">
@@ -370,7 +382,6 @@ function StudentDashboard() {
                     key={index}
                     className="flex gap-4 items-start relative group"
                   >
-                    {/* Icon Box */}
                     <div
                       className={`p-2.5 rounded-lg shrink-0 ${notice.color}`}
                     >
@@ -379,7 +390,6 @@ function StudentDashboard() {
                       {notice.icon === "bell" && <Bell size={18} />}
                       {notice.icon === "star" && <CheckCircle size={18} />}
                     </div>
-                    {/* Content */}
                     <div className="flex-1 min-w-0">
                       <div className="text-sm font-semibold text-gray-800 truncate">
                         {notice.title}
@@ -388,7 +398,6 @@ function StudentDashboard() {
                         {notice.sub}
                       </div>
                     </div>
-                    {/* Menu Dots */}
                     <button className="text-gray-300 hover:text-gray-600 transition-colors">
                       <MoreHorizontal size={16} />
                     </button>
@@ -430,8 +439,6 @@ function StudentDashboard() {
     </div>
   );
 }
-
-// --- HELPER COMPONENT: STAT CARD ---
 
 function StatCard({ title, value, sub, subValue }) {
   return (

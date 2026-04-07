@@ -1,8 +1,7 @@
-// src/components/Schools/SchoolsPage.jsx
 import React, { useState, useEffect, useCallback } from "react";
 import axios from "axios";
 import { useAuth } from "../../../AuthContext";
-import { useNavigate } from "react-router-dom"; // Import useNavigate
+import { useNavigate } from "react-router-dom";
 import { parse, format } from "date-fns";
 import { getAuthHeaders } from "../../../lib/utils.js";
 
@@ -10,11 +9,11 @@ import SchoolManagementControls from "./SchoolManagementControls.jsx";
 import SchoolTable from "./SchoolTable.jsx";
 import SchoolAdminModal from "../../../components/SchoolAdminModal.jsx";
 import ConfirmationModal from "../../../components/ui/ConfirmationModal.jsx";
-import { toast } from 'react-hot-toast';
+import { toast } from "react-hot-toast";
 
 function SchoolsPage() {
   const { user } = useAuth();
-  const navigate = useNavigate(); // For navigation
+  const navigate = useNavigate();
 
   const [schools, setSchools] = useState([]);
   const [isLoading, setIsLoading] = useState(true);
@@ -23,11 +22,10 @@ function SchoolsPage() {
   const [isSchoolAdminModalOpen, setIsSchoolAdminModalOpen] = useState(false);
   const [availableSchools, setAvailableSchools] = useState([]);
   const [isConfirmModalOpen, setIsConfirmModalOpen] = useState(false);
-  const [confirmTitle, setConfirmTitle] = useState('');
-  const [confirmMessage, setConfirmMessage] = useState('');
+  const [confirmTitle, setConfirmTitle] = useState("");
+  const [confirmMessage, setConfirmMessage] = useState("");
   const [onConfirmAction, setOnConfirmAction] = useState(() => {});
 
-  // Fetch Schools
   const fetchSchools = useCallback(async () => {
     setIsLoading(true);
     try {
@@ -38,7 +36,6 @@ function SchoolsPage() {
 
       const fetchedSchools = response.data.map((school) => ({
         ...school,
-        // Ensure dates are parsed correctly for the Table display
         startDate: school.startDate ? new Date(school.startDate) : null,
         expireDate: school.expireDate ? new Date(school.expireDate) : null,
       }));
@@ -51,7 +48,6 @@ function SchoolsPage() {
     }
   }, [searchTerm]);
 
-  // Fetch Available Schools for School Admin Creation
   const fetchAvailableSchools = useCallback(async () => {
     try {
       const response = await axios.get("/api/schools", {
@@ -73,24 +69,22 @@ function SchoolsPage() {
     fetchSchools();
   }, [fetchSchools]);
 
-  // Handle Add: Navigate to Unified Form Page (Add Mode)
   const handleAddNewClick = () => {
     navigate("/schools/add");
   };
 
-  // Handle Edit: Navigate to Unified Form Page (Edit Mode)
   const handleEditClick = (school) => {
-    navigate(`/schools/edit/${school._id}`); // Pass ID in URL
+    navigate(`/schools/edit/${school._id}`);
   };
 
   // Handle Delete
   const handleDeleteClick = (schoolId) => {
-    setConfirmTitle('Delete School');
-    setConfirmMessage('Are you sure you want to delete this school?');
+    setConfirmTitle("Delete School");
+    setConfirmMessage("Are you sure you want to delete this school?");
     setOnConfirmAction(() => async () => {
       try {
         await axios.delete(`/api/schools/${schoolId}`, getAuthHeaders());
-        fetchSchools(); // Refresh list
+        fetchSchools();
       } catch (err) {
         console.error(err);
         toast.error("Failed to delete school.");
@@ -99,12 +93,11 @@ function SchoolsPage() {
     setIsConfirmModalOpen(true);
   };
 
-  // Handle Create School Admin
   const handleCreateSchoolAdmin = async (data) => {
     try {
       await axios.post("/api/users", data, getAuthHeaders());
       toast.success("School Admin created successfully.");
-      fetchSchools(); // Refresh the schools list to show updated assignments
+      fetchSchools();
       setIsSchoolAdminModalOpen(false);
     } catch (err) {
       console.error(err);

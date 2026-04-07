@@ -10,54 +10,50 @@ import {
   ChevronRightIcon,
 } from "@heroicons/react/24/outline";
 
-// Import Modals (Ensure these exist in src/components/)
 import StudentModal from "../StudentModal";
 import AssignScenariosModal from "./AssignScenariosModal";
-import { toast } from 'react-hot-toast';
-import { useAuth } from '../../AuthContext';
-import { useDispatch } from 'react-redux';
-import { fetchScenarios } from '../../redux/slices/scenarioSlice';
+import TranscriptViewerModal from "../ui/TranscriptViewerModal";
+import { toast } from "react-hot-toast";
+import { useAuth } from "../../AuthContext";
+import { useDispatch } from "react-redux";
+import { fetchScenarios } from "../../redux/slices/scenarioSlice";
 
-// Helper for Auth Headers
 const getAuthHeaders = () => {
   const token = localStorage.getItem("token");
   return { headers: { Authorization: `Bearer ${token}` } };
 };
 
 function StudentPage({ role }) {
-  // Accepting role as prop if specific logic is needed later
   const { user } = useAuth();
   const dispatch = useDispatch();
-  // --- State Management ---
   const [students, setStudents] = useState([]);
   const [loading, setLoading] = useState(true);
   const [searchTerm, setSearchTerm] = useState("");
 
-  // Modal States
   const [isStudentModalOpen, setIsStudentModalOpen] = useState(false);
   const [isAssignModalOpen, setIsAssignModalOpen] = useState(false);
+  const [selectedStudent, setSelectedStudent] = useState(null);
   const [editingStudent, setEditingStudent] = useState(null);
 
-  // Pagination State
   const [currentPage, setCurrentPage] = useState(1);
   const itemsPerPage = 8;
 
-  // --- API Functions ---
   const fetchStudents = async () => {
     try {
       setLoading(true);
-      // The backend automatically filters this based on the logged-in user's role/scope
       const response = await axios.get("/api/students", getAuthHeaders());
 
-      // Map Backend Data to UI Structure (now from User collection with stats)
       const mappedData = response.data.map((student) => ({
-        id: student._id, // Internal ID (from User _id)
-        visualId: `VS${student._id.slice(-6).toUpperCase()}`, // Visual ID (VS987654)
-        user_id: student._id, // User ID directly from User collection
+        id: student._id,
+        visualId: `VS${student._id.slice(-6).toUpperCase()}`,
+        user_id: student._id,
         name: student.name || "Unknown",
         email: student.email || "No Email",
         schoolName: student.schoolId?.schoolName || "Unassigned",
-        progress: student.bestScore !== null ? `${Math.round(student.bestScore * 100)}%` : "Not Assigned",
+        progress:
+          student.bestScore !== null
+            ? `${Math.round(student.bestScore * 100)}%`
+            : "Not Assigned",
         assignedScenariosCount: student.assignedScenariosCount || 0,
         isAssigned: (student.assignedScenariosCount || 0) > 0,
         originalData: student,
@@ -70,26 +66,29 @@ function StudentPage({ role }) {
     }
   };
 
-   useEffect(() => {
-     fetchStudents();
-   }, []);
+  useEffect(() => {
+    fetchStudents();
+  }, []);
 
-   // Listen for scenario assignment changes to refetch students
-   useEffect(() => {
-     const handleScenarioAssignmentsChanged = () => {
-       console.log("Scenario assignments changed, refetching students...");
-       fetchStudents();
-     };
+  useEffect(() => {
+    const handleScenarioAssignmentsChanged = () => {
+      console.log("Scenario assignments changed, refetching students...");
+      fetchStudents();
+    };
 
-     // Listen for a custom event that can be dispatched from assignScenarios thunk
-     window.addEventListener('scenarioAssignmentsChanged', handleScenarioAssignmentsChanged);
+    window.addEventListener(
+      "scenarioAssignmentsChanged",
+      handleScenarioAssignmentsChanged,
+    );
 
-     return () => {
-       window.removeEventListener('scenarioAssignmentsChanged', handleScenarioAssignmentsChanged);
-     };
-   }, []);
+    return () => {
+      window.removeEventListener(
+        "scenarioAssignmentsChanged",
+        handleScenarioAssignmentsChanged,
+      );
+    };
+  }, []);
 
-  // --- Handlers ---
   const handleAddNew = () => {
     setEditingStudent(null);
     setIsStudentModalOpen(true);
@@ -103,7 +102,6 @@ function StudentPage({ role }) {
   const handleSaveStudent = async (formData) => {
     try {
       if (formData.id) {
-        // Update Existing - only update user fields (name, email)
         if (formData.user_id) {
           await axios.put(
             `/api/users/${formData.user_id}`,
@@ -111,11 +109,10 @@ function StudentPage({ role }) {
               name: formData.name,
               email: formData.email,
             },
-            getAuthHeaders()
+            getAuthHeaders(),
           );
         }
       } else {
-        // Create New - only send user fields, backend handles schoolId and supervisor
         await axios.post(
           "/api/users",
           {
@@ -124,25 +121,24 @@ function StudentPage({ role }) {
             password: formData.password,
             role: "student",
           },
-          getAuthHeaders()
+          getAuthHeaders(),
         );
       }
-      await fetchStudents(); // Refresh table
+      await fetchStudents();
       setIsStudentModalOpen(false);
     } catch (error) {
       toast.error(
         "Error saving student: " +
-          (error.response?.data?.message || error.message)
+          (error.response?.data?.message || error.message),
       );
     }
   };
 
-  // --- Filtering & Pagination Logic ---
   const filteredData = useMemo(() => {
     return students.filter(
       (student) =>
         student.name.toLowerCase().includes(searchTerm.toLowerCase()) ||
-        student.email.toLowerCase().includes(searchTerm.toLowerCase())
+        student.email.toLowerCase().includes(searchTerm.toLowerCase()),
     );
   }, [students, searchTerm]);
 
@@ -151,20 +147,16 @@ function StudentPage({ role }) {
     return filteredData.slice(start, start + itemsPerPage);
   }, [filteredData, currentPage]);
 
-  // --- Render ---
   return (
     <div className="p-8 bg-white min-h-screen font-sans">
-      {/* Header */}
       <div className="flex justify-between items-center mb-8">
         <h1 className="text-2xl font-bold text-gray-900">
           Students Management
         </h1>
       </div>
 
-      {/* Controls Bar */}
       <div className="flex flex-wrap justify-between items-center mb-6 gap-4">
         <div className="flex gap-3 flex-1">
-          {/* Search */}
           <div className="relative w-full max-w-md">
             <div className="absolute inset-y-0 left-0 pl-3 flex items-center pointer-events-none">
               <MagnifyingGlassIcon className="h-5 w-5 text-gray-400" />
@@ -178,32 +170,31 @@ function StudentPage({ role }) {
             />
           </div>
 
-          {/* Filter Button */}
           <button className="flex items-center gap-2 px-4 py-2.5 border border-gray-200 rounded-lg text-sm font-medium text-gray-600 hover:bg-gray-50 transition-colors">
             <FunnelIcon className="h-5 w-5" />
             Filters
           </button>
         </div>
 
-         <div className="flex gap-3">
-           {role !== "school_admin" && (
-             <>
-               <button
-                 onClick={() => setIsAssignModalOpen(true)}
-                 className="px-5 py-2.5 bg-gray-100 hover:bg-gray-200 text-gray-800 text-sm font-semibold rounded-lg transition-colors"
-               >
-                 Assign Scenarios
-               </button>
-               <button
-                 onClick={handleAddNew}
-                 className="flex items-center gap-2 px-5 py-2.5 bg-black hover:bg-gray-800 text-white text-sm font-bold rounded-lg transition-colors shadow-sm"
-               >
-                 <PlusIcon className="h-5 w-5" />
-                 New Student
-               </button>
-             </>
-           )}
-         </div>
+        <div className="flex gap-3">
+          {role !== "school_admin" && (
+            <>
+              <button
+                onClick={() => setIsAssignModalOpen(true)}
+                className="px-5 py-2.5 bg-gray-100 hover:bg-gray-200 text-gray-800 text-sm font-semibold rounded-lg transition-colors"
+              >
+                Assign Scenarios
+              </button>
+              <button
+                onClick={handleAddNew}
+                className="flex items-center gap-2 px-5 py-2.5 bg-black hover:bg-gray-800 text-white text-sm font-bold rounded-lg transition-colors shadow-sm"
+              >
+                <PlusIcon className="h-5 w-5" />
+                New Student
+              </button>
+            </>
+          )}
+        </div>
       </div>
 
       {/* Table */}
@@ -223,18 +214,18 @@ function StudentPage({ role }) {
               <th className="px-6 py-4 text-left text-xs font-semibold text-gray-500 uppercase tracking-wider">
                 School Name
               </th>
-               <th className="px-6 py-4 text-left text-xs font-semibold text-gray-500 uppercase tracking-wider">
-                 Progress
-               </th>
-               <th className="px-6 py-4 text-left text-xs font-semibold text-gray-500 uppercase tracking-wider">
-                 Assigned Scenarios
-               </th>
-               <th className="px-6 py-4 text-left text-xs font-semibold text-gray-500 uppercase tracking-wider">
-                 Transcript
-               </th>
-               <th className="px-6 py-4 text-left text-xs font-semibold text-gray-500 uppercase tracking-wider">
-                 Action
-               </th>
+              <th className="px-6 py-4 text-left text-xs font-semibold text-gray-500 uppercase tracking-wider">
+                Progress
+              </th>
+              <th className="px-6 py-4 text-left text-xs font-semibold text-gray-500 uppercase tracking-wider">
+                Assigned Scenarios
+              </th>
+              <th className="px-6 py-4 text-left text-xs font-semibold text-gray-500 uppercase tracking-wider">
+                Transcript
+              </th>
+              <th className="px-6 py-4 text-left text-xs font-semibold text-gray-500 uppercase tracking-wider">
+                Action
+              </th>
             </tr>
           </thead>
           <tbody className="bg-white divide-y divide-gray-100">
@@ -274,42 +265,47 @@ function StudentPage({ role }) {
                   <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-600 max-w-xs truncate">
                     {student.schoolName}
                   </td>
-                   <td className="px-6 py-4 whitespace-nowrap text-sm font-medium text-gray-900">
-                     {student.progress}
-                   </td>
-                   <td className="px-6 py-4 whitespace-nowrap text-sm">
-                     {student.isAssigned ? (
-                       <span className="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium bg-green-100 text-green-800">
-                         Assigned ({student.assignedScenariosCount})
-                       </span>
-                     ) : (
-                       <span className="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium bg-gray-100 text-gray-800">
-                         Not Assigned
-                       </span>
-                     )}
-                   </td>
-                   <td className="px-6 py-4 whitespace-nowrap text-sm">
-                     <button className="text-blue-600 hover:text-blue-800 font-medium underline decoration-blue-300 underline-offset-2">
-                       View
-                     </button>
-                   </td>
-                   <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500">
-                     <div className="flex items-center gap-4">
-                       {role !== "school_admin" && (
-                         <button
-                           onClick={() => handleEdit(student)}
-                           className="flex items-center gap-1.5 text-gray-500 hover:text-gray-900 transition-colors"
-                         >
-                           <PencilSquareIcon className="w-4 h-4" />
-                           Edit
-                         </button>
-                       )}
-                       <button className="flex items-center gap-1.5 text-gray-500 hover:text-gray-900 transition-colors">
-                         <UserCircleIcon className="w-4 h-4" />
-                         Profile
-                       </button>
-                     </div>
-                   </td>
+                  <td className="px-6 py-4 whitespace-nowrap text-sm font-medium text-gray-900">
+                    {student.progress}
+                  </td>
+                  <td className="px-6 py-4 whitespace-nowrap text-sm">
+                    {student.isAssigned ? (
+                      <span className="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium bg-green-100 text-green-800">
+                        Assigned ({student.assignedScenariosCount})
+                      </span>
+                    ) : (
+                      <span className="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium bg-gray-100 text-gray-800">
+                        Not Assigned
+                      </span>
+                    )}
+                  </td>
+                  <td className="px-6 py-4 whitespace-nowrap text-sm">
+                    <button
+                      onClick={() =>
+                        setSelectedStudent(student.originalData || student)
+                      }
+                      className="text-blue-600 hover:text-blue-800 font-medium underline decoration-blue-300 underline-offset-2"
+                    >
+                      View
+                    </button>
+                  </td>
+                  <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500">
+                    <div className="flex items-center gap-4">
+                      {role !== "school_admin" && (
+                        <button
+                          onClick={() => handleEdit(student)}
+                          className="flex items-center gap-1.5 text-gray-500 hover:text-gray-900 transition-colors"
+                        >
+                          <PencilSquareIcon className="w-4 h-4" />
+                          Edit
+                        </button>
+                      )}
+                      <button className="flex items-center gap-1.5 text-gray-500 hover:text-gray-900 transition-colors">
+                        <UserCircleIcon className="w-4 h-4" />
+                        Profile
+                      </button>
+                    </div>
+                  </td>
                 </tr>
               ))
             )}
@@ -351,15 +347,15 @@ function StudentPage({ role }) {
               >
                 {idx + 1}
               </button>
-            )
+            ),
           )}
           <button
             onClick={() =>
               setCurrentPage((prev) =>
                 Math.min(
                   prev + 1,
-                  Math.ceil(filteredData.length / itemsPerPage)
-                )
+                  Math.ceil(filteredData.length / itemsPerPage),
+                ),
               )
             }
             disabled={
@@ -380,26 +376,35 @@ function StudentPage({ role }) {
             onSave={handleSaveStudent}
             onClose={() => setIsStudentModalOpen(false)}
             role={role}
-            defaultSchoolName={user?.schoolName || ''}
+            defaultSchoolName={user?.schoolName || ""}
           />
         </div>
       )}
 
-       {isAssignModalOpen && role !== "school_admin" && (
-         <AssignScenariosModal
-           onClose={() => setIsAssignModalOpen(false)}
-            onAssignSuccess={() => {
-              dispatch(fetchScenarios());
-              fetchStudents();
-              toast.success("Scenarios assigned successfully");
+      {isAssignModalOpen && role !== "school_admin" && (
+        <AssignScenariosModal
+          onClose={() => setIsAssignModalOpen(false)}
+          onAssignSuccess={() => {
+            dispatch(fetchScenarios());
+            fetchStudents();
+            toast.success("Scenarios assigned successfully");
 
-              // Dispatch custom event to notify other components
-              if (typeof window !== 'undefined') {
-                window.dispatchEvent(new CustomEvent('scenarioAssignmentsChanged'));
-              }
-            }}
-         />
-       )}
+            if (typeof window !== "undefined") {
+              window.dispatchEvent(
+                new CustomEvent("scenarioAssignmentsChanged"),
+              );
+            }
+          }}
+        />
+      )}
+
+      {selectedStudent && (
+        <TranscriptViewerModal
+          isOpen={!!selectedStudent}
+          onClose={() => setSelectedStudent(null)}
+          student={selectedStudent}
+        />
+      )}
     </div>
   );
 }

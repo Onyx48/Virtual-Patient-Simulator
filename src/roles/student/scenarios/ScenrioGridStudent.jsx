@@ -16,7 +16,6 @@ function ScenarioGridStudent({ data, onStartNow }) {
     navigate(`/student/scenario/${scenarioId}`);
   };
 
-  // Helper: Get text color based on difficulty
   const getDifficultyColor = (level) => {
     switch (level?.toLowerCase()) {
       case "high":
@@ -30,10 +29,8 @@ function ScenarioGridStudent({ data, onStartNow }) {
     }
   };
 
-  // Helper: Render the 3-bar signal icon based on difficulty
   const getSignalIcon = (level) => {
     const colorClass = getDifficultyColor(level);
-    // Convert 'text-red-500' to 'bg-red-500' for the bars
     const bgClass = (isActive) =>
       isActive ? colorClass.replace("text-", "bg-") : "bg-gray-200";
 
@@ -67,14 +64,11 @@ function ScenarioGridStudent({ data, onStartNow }) {
           }}
           className="bg-white rounded-3xl p-6 shadow-sm border border-gray-100 hover:shadow-lg transition-shadow flex flex-col h-full"
         >
-          {/* Header: Icon, Score, Difficulty */}
           <div className="flex justify-between items-start mb-5">
             <div className="flex items-center gap-3">
-              {/* Target Icon Circle */}
               <div className="w-10 h-10 rounded-full bg-red-50 flex items-center justify-center border border-red-100">
                 <Target className="w-5 h-5 text-red-500" />
               </div>
-              {/* Highest Score Text */}
               <div>
                 <span className="block text-sm font-bold text-gray-900">
                   {scenario.highestScore || "0"}% Highest
@@ -82,12 +76,11 @@ function ScenarioGridStudent({ data, onStartNow }) {
               </div>
             </div>
 
-            {/* Difficulty Indicator */}
             <div className="flex items-center gap-2">
               {getSignalIcon(scenario.difficulty)}
               <span
                 className={`text-xs font-bold ${getDifficultyColor(
-                  scenario.difficulty
+                  scenario.difficulty,
                 )}`}
               >
                 {scenario.difficulty}
@@ -95,7 +88,6 @@ function ScenarioGridStudent({ data, onStartNow }) {
             </div>
           </div>
 
-          {/* Body: Title & Description */}
           <div className="mb-8 flex-1">
             <h3 className="text-lg font-bold text-gray-900 mb-2 leading-tight">
               {scenario.scenarioName}
@@ -106,7 +98,6 @@ function ScenarioGridStudent({ data, onStartNow }) {
             </p>
           </div>
 
-          {/* Footer: Status & Action Button */}
           <div className="mt-auto">
             <p className="text-[10px] font-bold text-gray-400 uppercase tracking-wider mb-3">
               {scenario.status || "AVAILABLE"}

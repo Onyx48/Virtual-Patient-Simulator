@@ -7,7 +7,6 @@ import ScenarioManagementControls from "./ScenarioManagementControls.jsx";
 import ScenarioTable from "./ScenarioTable.jsx";
 // import AssignScenariosModal from "../../components/shared/AssignScenariosModal";
 
-// We only need fetchScenarios now. The FormPage handles specific selection via ID.
 import {
   fetchScenarios,
   setSelectedScenario,
@@ -18,43 +17,36 @@ function ScenariosPage() {
   const navigate = useNavigate();
   const { user } = useAuth();
 
-  // Get data from Redux
   const { scenarios, loading, error } = useSelector((state) => state.scenarios);
 
-  // Role check
   const canEditScenarios =
     user?.role === "educator" || user?.role === "superadmin";
 
-  // Local state for UI controls
   const [searchTerm, setSearchTerm] = useState("");
   const [sortConfig, setSortConfig] = useState(null);
   const [filterCriteria, setFilterCriteria] = useState({});
   const [isAssignModalOpen, setIsAssignModalOpen] = useState(false);
 
-  // Load scenarios on mount
   useEffect(() => {
     dispatch(fetchScenarios());
   }, [dispatch]);
 
-  // --- FILTERING LOGIC ---
   const filteredScenarios = useMemo(() => {
     if (!scenarios) return [];
     let currentData = [...scenarios];
 
-    // 1. Search
     if (searchTerm) {
       const lowerCaseSearchTerm = searchTerm.toLowerCase();
       currentData = currentData.filter(
         (scenario) =>
           scenario.scenarioName?.toLowerCase().includes(lowerCaseSearchTerm) ||
           scenario.description?.toLowerCase().includes(lowerCaseSearchTerm) ||
-          scenario.educator?.name?.toLowerCase().includes(lowerCaseSearchTerm) // Handling populated educator object
+          scenario.educator?.name?.toLowerCase().includes(lowerCaseSearchTerm), // Handling populated educator object
       );
     }
 
-    // 2. Advanced Filters
     const hasActiveFilters = Object.values(filterCriteria).some(
-      (value) => value !== "" && value !== null && value !== undefined
+      (value) => value !== "" && value !== null && value !== undefined,
     );
 
     if (hasActiveFilters) {
@@ -63,7 +55,6 @@ function ScenariosPage() {
         if (filterCriteria.status && filterCriteria.status !== "") {
           if (scenario.status !== filterCriteria.status) matchesFilters = false;
         }
-        // Add other filters here if needed
         return matchesFilters;
       });
     }
@@ -71,7 +62,6 @@ function ScenariosPage() {
     return currentData;
   }, [scenarios, searchTerm, filterCriteria]);
 
-  // --- SORTING LOGIC ---
   const filteredAndSortedScenarios = useMemo(() => {
     let sortableItems = [...filteredScenarios];
     if (sortConfig !== null) {
@@ -91,8 +81,6 @@ function ScenariosPage() {
     }
     return sortableItems;
   }, [filteredScenarios, sortConfig]);
-
-  // --- HANDLERS ---
 
   const handleSearchChange = (term) => {
     setSearchTerm(term);
@@ -117,18 +105,14 @@ function ScenariosPage() {
     setSortConfig({ key, direction });
   };
 
-  // CLEANED UP: Just navigate to the Add Page
   const handleAddNewClick = () => {
     if (!canEditScenarios) return;
     navigate("/scenarios/add");
   };
 
-  // CLEANED UP: Just navigate to the Edit Page
   const handleEditClick = (scenario) => {
     if (!canEditScenarios) return;
-    // Optional: Pre-set selected scenario in Redux to avoid loading delay on next page
     dispatch(setSelectedScenario(scenario));
-    // Use _id (MongoDB default) or id depending on your backend response
     const scenarioId = scenario._id || scenario.id;
     navigate(`/scenarios/edit/${scenarioId}`);
   };
@@ -173,13 +157,13 @@ function ScenariosPage() {
         onSort={handleSort}
       />
 
-       {/* Assign Scenarios Modal */}
-       {isAssignModalOpen && (
-         <AssignScenariosModal
-           onClose={() => setIsAssignModalOpen(false)}
-           onAssignSuccess={() => dispatch(fetchScenarios())}
-         />
-       )}
+      {/* Assign Scenarios Modal */}
+      {isAssignModalOpen && (
+        <AssignScenariosModal
+          onClose={() => setIsAssignModalOpen(false)}
+          onAssignSuccess={() => dispatch(fetchScenarios())}
+        />
+      )}
     </div>
   );
 }

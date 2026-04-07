@@ -1,9 +1,10 @@
 // src/components/StudentsPage.jsx
 import React, { useState } from 'react';
-import StudentManagementControls from '../roles/educator/students/StudentManagementControls.jsx'; // Temporarily import
+import StudentManagementControls from '../roles/educator/students/StudentManagementControls.jsx';
 import StudentTable from '../roles/educator/students/StudentTable.jsx';
 import StudentModal from './StudentModal.jsx';
 import AssignScenarios from '../components/shared/AssignScenarios.jsx';
+import TranscriptViewerModal from './ui/TranscriptViewerModal.jsx';
 import { useEntityFilters } from '../lib/hooks/useEntityFilters.js';
 import { useSorting } from '../lib/hooks/useSorting.js';
 
@@ -13,6 +14,7 @@ function StudentsPage({ students, onAdd, onEdit, onDelete, canEdit = true, canAd
   const [isModalOpen, setIsModalOpen] = useState(false);
   const [editingStudent, setEditingStudent] = useState(null);
   const [isAssigningScenarios, setIsAssigningScenarios] = useState(false);
+  const [selectedStudent, setSelectedStudent] = useState(null);
 
   // Filter students
   const filteredStudents = useEntityFilters(
@@ -45,6 +47,14 @@ function StudentsPage({ students, onAdd, onEdit, onDelete, canEdit = true, canAd
     }
   };
 
+  const handleViewTranscriptClick = (student) => {
+    setSelectedStudent(student);
+  };
+
+  const handleCloseTranscriptModal = () => {
+    setSelectedStudent(null);
+  };
+
   const handleModalSave = (data) => {
     if (editingStudent) {
       onEdit(editingStudent.id, data);
@@ -72,7 +82,7 @@ function StudentsPage({ students, onAdd, onEdit, onDelete, canEdit = true, canAd
         data={sortedData}
         onEditClick={handleEditClick}
         onDeleteClick={onDelete}
-        onViewTranscriptClick={() => {}}
+        onViewTranscriptClick={handleViewTranscriptClick}
         onViewProfileClick={() => {}}
         onSort={handleSort}
         canEdit={canEdit}
@@ -87,6 +97,13 @@ function StudentsPage({ students, onAdd, onEdit, onDelete, canEdit = true, canAd
       {isAssigningScenarios && (
         <AssignScenarios
           onClose={() => setIsAssigningScenarios(false)}
+        />
+      )}
+      {selectedStudent && (
+        <TranscriptViewerModal
+          isOpen={!!selectedStudent}
+          onClose={handleCloseTranscriptModal}
+          student={selectedStudent}
         />
       )}
     </div>

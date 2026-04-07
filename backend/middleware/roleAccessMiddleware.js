@@ -1,20 +1,15 @@
-// backend/middleware/roleAccessMiddleware.js
 import { hasPermission } from "./rolePermissions.js";
 
-// Middleware to check if user has permission for an action and set scope
-// Usage: app.get('/api/students', protect, checkAccess('manageStudents'), ...)
 export const checkAccess = (action) => {
   return (req, res, next) => {
     const userRole = req.user.role;
 
-    // Check if role has permission for the action
     if (!hasPermission(userRole, action)) {
       return res.status(403).json({
         message: `User role '${userRole}' is not authorized to perform action: ${action}`,
       });
     }
 
-    // Set scope based on role for data filtering (to be used in routes)
     req.scope = {};
     if (userRole === "school_admin") {
       if (!req.user.schoolId) {
@@ -23,14 +18,13 @@ export const checkAccess = (action) => {
             "School admin account is not assigned to a school. Please contact superadmin.",
         });
       }
-      req.scope.schoolId = req.user.schoolId._id; // Filter to admin's school
+      req.scope.schoolId = req.user.schoolId._id;
     } else if (userRole === "educator") {
-      req.scope.educatorId = req.user._id; // Educators see only their own scenarios
-      req.scope.schoolId = req.user.schoolId ? req.user.schoolId._id : null; // Educators have schoolId directly
+      req.scope.educatorId = req.user._id;
+      req.scope.schoolId = req.user.schoolId ? req.user.schoolId._id : null;
     } else if (userRole === "student") {
-      req.scope.userId = req.user._id; // Filter to own data
+      req.scope.userId = req.user._id;
     }
-    // superadmin has no scope restrictions
 
     next();
   };

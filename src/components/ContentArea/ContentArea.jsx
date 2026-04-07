@@ -38,7 +38,7 @@ import ReportPage from "../Report/ReportPage";
 
 const RoleBasedRoute = ({ children, allowedRoles }) => {
   const { user, loading } = useAuth();
-  if (loading) return <div>Loading content...</div>;
+  if (loading) return <div className="min-h-full bg-gray-50" />;
   if (!user) return <Navigate to="/login" replace />;
   if (allowedRoles && !allowedRoles.includes(user.role)) {
     return <Navigate to="/" replace />;

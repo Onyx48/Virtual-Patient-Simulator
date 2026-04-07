@@ -74,7 +74,6 @@ export const assignScenarios = createAsyncThunk(
       const promises = [];
 
       assignmentPayload.forEach((change) => {
-        // Update scenario with IDs
         promises.push(
           axios.put(
             `/api/scenarios/${change.scenarioId}`,
@@ -82,26 +81,6 @@ export const assignScenarios = createAsyncThunk(
             getAuthHeaders()
           )
         );
-
-        // Update students
-        change.studentUpdates.forEach((update) => {
-          const updateData = {};
-          if (update.addScenarios.length > 0) {
-            updateData.$addToSet = { assignedScenarios: { $each: update.addScenarios } };
-          }
-          if (update.removeScenarios.length > 0) {
-            updateData.$pull = { assignedScenarios: { $in: update.removeScenarios } };
-          }
-          if (Object.keys(updateData).length > 0) {
-            promises.push(
-              axios.put(
-                `/api/students/${update.studentId}`,
-                updateData,
-                getAuthHeaders()
-              )
-            );
-          }
-        });
       });
 
        await Promise.all(promises);

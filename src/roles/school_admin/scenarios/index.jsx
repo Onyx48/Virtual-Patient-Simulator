@@ -1,69 +1,58 @@
 import React, { useState, useMemo, useEffect } from "react";
 import { useSelector, useDispatch } from "react-redux";
 
-// Import Shared Components
 import ScenarioManagementControls from "../../educator/scenarios/ScenarioManagementControls.jsx";
 import ScenarioTable from "../../educator/scenarios/ScenarioTable.jsx";
 
-import {
-  fetchScenarios,
-} from "../../../redux/slices/scenarioSlice.js";
+import { fetchScenarios } from "../../../redux/slices/scenarioSlice.js";
 
 function SchoolAdminScenariosPage() {
   const dispatch = useDispatch();
 
-  // Get scenarios from Redux Store
   const { scenarios, loading, error } = useSelector((state) => state.scenarios);
 
-  // Local Component State
   const [searchTerm, setSearchTerm] = useState("");
   const [sortConfig, setSortConfig] = useState({
     key: "createdAt",
     direction: "desc",
   });
-   const [filterCriteria, setFilterCriteria] = useState({});
+  const [filterCriteria, setFilterCriteria] = useState({});
 
-  // Fetch Data on Component Mount
   useEffect(() => {
     dispatch(fetchScenarios());
   }, [dispatch]);
 
-  // --- FILTERING LOGIC ---
   const filteredScenarios = useMemo(() => {
     if (!scenarios) return [];
     let currentData = [...scenarios];
 
-    // 1. Search Filter (Name, Description, Creator)
     if (searchTerm) {
       const lowerTerm = searchTerm.toLowerCase();
       currentData = currentData.filter(
         (s) =>
           s.scenarioName?.toLowerCase().includes(lowerTerm) ||
           s.description?.toLowerCase().includes(lowerTerm) ||
-          (s.educator?.name || "").toLowerCase().includes(lowerTerm)
+          (s.educator?.name || "").toLowerCase().includes(lowerTerm),
       );
     }
 
-    // 2. Status Filter
     if (filterCriteria.status) {
       currentData = currentData.filter(
-        (s) => s.status === filterCriteria.status
+        (s) => s.status === filterCriteria.status,
       );
     }
 
-    // 3. Educator Filter (Optional text input match)
     if (filterCriteria.educator) {
       currentData = currentData.filter((s) =>
         (s.educator?.name || "")
           .toLowerCase()
-          .includes(filterCriteria.educator.toLowerCase())
+          .includes(filterCriteria.educator.toLowerCase()),
       );
     }
 
     return currentData;
   }, [scenarios, searchTerm, filterCriteria]);
 
-  // --- SORTING LOGIC ---
   const filteredAndSortedScenarios = useMemo(() => {
     let sortableItems = [...filteredScenarios];
     if (sortConfig !== null) {
@@ -71,13 +60,11 @@ function SchoolAdminScenariosPage() {
         let aValue = a[sortConfig.key];
         let bValue = b[sortConfig.key];
 
-        // Handle Educator field which is an object
         if (sortConfig.key === "educator") {
           aValue = typeof aValue === "object" ? aValue?.name : aValue;
           bValue = typeof bValue === "object" ? bValue?.name : bValue;
         }
 
-        // Handle nulls
         if (!aValue) return 1;
         if (!bValue) return -1;
 
@@ -89,7 +76,6 @@ function SchoolAdminScenariosPage() {
     return sortableItems;
   }, [filteredScenarios, sortConfig]);
 
-  // --- HANDLERS ---
   const handleSort = (key) => {
     let direction = "asc";
     if (
@@ -102,7 +88,6 @@ function SchoolAdminScenariosPage() {
     setSortConfig({ key, direction });
   };
 
-  // Simple filter application (you can expand this to a modal if needed)
   const handleApplyFilters = (filters) => {
     setFilterCriteria((prev) => ({ ...prev, ...filters }));
   };
@@ -133,7 +118,6 @@ function SchoolAdminScenariosPage() {
         onApplyFilters={handleApplyFilters}
       />
 
-      {/* Renders the Table View for School Admins */}
       <ScenarioTable
         data={filteredAndSortedScenarios}
         canEdit={false}
@@ -141,8 +125,6 @@ function SchoolAdminScenariosPage() {
         onSort={handleSort}
         sortConfig={sortConfig}
       />
-
-
     </div>
   );
 }

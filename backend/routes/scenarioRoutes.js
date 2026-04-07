@@ -9,25 +9,20 @@ import { checkAccess } from "../middleware/roleAccessMiddleware.js";
 
 const router = express.Router();
 
-// --- Validation Rules ---
 const scenarioValidationRules = [
   body("scenarioName").optional().notEmpty().trim(),
   body("description").optional().trim(),
-   body("status", "Invalid Status")
-     .optional()
-     .isIn(["Draft", "Published", "Archived", "success"]),
+  body("status", "Invalid Status")
+    .optional()
+    .isIn(["Draft", "Published", "Archived", "success"]),
   body("permissions").optional().isIn(["Read Only", "Write Only", "Both"]),
 ];
 
-// --- GET ALL SCENARIOS ---
-// @desc    Get all scenarios with filtering and scoping
-// @route   GET /api/scenarios
 router.get("/", protect, checkAccess("viewScenarios"), async (req, res) => {
   try {
     let query = {};
     const { status, permissions, searchTerm } = req.query;
 
-    // 1. General Filtering
     if (status) query.status = status;
     if (permissions) query.permissions = permissions;
     if (searchTerm) {
@@ -35,16 +30,12 @@ router.get("/", protect, checkAccess("viewScenarios"), async (req, res) => {
       query.$or = [{ scenarioName: searchRegex }, { description: searchRegex }];
     }
 
-    // 2. Role-based Scoping (Enforced by roleAccessMiddleware)
     if (req.scope) {
       if (req.scope.educatorId) {
-        // Educator sees scenarios they created
         query.educator = req.scope.educatorId;
       } else if (req.scope.schoolId) {
-        // School Admin sees scenarios in their school
         query.schoolId = req.scope.schoolId;
       } else if (req.scope.userId) {
-        // Students see scenarios assigned to them
         query.assignedTo = { $in: [req.scope.userId] };
       }
     }
@@ -58,7 +49,10 @@ router.get("/", protect, checkAccess("viewScenarios"), async (req, res) => {
       .sort({ createdAt: -1 });
 
     console.log("Found scenarios count:", scenarios.length);
-    console.log("Fetched scenarios with assignedTo:", scenarios.map(s => ({ id: s._id, assignedTo: s.assignedTo })));
+    console.log(
+      "Fetched scenarios with assignedTo:",
+      scenarios.map((s) => ({ id: s._id, assignedTo: s.assignedTo })),
+    );
 
     res.json(scenarios);
   } catch (err) {
@@ -67,12 +61,8 @@ router.get("/", protect, checkAccess("viewScenarios"), async (req, res) => {
   }
 });
 
-// --- GET SINGLE SCENARIO ---
-// @desc    Get a single scenario by ID
-// @route   GET /api/scenarios/:id
 router.get("/:id", protect, checkAccess("viewScenarios"), async (req, res) => {
   try {
-    // Validate ID format before querying
     if (!mongoose.Types.ObjectId.isValid(req.params.id)) {
       return res
         .status(404)
@@ -81,13 +71,12 @@ router.get("/:id", protect, checkAccess("viewScenarios"), async (req, res) => {
 
     const scenario = await Scenario.findById(req.params.id).populate(
       "educator",
-      "name email"
+      "name email",
     );
 
     if (!scenario)
       return res.status(404).json({ message: "Scenario not found." });
 
-    // Check scope for school_admin
     if (
       req.scope.schoolId &&
       scenario.schoolId &&
@@ -105,16 +94,12 @@ router.get("/:id", protect, checkAccess("viewScenarios"), async (req, res) => {
   }
 });
 
-// --- CREATE SCENARIO (Educators Only) ---
-// @desc    Create a new scenario
-// @route   POST /api/scenarios
 router.post(
   "/",
   protect,
-  checkAccess("manageScenarios"), // Locked to 'educator' via rolePermissions.js
+  checkAccess("manageScenarios"),
   scenarioValidationRules,
   async (req, res) => {
-    // 1. Validation Errors from express-validator
     const errors = validationResult(req);
     if (!errors.isEmpty()) {
       console.log("Validation Failed:", errors.array());
@@ -122,7 +107,7 @@ router.post(
     }
 
     const {
-      _id, // ID coming from AI (potentially)
+      _id,
       scenarioName,
       description,
       status,
@@ -141,7 +126,6 @@ router.post(
     console.log("POST /scenarios - Received body:", req.body);
     console.log("User schoolId:", req.user.schoolId);
 
-    // 2. Resolve assignedTo emails to user IDs
     let assignedUserIds = [];
     if (assignedTo && Array.isArray(assignedTo) && assignedTo.length > 0) {
       try {
@@ -153,12 +137,10 @@ router.post(
     }
 
     try {
-      // 3. ID Validation Logic (The Fix for 400 Bad Request)
       let customId = null;
       if (_id) {
         console.log("Checking _id from AI:", _id);
         if (mongoose.Types.ObjectId.isValid(_id)) {
-          // It is a valid Mongo ID, check for duplicates
           const existingScenario = await Scenario.findById(_id);
           if (existingScenario) {
             console.log("Duplicate _id found:", _id);
@@ -169,14 +151,10 @@ router.post(
           customId = _id;
           console.log("Using custom _id:", _id);
         } else {
-          // It is NOT a valid Mongo ID. Log it and ignore it.
-          // This allows Mongo to generate a fresh, valid ID automatically.
           console.warn(`Ignoring invalid ObjectId provided by AI: ${_id}`);
         }
       }
 
-      // 4. Safe School ID Extraction
-      // authMiddleware populates 'schoolId', so it might be an object or a string.
       const userSchoolId = req.user.schoolId?._id || req.user.schoolId;
 
       if (!userSchoolId) {
@@ -186,12 +164,11 @@ router.post(
         });
       }
 
-      // 5. Construct the Scenario Object
       const scenarioData = {
         scenarioName,
         description,
-        educator: req.user._id, // Enforce logged-in user as educator
-        schoolId: userSchoolId, // Use extracted School ID
+        educator: req.user._id,
+        schoolId: userSchoolId,
         status: status || "Draft",
         permissions: permissions || "Read Only",
         assignedTo: assignedUserIds,
@@ -205,7 +182,6 @@ router.post(
         apiKey: apiKey || "",
       };
 
-      // Only attach _id if it was valid
       if (customId) {
         scenarioData._id = customId;
       }
@@ -213,7 +189,6 @@ router.post(
       const newScenario = new Scenario(scenarioData);
       await newScenario.save();
 
-      // Populate for immediate return
       await newScenario.populate("educator", "name email");
       await newScenario.populate("assignedTo", "name");
 
@@ -234,19 +209,15 @@ router.post(
         .status(500)
         .json({ message: "Server error creating scenario: " + err.message });
     }
-  }
+  },
 );
 
-// --- UPDATE SCENARIO (Educator & Owner Only) ---
-// @desc    Update an existing scenario
-// @route   PUT /api/scenarios/:id
 router.put(
   "/:id",
   protect,
   checkAccess("manageScenarios"),
   scenarioValidationRules,
   async (req, res) => {
-    // 1. Validation Errors
     const errors = validationResult(req);
     if (!errors.isEmpty())
       return res.status(400).json({ errors: errors.array() });
@@ -267,18 +238,20 @@ router.put(
       apiKey,
     } = req.body;
 
-    // 2. Validate Assigned User IDs
     let assignedUserIds = [];
     if (assignedTo && Array.isArray(assignedTo)) {
-      const invalidIds = assignedTo.filter(id => !mongoose.Types.ObjectId.isValid(id));
+      const invalidIds = assignedTo.filter(
+        (id) => !mongoose.Types.ObjectId.isValid(id),
+      );
       if (invalidIds.length > 0) {
-        return res.status(400).json({ message: "Invalid user IDs in assignedTo" });
+        return res
+          .status(400)
+          .json({ message: "Invalid user IDs in assignedTo" });
       }
       assignedUserIds = assignedTo;
     }
 
     try {
-      // Validate ID
       if (!mongoose.Types.ObjectId.isValid(req.params.id)) {
         return res
           .status(404)
@@ -289,15 +262,12 @@ router.put(
       if (!scenario)
         return res.status(404).json({ message: "Scenario not found." });
 
-      // 3. Ownership Check
-      // Ensure the logged-in user is the educator
       if (scenario.educator.toString() !== req.user._id.toString()) {
         return res
           .status(403)
           .json({ message: "You are not authorized to edit this scenario." });
       }
 
-      // Check scope for school_admin safety (double check)
       if (
         req.scope.schoolId &&
         scenario.schoolId.toString() !== req.scope.schoolId.toString()
@@ -307,19 +277,21 @@ router.put(
           .json({ message: "Access denied: Scenario not in your school" });
       }
 
-      // 4. Update Fields (only if provided)
       if (scenarioName !== undefined) scenario.scenarioName = scenarioName;
       if (description !== undefined) scenario.description = description;
       if (status !== undefined) scenario.status = status;
       if (permissions !== undefined) scenario.permissions = permissions;
       if (assignedTo !== undefined) scenario.assignedTo = assignedUserIds;
       if (template !== undefined) scenario.template = template;
-      if (scenarioPrompt !== undefined) scenario.scenarioPrompt = scenarioPrompt;
+      if (scenarioPrompt !== undefined)
+        scenario.scenarioPrompt = scenarioPrompt;
       if (aiAvatarRole !== undefined) scenario.aiAvatarRole = aiAvatarRole;
-      if (aiInstructions !== undefined) scenario.aiInstructions = aiInstructions;
+      if (aiInstructions !== undefined)
+        scenario.aiInstructions = aiInstructions;
       if (aiQuestions !== undefined) scenario.aiQuestions = aiQuestions;
       if (difficulty !== undefined) scenario.difficulty = difficulty;
-      if (animationTriggers !== undefined) scenario.animationTriggers = animationTriggers;
+      if (animationTriggers !== undefined)
+        scenario.animationTriggers = animationTriggers;
       if (apiKey !== undefined) scenario.apiKey = apiKey;
 
       await scenario.save();
@@ -339,12 +311,9 @@ router.put(
           .json({ message: "Scenario name already exists." });
       res.status(500).json({ message: "Server error updating scenario." });
     }
-  }
+  },
 );
 
-// --- DELETE SCENARIO (Educator & Owner Only) ---
-// @desc    Delete a scenario
-// @route   DELETE /api/scenarios/:id
 router.delete(
   "/:id",
   protect,
@@ -361,7 +330,6 @@ router.delete(
       if (!scenario)
         return res.status(404).json({ message: "Scenario not found." });
 
-      // Ownership Check
       if (scenario.educator.toString() !== req.user._id.toString()) {
         return res
           .status(403)
@@ -374,7 +342,7 @@ router.delete(
       console.error("Delete Scenario Error:", err);
       res.status(500).json({ message: "Server error deleting scenario." });
     }
-  }
+  },
 );
 
 export default router;

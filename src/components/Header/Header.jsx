@@ -1,6 +1,6 @@
 // src/components/Container/Header.jsx
 import React from "react";
-import { useLocation, Link } from "react-router-dom";
+import { useLocation, useNavigate } from "react-router-dom";
 import { useAuth } from "../../AuthContext";
 
 // Icons (example using Heroicons)
@@ -31,6 +31,7 @@ const formatRoleForDisplay = (role) => {
 function Header() {
   const { user } = useAuth(); // Only need user for display
   const location = useLocation();
+  const navigate = useNavigate();
 
   let pageTitle = "Dashboard";
   const currentPath = location.pathname;
@@ -85,7 +86,10 @@ function Header() {
           <QuestionMarkCircleIcon className="h-6 w-6" />
         </button>
         <div className="relative">
-          <button className="flex items-center space-x-2 focus:outline-none">
+          <button
+            onClick={() => navigate('/settings')}
+            className="flex items-center space-x-2 focus:outline-none"
+          >
             {user?.profilePictureUrl ? (
               <img
                 src={user.profilePictureUrl}

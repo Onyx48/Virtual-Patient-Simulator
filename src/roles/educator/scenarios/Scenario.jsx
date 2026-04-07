@@ -1,61 +1,50 @@
 import React, { useState, useMemo } from "react";
 import { useNavigate } from "react-router-dom";
 
-// --- Components ---
 import ScenarioManagementControls from "./ScenarioManagementControls.jsx";
 import ScenarioTable from "./ScenarioTable.jsx";
 
-// --- Mock Data ---
-// Ensure this file exists in the same folder with the data I gave you previously
 import initialScenarios from "./initialScenarios.json";
 
 function ScenariosPage() {
   const navigate = useNavigate();
 
-  // --- STATE: Initialize directly with Mock Data ---
   const [scenarios, setScenarios] = useState(initialScenarios);
 
   const [searchTerm, setSearchTerm] = useState("");
   const [filterCriteria, setFilterCriteria] = useState({});
   const [sortConfig, setSortConfig] = useState(null);
 
-  // --- NAVIGATION HANDLERS ---
   const handleAddNewClick = () => {
     navigate("/scenarios/add");
   };
 
   const handleEditClick = (scenario) => {
-    // Navigate to edit page with ID
     navigate(`/scenarios/edit/${scenario.id}`);
   };
 
-  // --- FILTERING LOGIC ---
   const filteredScenarios = useMemo(() => {
     let currentData = scenarios;
 
-    // 1. Search Filter
     if (searchTerm) {
       const lowerTerm = searchTerm.toLowerCase();
       currentData = currentData.filter(
         (s) =>
           s.scenarioName.toLowerCase().includes(lowerTerm) ||
           s.description.toLowerCase().includes(lowerTerm) ||
-          s.educator.toLowerCase().includes(lowerTerm)
+          s.educator.toLowerCase().includes(lowerTerm),
       );
     }
 
-    // 2. Dropdown Filters
     if (filterCriteria.status) {
       currentData = currentData.filter(
-        (s) => s.status === filterCriteria.status
+        (s) => s.status === filterCriteria.status,
       );
     }
-    // Add other filters here if needed (e.g. Creator)
 
     return currentData;
   }, [scenarios, searchTerm, filterCriteria]);
 
-  // --- SORTING LOGIC ---
   const filteredAndSortedScenarios = useMemo(() => {
     let items = [...filteredScenarios];
     if (sortConfig !== null) {
@@ -63,7 +52,6 @@ function ScenariosPage() {
         const aValue = a[sortConfig.key];
         const bValue = b[sortConfig.key];
 
-        // Handle nulls
         if (aValue == null) return sortConfig.direction === "asc" ? 1 : -1;
         if (bValue == null) return sortConfig.direction === "asc" ? -1 : 1;
 
@@ -75,7 +63,6 @@ function ScenariosPage() {
     return items;
   }, [filteredScenarios, sortConfig]);
 
-  // --- CONTROLS HANDLERS ---
   const handleSearchChange = (term) => {
     setSearchTerm(term);
   };

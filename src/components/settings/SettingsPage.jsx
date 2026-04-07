@@ -1,8 +1,8 @@
 import React, { useState, useEffect } from "react";
 import { useForm } from "react-hook-form";
 import { useAuth } from "@/AuthContext.jsx";
-import { toast } from 'react-hot-toast';
-import axios from 'axios';
+import { toast } from "react-hot-toast";
+import axios from "axios";
 
 const initialUserData = {
   profilePictureUrl: "https://via.placeholder.com/150/FF5733/FFFFFF?text=JD",
@@ -80,24 +80,21 @@ const EyeIcon = ({ isVisible, onClick }) => (
   </button>
 );
 
-
-
 function SettingsPage() {
   const { user, updateProfile } = useAuth();
   const [userData, setUserData] = useState(initialUserData);
   const [showChangeEmailModal, setShowChangeEmailModal] = useState(false);
   const [uploading, setUploading] = useState(false);
   const [passwordData, setPasswordData] = useState({
-    currentPassword: '',
-    newPassword: '',
-    confirmPassword: '',
+    currentPassword: "",
+    newPassword: "",
+    confirmPassword: "",
   });
   const [emailData, setEmailData] = useState({
-    newEmail: '',
-    password: '',
+    newEmail: "",
+    password: "",
   });
 
-  // All roles can edit personal info
   const canEditPersonalInfo = true;
 
   const {
@@ -117,7 +114,9 @@ function SettingsPage() {
   useEffect(() => {
     if (user) {
       setUserData({
-        profilePictureUrl: user.profilePicture ? `http://localhost:5001${user.profilePicture}` : initialUserData.profilePictureUrl,
+        profilePictureUrl: user.profilePicture
+          ? `http://localhost:5001${user.profilePicture}`
+          : initialUserData.profilePictureUrl,
         fullName: user.name || initialUserData.fullName,
         email: user.email || initialUserData.email,
         phoneNumber: user.phoneNumber || initialUserData.phoneNumber,
@@ -130,7 +129,7 @@ function SettingsPage() {
 
   const onSubmit = async (data) => {
     try {
-      const response = await axios.put('/api/auth/profile', {
+      const response = await axios.put("/api/auth/profile", {
         name: data.fullName,
         phoneNumber: data.phoneNumber,
       });
@@ -148,41 +147,54 @@ function SettingsPage() {
   const handleProfilePictureChange = async (e) => {
     const file = e.target.files[0];
     if (file) {
-      // Validate file type and size
-      const allowedTypes = ['image/jpeg', 'image/jpg', 'image/png', 'image/gif'];
+      const allowedTypes = [
+        "image/jpeg",
+        "image/jpg",
+        "image/png",
+        "image/gif",
+      ];
       if (!allowedTypes.includes(file.type)) {
         toast.error("Only JPG, PNG, and GIF files are allowed");
         return;
       }
-      if (file.size > 2 * 1024 * 1024) { // 2MB
+      if (file.size > 2 * 1024 * 1024) {
         toast.error("File size must be less than 2MB");
         return;
       }
 
-      // Preview
       const reader = new FileReader();
       reader.onloadend = () => {
         setUserData({ ...userData, profilePictureUrl: reader.result });
       };
       reader.readAsDataURL(file);
 
-      // Upload
       setUploading(true);
       try {
         const formData = new FormData();
-        formData.append('profilePicture', file);
-        const response = await axios.post('/api/auth/upload-profile-picture', formData, {
-          headers: {
-            'Content-Type': 'multipart/form-data',
+        formData.append("profilePicture", file);
+        const response = await axios.post(
+          "/api/auth/upload-profile-picture",
+          formData,
+          {
+            headers: {
+              "Content-Type": "multipart/form-data",
+            },
           },
-        });
+        );
         updateProfile({ profilePicture: response.data.profilePicture });
         toast.success("Profile picture updated successfully");
       } catch (error) {
         console.error("Upload error:", error);
-        toast.error(error.response?.data?.message || "Failed to upload profile picture");
+        toast.error(
+          error.response?.data?.message || "Failed to upload profile picture",
+        );
         // Reset to original
-        setUserData({ ...userData, profilePictureUrl: user?.profilePicture ? `http://localhost:5001${user.profilePicture}` : initialUserData.profilePictureUrl });
+        setUserData({
+          ...userData,
+          profilePictureUrl: user?.profilePicture
+            ? `http://localhost:5001${user.profilePicture}`
+            : initialUserData.profilePictureUrl,
+        });
       } finally {
         setUploading(false);
       }
@@ -191,13 +203,18 @@ function SettingsPage() {
 
   const handleRemoveProfilePicture = async () => {
     try {
-      await axios.delete('/api/auth/profile-picture');
+      await axios.delete("/api/auth/profile-picture");
       updateProfile({ profilePicture: null });
-      setUserData({ ...userData, profilePictureUrl: initialUserData.profilePictureUrl });
+      setUserData({
+        ...userData,
+        profilePictureUrl: initialUserData.profilePictureUrl,
+      });
       toast.success("Profile picture removed successfully");
     } catch (error) {
       console.error("Remove error:", error);
-      toast.error(error.response?.data?.message || "Failed to remove profile picture");
+      toast.error(
+        error.response?.data?.message || "Failed to remove profile picture",
+      );
     }
   };
 
@@ -207,8 +224,12 @@ function SettingsPage() {
       return;
     }
     try {
-      await axios.put('/api/auth/change-password', passwordData);
-      setPasswordData({ currentPassword: '', newPassword: '', confirmPassword: '' });
+      await axios.put("/api/auth/change-password", passwordData);
+      setPasswordData({
+        currentPassword: "",
+        newPassword: "",
+        confirmPassword: "",
+      });
       toast.success("Password updated successfully");
     } catch (error) {
       console.error("Password change error:", error);
@@ -219,9 +240,9 @@ function SettingsPage() {
   const handleEmailSubmit = async (e) => {
     e.preventDefault();
     try {
-      const response = await axios.put('/api/auth/change-email', emailData);
+      const response = await axios.put("/api/auth/change-email", emailData);
       updateProfile({ email: response.data.email });
-      setEmailData({ newEmail: '', password: '' });
+      setEmailData({ newEmail: "", password: "" });
       setShowChangeEmailModal(false);
       toast.success("Email updated successfully");
     } catch (error) {
@@ -236,250 +257,294 @@ function SettingsPage() {
         <h1 className="text-2xl font-bold text-gray-900 mb-6">Settings</h1>
 
         <form onSubmit={handleSubmit(onSubmit)} className="space-y-8">
-        {/* Profile Picture Section */}
-        <div className="flex items-center space-x-6">
-          <img
-            src={userData.profilePictureUrl}
-            alt="Profile"
-            className="w-24 h-24 rounded-full object-cover"
-          />
-          <div className="flex flex-col space-y-2">
-            <div className="flex space-x-2">
-              <input
-                type="file"
-                accept="image/*"
-                onChange={handleProfilePictureChange}
-                disabled={!canEditPersonalInfo}
-                className="hidden"
-                id="profile-pic"
+          {/* Profile Picture Section */}
+          <div className="flex items-center space-x-6">
+            {user?.profilePicture ? (
+              <img
+                src={userData.profilePictureUrl}
+                alt="Profile"
+                className="w-24 h-24 rounded-full object-cover"
               />
-              <label
-                htmlFor="profile-pic"
-                className={`px-4 py-2 text-sm font-medium text-white bg-blue-600 rounded-md cursor-pointer ${
-                  uploading || !canEditPersonalInfo ? "opacity-50 cursor-not-allowed" : "hover:bg-blue-700"
-                }`}
-              >
-                {uploading ? "Uploading..." : "Change Picture"}
-              </label>
-              <button
-                type="button"
-                onClick={handleRemoveProfilePicture}
-                disabled={uploading || !canEditPersonalInfo}
-                className={`px-4 py-2 text-sm font-medium text-gray-700 bg-gray-200 rounded-md ${
-                  uploading || !canEditPersonalInfo ? "opacity-50 cursor-not-allowed" : "hover:bg-gray-300"
-                }`}
-              >
-                Remove
-              </button>
+            ) : (
+              <div className="w-24 h-24 rounded-full bg-gray-200 flex items-center justify-center">
+                <span className="text-gray-400 text-sm">No Image</span>
+              </div>
+            )}
+            <div className="flex flex-col space-y-2">
+              <div className="flex space-x-2">
+                <input
+                  type="file"
+                  accept="image/*"
+                  onChange={handleProfilePictureChange}
+                  disabled={!canEditPersonalInfo}
+                  className="hidden"
+                  id="profile-pic"
+                />
+                <label
+                  htmlFor="profile-pic"
+                  className={`px-4 py-2 text-sm font-medium text-white bg-blue-600 rounded-md cursor-pointer ${
+                    uploading || !canEditPersonalInfo
+                      ? "opacity-50 cursor-not-allowed"
+                      : "hover:bg-blue-700"
+                  }`}
+                >
+                  {uploading
+                    ? "Uploading..."
+                    : user?.profilePicture
+                      ? "Change Picture"
+                      : "Upload"}
+                </label>
+                {user?.profilePicture && (
+                  <button
+                    type="button"
+                    onClick={handleRemoveProfilePicture}
+                    disabled={uploading || !canEditPersonalInfo}
+                    className={`px-4 py-2 text-sm font-medium text-gray-700 bg-gray-200 rounded-md ${
+                      uploading || !canEditPersonalInfo
+                        ? "opacity-50 cursor-not-allowed"
+                        : "hover:bg-gray-300"
+                    }`}
+                  >
+                    Remove
+                  </button>
+                )}
+              </div>
+              <p className="text-sm text-gray-500">
+                JPG, GIF or PNG. Max size of 2MB.
+              </p>
             </div>
-            <p className="text-sm text-gray-500">
-              JPG, GIF or PNG. Max size of 2MB.
-            </p>
+          </div>
+
+          <div>
+            <h2 className="text-lg font-semibold text-gray-900 mb-4">
+              Personal Information
+            </h2>
+            <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+              <div>
+                <label className="block text-sm font-medium text-gray-700 mb-1">
+                  Full Name
+                </label>
+                <div className="flex items-center">
+                  <input
+                    {...register("fullName", {
+                      required: "Full name is required",
+                    })}
+                    type="text"
+                    disabled={!canEditPersonalInfo}
+                    className={`flex-1 px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500 ${
+                      !canEditPersonalInfo
+                        ? "bg-gray-100 cursor-not-allowed"
+                        : ""
+                    }`}
+                  />
+                  {canEditPersonalInfo && <EditIcon />}
+                </div>
+                {errors.fullName && (
+                  <p className="text-sm text-red-600 mt-1">
+                    {errors.fullName.message}
+                  </p>
+                )}
+              </div>
+              <div>
+                <label className="block text-sm font-medium text-gray-700 mb-1">
+                  Email Address
+                </label>
+                <div className="flex items-center">
+                  <input
+                    {...register("email", { required: "Email is required" })}
+                    type="email"
+                    disabled={true} // Email always read-only
+                    className="flex-1 px-3 py-2 border border-gray-300 rounded-md bg-gray-100 cursor-not-allowed"
+                  />
+                  <button
+                    type="button"
+                    onClick={() => setShowChangeEmailModal(true)}
+                    className="ml-2 px-4 py-2 text-sm font-medium text-blue-600 bg-blue-50 rounded-md hover:bg-blue-100"
+                  >
+                    Change Email
+                  </button>
+                </div>
+                {errors.email && (
+                  <p className="text-sm text-red-600 mt-1">
+                    {errors.email.message}
+                  </p>
+                )}
+              </div>
+              <div>
+                <label className="block text-sm font-medium text-gray-700 mb-1">
+                  Phone Number
+                </label>
+                <div className="flex items-center">
+                  <input
+                    {...register("phoneNumber")}
+                    type="text"
+                    disabled={!canEditPersonalInfo}
+                    className={`flex-1 px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500 ${
+                      !canEditPersonalInfo
+                        ? "bg-gray-100 cursor-not-allowed"
+                        : ""
+                    }`}
+                  />
+                  {canEditPersonalInfo && <EditIcon />}
+                </div>
+              </div>
+            </div>
+          </div>
+
+          <div className="flex justify-end">
+            <button
+              type="submit"
+              disabled={!isDirty}
+              className={`px-6 py-2 text-white rounded-md ${
+                isDirty
+                  ? "bg-blue-600 hover:bg-blue-700"
+                  : "bg-gray-400 cursor-not-allowed"
+              }`}
+            >
+              Save Changes
+            </button>
+          </div>
+        </form>
+      </div>
+
+      <React.Fragment>
+        <div className="max-w-4xl mx-auto mt-6 p-6 bg-white rounded-lg shadow-md">
+          <h2 className="text-lg font-semibold text-gray-900 mb-4">
+            Change Password
+          </h2>
+          <div className="space-y-4">
+            <div>
+              <label className="block text-sm font-medium text-gray-700 mb-1">
+                Current Password
+              </label>
+              <div className="relative">
+                <input
+                  type={showCurrentPassword ? "text" : "password"}
+                  value={passwordData.currentPassword}
+                  onChange={(e) =>
+                    setPasswordData({
+                      ...passwordData,
+                      currentPassword: e.target.value,
+                    })
+                  }
+                  className="w-full px-3 py-2 pr-10 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500"
+                  placeholder="Enter current password"
+                />
+                <EyeIcon
+                  isVisible={showCurrentPassword}
+                  onClick={() => setShowCurrentPassword(!showCurrentPassword)}
+                />
+              </div>
+            </div>
+            <div>
+              <label className="block text-sm font-medium text-gray-700 mb-1">
+                New Password
+              </label>
+              <div className="relative">
+                <input
+                  type={showNewPassword ? "text" : "password"}
+                  value={passwordData.newPassword}
+                  onChange={(e) =>
+                    setPasswordData({
+                      ...passwordData,
+                      newPassword: e.target.value,
+                    })
+                  }
+                  className="w-full px-3 py-2 pr-10 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500"
+                  placeholder="Enter new password"
+                />
+                <EyeIcon
+                  isVisible={showNewPassword}
+                  onClick={() => setShowNewPassword(!showNewPassword)}
+                />
+              </div>
+            </div>
+            <div>
+              <label className="block text-sm font-medium text-gray-700 mb-1">
+                Confirm New Password
+              </label>
+              <div className="relative">
+                <input
+                  type={showConfirmPassword ? "text" : "password"}
+                  value={passwordData.confirmPassword}
+                  onChange={(e) =>
+                    setPasswordData({
+                      ...passwordData,
+                      confirmPassword: e.target.value,
+                    })
+                  }
+                  className="w-full px-3 py-2 pr-10 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500"
+                  placeholder="Confirm new password"
+                />
+                <EyeIcon
+                  isVisible={showConfirmPassword}
+                  onClick={() => setShowConfirmPassword(!showConfirmPassword)}
+                />
+              </div>
+            </div>
+            <button
+              onClick={handlePasswordSubmit}
+              disabled={uploading}
+              className="px-4 py-2 text-white bg-blue-600 rounded-md hover:bg-blue-700 disabled:bg-gray-400"
+            >
+              Update Password
+            </button>
           </div>
         </div>
 
-        {/* Personal Information Section */}
-        <div>
-          <h2 className="text-lg font-semibold text-gray-900 mb-4">Personal Information</h2>
-          <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-            <div>
-              <label className="block text-sm font-medium text-gray-700 mb-1">
-                Full Name
-              </label>
-              <div className="flex items-center">
+        <div
+          className={`fixed inset-0 bg-gray-600 bg-opacity-50 flex items-center justify-center z-50 ${showChangeEmailModal ? "" : "hidden"}`}
+        >
+          <div className="bg-white p-6 rounded-lg shadow-lg w-full max-w-md">
+            <h3 className="text-lg font-semibold mb-4">Change Email</h3>
+            <form onSubmit={handleEmailSubmit} className="space-y-4">
+              <div>
+                <label className="block text-sm font-medium text-gray-700 mb-1">
+                  New Email
+                </label>
                 <input
-                  {...register("fullName", { required: "Full name is required" })}
-                  type="text"
-                  disabled={!canEditPersonalInfo}
-                  className={`flex-1 px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500 ${
-                    !canEditPersonalInfo ? "bg-gray-100 cursor-not-allowed" : ""
-                  }`}
-                />
-                {canEditPersonalInfo && <EditIcon />}
-              </div>
-              {errors.fullName && (
-                <p className="text-sm text-red-600 mt-1">{errors.fullName.message}</p>
-              )}
-            </div>
-            <div>
-              <label className="block text-sm font-medium text-gray-700 mb-1">
-                Email Address
-              </label>
-              <div className="flex items-center">
-                <input
-                  {...register("email", { required: "Email is required" })}
                   type="email"
-                  disabled={true} // Email always read-only
-                  className="flex-1 px-3 py-2 border border-gray-300 rounded-md bg-gray-100 cursor-not-allowed"
+                  value={emailData.newEmail}
+                  onChange={(e) =>
+                    setEmailData({ ...emailData, newEmail: e.target.value })
+                  }
+                  className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500"
+                  required
                 />
+              </div>
+              <div>
+                <label className="block text-sm font-medium text-gray-700 mb-1">
+                  Password
+                </label>
+                <input
+                  type="password"
+                  value={emailData.password}
+                  onChange={(e) =>
+                    setEmailData({ ...emailData, password: e.target.value })
+                  }
+                  className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500"
+                  required
+                />
+              </div>
+              <div className="flex justify-end space-x-2">
                 <button
                   type="button"
-                  onClick={() => setShowChangeEmailModal(true)}
-                  className="ml-2 px-4 py-2 text-sm font-medium text-blue-600 bg-blue-50 rounded-md hover:bg-blue-100"
+                  onClick={() => setShowChangeEmailModal(false)}
+                  className="px-4 py-2 text-gray-600 bg-gray-200 rounded-md hover:bg-gray-300"
                 >
-                  Change Email
+                  Cancel
+                </button>
+                <button
+                  type="submit"
+                  className="px-4 py-2 text-white bg-blue-600 rounded-md hover:bg-blue-700"
+                >
+                  Update Email
                 </button>
               </div>
-              {errors.email && (
-                <p className="text-sm text-red-600 mt-1">{errors.email.message}</p>
-              )}
-            </div>
-            <div>
-              <label className="block text-sm font-medium text-gray-700 mb-1">
-                Phone Number
-              </label>
-              <div className="flex items-center">
-                <input
-                  {...register("phoneNumber")}
-                  type="text"
-                  disabled={!canEditPersonalInfo}
-                  className={`flex-1 px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500 ${
-                    !canEditPersonalInfo ? "bg-gray-100 cursor-not-allowed" : ""
-                  }`}
-                />
-                {canEditPersonalInfo && <EditIcon />}
-              </div>
-            </div>
+            </form>
           </div>
         </div>
-
-
-
-        {/* Save Button */}
-        <div className="flex justify-end">
-          <button
-            type="submit"
-            disabled={!isDirty}
-            className={`px-6 py-2 text-white rounded-md ${
-              isDirty
-                ? "bg-blue-600 hover:bg-blue-700"
-                : "bg-gray-400 cursor-not-allowed"
-            }`}
-          >
-            Save Changes
-          </button>
-        </div>
-      </form>
-    </div>
-
-    <React.Fragment>
-    {/* Change Password Section */}
-    <div className="max-w-4xl mx-auto mt-6 p-6 bg-white rounded-lg shadow-md">
-      <h2 className="text-lg font-semibold text-gray-900 mb-4">Change Password</h2>
-      <div className="space-y-4">
-        <div>
-          <label className="block text-sm font-medium text-gray-700 mb-1">
-            Current Password
-          </label>
-          <div className="relative">
-            <input
-              type={showCurrentPassword ? "text" : "password"}
-              value={passwordData.currentPassword}
-              onChange={(e) => setPasswordData({ ...passwordData, currentPassword: e.target.value })}
-              className="w-full px-3 py-2 pr-10 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500"
-              placeholder="Enter current password"
-            />
-            <EyeIcon
-              isVisible={showCurrentPassword}
-              onClick={() => setShowCurrentPassword(!showCurrentPassword)}
-            />
-          </div>
-        </div>
-        <div>
-          <label className="block text-sm font-medium text-gray-700 mb-1">
-            New Password
-          </label>
-          <div className="relative">
-            <input
-              type={showNewPassword ? "text" : "password"}
-              value={passwordData.newPassword}
-              onChange={(e) => setPasswordData({ ...passwordData, newPassword: e.target.value })}
-              className="w-full px-3 py-2 pr-10 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500"
-              placeholder="Enter new password"
-            />
-            <EyeIcon
-              isVisible={showNewPassword}
-              onClick={() => setShowNewPassword(!showNewPassword)}
-            />
-          </div>
-        </div>
-        <div>
-          <label className="block text-sm font-medium text-gray-700 mb-1">
-            Confirm New Password
-          </label>
-          <div className="relative">
-            <input
-              type={showConfirmPassword ? "text" : "password"}
-              value={passwordData.confirmPassword}
-              onChange={(e) => setPasswordData({ ...passwordData, confirmPassword: e.target.value })}
-              className="w-full px-3 py-2 pr-10 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500"
-              placeholder="Confirm new password"
-            />
-            <EyeIcon
-              isVisible={showConfirmPassword}
-              onClick={() => setShowConfirmPassword(!showConfirmPassword)}
-            />
-          </div>
-        </div>
-        <button
-          onClick={handlePasswordSubmit}
-          disabled={uploading}
-          className="px-4 py-2 text-white bg-blue-600 rounded-md hover:bg-blue-700 disabled:bg-gray-400"
-        >
-          Update Password
-        </button>
-      </div>
-    </div>
-
-    {/* Change Email Modal */}
-    <div className={`fixed inset-0 bg-gray-600 bg-opacity-50 flex items-center justify-center z-50 ${showChangeEmailModal ? '' : 'hidden'}`}>
-        <div className="bg-white p-6 rounded-lg shadow-lg w-full max-w-md">
-          <h3 className="text-lg font-semibold mb-4">Change Email</h3>
-          <form onSubmit={handleEmailSubmit} className="space-y-4">
-            <div>
-              <label className="block text-sm font-medium text-gray-700 mb-1">
-                New Email
-              </label>
-              <input
-                type="email"
-                value={emailData.newEmail}
-                onChange={(e) => setEmailData({ ...emailData, newEmail: e.target.value })}
-                className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500"
-                required
-              />
-            </div>
-            <div>
-              <label className="block text-sm font-medium text-gray-700 mb-1">
-                Password
-              </label>
-              <input
-                type="password"
-                value={emailData.password}
-                onChange={(e) => setEmailData({ ...emailData, password: e.target.value })}
-                className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500"
-                required
-              />
-            </div>
-            <div className="flex justify-end space-x-2">
-              <button
-                type="button"
-                onClick={() => setShowChangeEmailModal(false)}
-                className="px-4 py-2 text-gray-600 bg-gray-200 rounded-md hover:bg-gray-300"
-              >
-                Cancel
-              </button>
-              <button
-                type="submit"
-                className="px-4 py-2 text-white bg-blue-600 rounded-md hover:bg-blue-700"
-              >
-                Update Email
-              </button>
-            </div>
-          </form>
-        </div>
-      </div>
-
-    </React.Fragment>
+      </React.Fragment>
     </div>
   );
 }

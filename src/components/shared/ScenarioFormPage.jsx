@@ -13,9 +13,8 @@ import {
   X,
   AlertCircle,
 } from "lucide-react";
-// --- CONFIGURATION ---
-const AI_SERVICE_URL = import.meta.env.VITE_AI_SERVICE_URL || "http://localhost:8888";
-// --- INTERNAL COMPONENT: ERROR POPUP ---
+const AI_SERVICE_URL =
+  import.meta.env.VITE_AI_SERVICE_URL || "http://localhost:8888";
 const ErrorModal = ({ isOpen, message, onClose }) => {
   if (!isOpen) return null;
   return (
@@ -53,10 +52,8 @@ function ScenarioFormPage() {
   const navigate = useNavigate();
   const { id } = useParams();
   const { user } = useAuth();
-  // Access Redux just for the list data
   const { scenarios } = useSelector((state) => state.scenarios);
   const dispatch = useDispatch();
-  // --- 1. DETERMINE MODE (DB EDIT vs NEW) ---
   const selectedScenario = id
     ? scenarios.find((s) => s._id === id || s.id === id)
     : null;
@@ -64,7 +61,6 @@ function ScenarioFormPage() {
   const title = isDbEdit
     ? "Edit Scenario (AI Generated Only)"
     : "Add Scenario (AI Generated Only)";
-  // --- 2. FORM SETUP ---
   const { register, handleSubmit, setValue, watch } = useForm({
     defaultValues: {
       scenarioName: "",
@@ -80,7 +76,6 @@ function ScenarioFormPage() {
       animationTriggers: { shoulder: [], neck: [] },
     },
   });
-  // --- 3. LOCAL STATE ---
   const [shoulderTags, setShoulderTags] = useState([]);
   const [neckTags, setNeckTags] = useState([]);
   const [aiInput, setAiInput] = useState("");
@@ -88,17 +83,13 @@ function ScenarioFormPage() {
   const [isSaving, setIsSaving] = useState(false);
   const [currentApiKey, setCurrentApiKey] = useState("");
   const [aiGeneratedId, setAiGeneratedId] = useState(null);
-  // Error Popup State
   const [errorPopup, setErrorPopup] = useState({ open: false, message: "" });
   const currentDifficulty = watch("difficulty");
   const isSchoolAdmin = user?.role === "school_admin";
   const isEducator = user?.role === "educator";
-  // --- 4. EFFECTS ---
-  // Redirect if not authorized
   useEffect(() => {
     if (!isEducator && !isSchoolAdmin) navigate("/dashboard");
   }, [isEducator, isSchoolAdmin, navigate]);
-  // Load Data if Editing Existing Scenario
   useEffect(() => {
     if (isDbEdit && selectedScenario) {
       console.log("Loading Existing Scenario Data...", selectedScenario);
@@ -114,7 +105,7 @@ function ScenarioFormPage() {
         "description",
         "permissions",
       ];
-       fields.forEach((field) => setValue(field, selectedScenario[field] || ""));
+      fields.forEach((field) => setValue(field, selectedScenario[field] || ""));
       if (selectedScenario.animationTriggers) {
         setShoulderTags(selectedScenario.animationTriggers.shoulder || []);
         setNeckTags(selectedScenario.animationTriggers.neck || []);
@@ -125,12 +116,10 @@ function ScenarioFormPage() {
       }
     }
   }, [isDbEdit, selectedScenario, setValue]);
-  // Sync Tags with Form
   useEffect(() => {
     setValue("animationTriggers.shoulder", shoulderTags);
     setValue("animationTriggers.neck", neckTags);
   }, [shoulderTags, neckTags, setValue]);
-  // --- 5. AI INTERACTION HANDLER ---
   const handleAskAI = async (e) => {
     e.preventDefault();
     if (!aiInput) return;
@@ -142,13 +131,11 @@ function ScenarioFormPage() {
       const headers = { "Content-Type": "application/json" };
 
       if (currentApiKey) {
-        // --- EDIT MODE ---
         const url = `${AI_SERVICE_URL}/edit-scenario`;
         const payload = { api_key: currentApiKey, scenario_prompt: aiInput };
         console.log(`Sending POST to ${url}`);
         response = await axios.post(url, payload, { headers });
       } else {
-        // --- ADD MODE ---
         const url = `${AI_SERVICE_URL}/add-scenario`;
         const payload = {
           educator_id: user?._id || user?.id,
@@ -175,7 +162,6 @@ function ScenarioFormPage() {
           setAiGeneratedId(returnedJson._id);
         }
 
-        // Map Name
         if (returnedJson.scenarioName || returnedJson.scenario_name) {
           const name = returnedJson.scenarioName || returnedJson.scenario_name;
           setValue("scenarioName", name);
@@ -185,10 +171,9 @@ function ScenarioFormPage() {
         if (returnedJson.scenarioPrompt || returnedJson.scenario_prompt)
           setValue(
             "scenarioPrompt",
-            returnedJson.scenarioPrompt || returnedJson.scenario_prompt
+            returnedJson.scenarioPrompt || returnedJson.scenario_prompt,
           );
 
-        // Map Questions
         const questions =
           returnedJson.aiQuestions ||
           returnedJson.ai_questions ||
@@ -203,12 +188,11 @@ function ScenarioFormPage() {
         if (returnedJson.difficulty || returnedJson.difficulty_level)
           setValue(
             "difficulty",
-            returnedJson.difficulty || returnedJson.difficulty_level
+            returnedJson.difficulty || returnedJson.difficulty_level,
           );
 
         if (returnedJson.status) setValue("status", returnedJson.status);
 
-        // Animation Triggers
         const triggers =
           returnedJson.animationTriggers || returnedJson.animation_triggers;
         if (triggers) {
@@ -227,7 +211,6 @@ function ScenarioFormPage() {
       setIsAiLoading(false);
     }
   };
-  // --- 6. SUBMIT HANDLER (UPDATED TOKEN LOGIC) ---
   const onSubmit = async (data) => {
     setIsSaving(true);
 
@@ -246,10 +229,14 @@ function ScenarioFormPage() {
 
     try {
       if (isDbEdit) {
-        // For edit, keep direct axios since no Redux update thunk
-        const token = localStorage.getItem("token") || (localStorage.getItem("userInfo") && JSON.parse(localStorage.getItem("userInfo"))?.token);
+        const token =
+          localStorage.getItem("token") ||
+          (localStorage.getItem("userInfo") &&
+            JSON.parse(localStorage.getItem("userInfo"))?.token);
         if (!token) {
-          throw new Error("Authentication token missing. Please log out and log back in.");
+          throw new Error(
+            "Authentication token missing. Please log out and log back in.",
+          );
         }
         const config = {
           headers: {
@@ -261,13 +248,12 @@ function ScenarioFormPage() {
       } else {
         await dispatch(addScenario(finalData)).unwrap();
       }
-      // Navigate on success
       navigate("/scenarios");
     } catch (err) {
       console.error("Failed to save to DB:", err);
       let errMsg = "Unknown error occurred";
       if (err.response?.data?.errors) {
-        errMsg = err.response.data.errors.map(e => e.msg).join(", ");
+        errMsg = err.response.data.errors.map((e) => e.msg).join(", ");
       } else if (err.response?.data?.message) {
         errMsg = err.response.data.message;
       } else {
@@ -279,19 +265,16 @@ function ScenarioFormPage() {
     }
   };
   if (!isEducator && !isSchoolAdmin) return null;
-  // --- STYLES ---
   const readOnlyClass =
     "w-full px-4 py-3 rounded-lg border border-gray-200 text-sm bg-gray-100 text-gray-600 cursor-not-allowed focus:outline-none";
   const disabledContainerClass = "opacity-60 pointer-events-none";
   return (
     <div className="min-h-screen bg-gray-50 flex flex-col items-center py-8 px-4">
-      {/* Error Popup Component */}
       <ErrorModal
         isOpen={errorPopup.open}
         message={errorPopup.message}
         onClose={() => setErrorPopup({ ...errorPopup, open: false })}
       />
-      {/* Header */}
       <div className="w-full max-w-4xl mb-6 flex items-center justify-between">
         <button
           onClick={() => navigate("/scenarios")}
@@ -308,8 +291,8 @@ function ScenarioFormPage() {
           {isSaving
             ? "Saving..."
             : isDbEdit
-            ? "Save Scenario"
-            : "Publish Scenario"}
+              ? "Save Scenario"
+              : "Publish Scenario"}
         </button>
       </div>
       <div className="w-full max-w-4xl bg-white rounded-2xl shadow-sm border border-gray-100 overflow-hidden relative pb-24">
@@ -333,53 +316,52 @@ function ScenarioFormPage() {
             />
           </div>
 
-           <div>
-             <label className="block text-xs font-bold text-gray-900 mb-2">
-               Scenario Prompt (Read Only)
-             </label>
-             <textarea
-               {...register("scenarioPrompt")}
-               rows={3}
-               className={readOnlyClass}
-               readOnly
-             />
-           </div>
+          <div>
+            <label className="block text-xs font-bold text-gray-900 mb-2">
+              Scenario Prompt (Read Only)
+            </label>
+            <textarea
+              {...register("scenarioPrompt")}
+              rows={3}
+              className={readOnlyClass}
+              readOnly
+            />
+          </div>
 
-           {/* Grid: Difficulty Only */}
-           <div className="grid grid-cols-1 gap-6">
-             <div className={disabledContainerClass}>
-               <label className="block text-xs font-bold text-gray-900 mb-2">
-                 Difficulty (Read Only)
-               </label>
-               <div className="flex bg-gray-100 p-1 rounded-lg">
-                 {["Low", "Medium", "High"].map((level) => (
-                   <button
-                     key={level}
-                     type="button"
-                     className={`flex-1 py-2 text-xs font-medium rounded-md transition-all ${
-                       currentDifficulty === level
-                         ? "bg-white shadow-sm"
-                         : "text-gray-500"
-                     }`}
-                   >
-                     {level}
-                   </button>
-                 ))}
-               </div>
-             </div>
-           </div>
+          <div className="grid grid-cols-1 gap-6">
+            <div className={disabledContainerClass}>
+              <label className="block text-xs font-bold text-gray-900 mb-2">
+                Difficulty (Read Only)
+              </label>
+              <div className="flex bg-gray-100 p-1 rounded-lg">
+                {["Low", "Medium", "High"].map((level) => (
+                  <button
+                    key={level}
+                    type="button"
+                    className={`flex-1 py-2 text-xs font-medium rounded-md transition-all ${
+                      currentDifficulty === level
+                        ? "bg-white shadow-sm"
+                        : "text-gray-500"
+                    }`}
+                  >
+                    {level}
+                  </button>
+                ))}
+              </div>
+            </div>
+          </div>
 
-           <div>
-             <label className="block text-xs font-bold text-gray-900 mb-2">
-               Questions (Read Only)
-             </label>
-             <textarea
-               {...register("aiQuestions")}
-               rows={4}
-               className={readOnlyClass}
-               readOnly
-             />
-           </div>
+          <div>
+            <label className="block text-xs font-bold text-gray-900 mb-2">
+              Questions (Read Only)
+            </label>
+            <textarea
+              {...register("aiQuestions")}
+              rows={4}
+              className={readOnlyClass}
+              readOnly
+            />
+          </div>
 
           <div>
             <label className="block text-xs font-bold text-gray-900 mb-2">

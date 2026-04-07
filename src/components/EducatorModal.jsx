@@ -15,14 +15,12 @@ function EducatorModal({ onSave, onClose, educatorData }) {
       ? {
           educatorName: educatorData.name,
           emailAddress: educatorData.email,
-          // Use existing department or fallback to Science
           department: educatorData.department || "Science",
         }
       : {
           educatorName: "",
           emailAddress: "",
           password: "",
-          // CRITICAL FIX: Ensure default is set here so it's never undefined
           department: "Science",
         },
   });

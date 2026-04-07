@@ -9,13 +9,11 @@ import {
   ChevronRightIcon,
 } from "@heroicons/react/24/outline";
 
-// Import Modal
 import EducatorModal from "./EducatorModal";
 import ConfirmationModal from "./ui/ConfirmationModal.jsx";
 import { toast } from "react-hot-toast";
 import { useAuth } from "../AuthContext";
 
-// Helper for Auth Headers
 const getAuthHeaders = () => {
   const token = localStorage.getItem("token");
   return { headers: { Authorization: `Bearer ${token}` } };
@@ -23,13 +21,11 @@ const getAuthHeaders = () => {
 
 function EducatorsPage() {
   const { user } = useAuth();
-  // --- State ---
   const [educators, setEducators] = useState([]);
   const [loading, setLoading] = useState(true);
   const [searchTerm, setSearchTerm] = useState("");
   const [departmentFilter, setDepartmentFilter] = useState("");
 
-  // Modal State
   const [isModalOpen, setIsModalOpen] = useState(false);
   const [editingEducator, setEditingEducator] = useState(null);
   const [isConfirmModalOpen, setIsConfirmModalOpen] = useState(false);
@@ -37,18 +33,15 @@ function EducatorsPage() {
   const [confirmMessage, setConfirmMessage] = useState("");
   const [onConfirmAction, setOnConfirmAction] = useState(() => {});
 
-  // Pagination State
   const [currentPage, setCurrentPage] = useState(1);
   const itemsPerPage = 8;
 
-  // --- API ---
   const fetchEducators = async () => {
     try {
       setLoading(true);
-      // Fetch users with role='educator'
       const response = await axios.get(
         "/api/users?role=educator",
-        getAuthHeaders()
+        getAuthHeaders(),
       );
 
       const mappedData = response.data.map((user) => ({
@@ -56,7 +49,7 @@ function EducatorsPage() {
         visualId: `VS${user._id.slice(-6).toUpperCase()}`,
         name: user.name,
         email: user.email,
-        department: user.department, // Ensure this maps correctly
+        department: user.department,
       }));
       setEducators(mappedData);
     } catch (error) {
@@ -70,7 +63,6 @@ function EducatorsPage() {
     fetchEducators();
   }, []);
 
-  // --- Handlers ---
   const handleAddNew = () => {
     setEditingEducator(null);
     setIsModalOpen(true);
@@ -87,13 +79,12 @@ function EducatorsPage() {
     setOnConfirmAction(() => async () => {
       try {
         await axios.delete(`/api/users/${id}`, getAuthHeaders());
-        // Optimistic UI update
         setEducators((prev) => prev.filter((e) => e.id !== id));
         toast.success("Educator deleted successfully");
       } catch (error) {
         toast.error(
           "Failed to delete educator: " +
-            (error.response?.data?.message || error.message)
+            (error.response?.data?.message || error.message),
         );
       }
     });
@@ -111,11 +102,10 @@ function EducatorsPage() {
             email: formData.emailAddress,
             department: formData.department,
           },
-          getAuthHeaders()
+          getAuthHeaders(),
         );
         toast.success("Educator updated successfully");
       } else {
-        // Add New Educator - school_admin creates educator in their school
         await axios.post(
           "/api/users",
           {
@@ -124,9 +114,9 @@ function EducatorsPage() {
             password: formData.password,
             role: "educator",
             department: formData.department,
-            schoolId: user.schoolId, // school_admin's schoolId
+            schoolId: user.schoolId,
           },
-          getAuthHeaders()
+          getAuthHeaders(),
         );
         toast.success("Educator created successfully");
       }
@@ -135,21 +125,20 @@ function EducatorsPage() {
       setIsModalOpen(false);
     } catch (error) {
       toast.error(
-        "Error saving: " + (error.response?.data?.message || error.message)
+        "Error saving: " + (error.response?.data?.message || error.message),
       );
     }
   };
 
-  // --- Filter & Pagination ---
   const filteredData = useMemo(() => {
     return educators
       .filter(
         (e) =>
           e.name.toLowerCase().includes(searchTerm.toLowerCase()) ||
-          e.email.toLowerCase().includes(searchTerm.toLowerCase())
+          e.email.toLowerCase().includes(searchTerm.toLowerCase()),
       )
       .filter(
-        (e) => departmentFilter === "" || e.department === departmentFilter
+        (e) => departmentFilter === "" || e.department === departmentFilter,
       );
   }, [educators, searchTerm, departmentFilter]);
 
@@ -158,20 +147,16 @@ function EducatorsPage() {
     return filteredData.slice(start, start + itemsPerPage);
   }, [filteredData, currentPage]);
 
-  // --- Render ---
   return (
     <div className="p-8 bg-white min-h-screen font-sans">
-      {/* Header */}
       <div className="flex justify-between items-center mb-8">
         <h1 className="text-2xl font-bold text-gray-900">
           Educators Management
         </h1>
       </div>
 
-      {/* Controls Bar */}
       <div className="flex flex-wrap justify-between items-center mb-6 gap-4">
         <div className="flex gap-3 flex-1">
-          {/* Search */}
           <div className="relative w-full max-w-md">
             <div className="absolute inset-y-0 left-0 pl-3 flex items-center pointer-events-none">
               <MagnifyingGlassIcon className="h-5 w-5 text-gray-400" />
@@ -185,7 +170,6 @@ function EducatorsPage() {
             />
           </div>
 
-          {/* Department Filter */}
           <div className="relative">
             <select
               value={departmentFilter}
@@ -216,7 +200,6 @@ function EducatorsPage() {
           </div>
         </div>
 
-        {/* Action Button */}
         <div>
           <button
             onClick={handleAddNew}
@@ -228,7 +211,6 @@ function EducatorsPage() {
         </div>
       </div>
 
-      {/* Table */}
       <div className="border border-gray-100 rounded-xl overflow-hidden shadow-sm">
         <table className="min-w-full divide-y divide-gray-100">
           <thead className="bg-gray-50/50">
@@ -312,7 +294,6 @@ function EducatorsPage() {
         </table>
       </div>
 
-      {/* Pagination */}
       <div className="flex items-center justify-between mt-6">
         <p className="text-sm text-gray-500">
           Showing{" "}
@@ -346,15 +327,15 @@ function EducatorsPage() {
               >
                 {idx + 1}
               </button>
-            )
+            ),
           )}
           <button
             onClick={() =>
               setCurrentPage((prev) =>
                 Math.min(
                   prev + 1,
-                  Math.ceil(filteredData.length / itemsPerPage)
-                )
+                  Math.ceil(filteredData.length / itemsPerPage),
+                ),
               )
             }
             disabled={

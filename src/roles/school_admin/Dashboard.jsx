@@ -149,13 +149,11 @@ function SchoolAdminDashboard() {
                  tick={{ fill: "#9ca3af", fontSize: 12 }}
                  dy={10}
                />
-               <YAxis
-                 axisLine={false}
-                 tickLine={false}
-                 tick={{ fill: "#9ca3af", fontSize: 12 }}
-                 domain={[0, 80]}
-                 ticks={[0, 10, 20, 30, 40, 50, 60, 70, 80]}
-               />
+                <YAxis
+                  axisLine={false}
+                  tickLine={false}
+                  tick={{ fill: "#9ca3af", fontSize: 12 }}
+                />
                <Tooltip
                  contentStyle={{
                    borderRadius: "8px",
@@ -163,15 +161,15 @@ function SchoolAdminDashboard() {
                    boxShadow: "0 4px 6px -1px rgb(0 0 0 / 0.1)",
                  }}
                />
-               <Area
-                 type="monotone"
-                 dataKey="value"
-                 stroke="#0ea5e9"
-                 strokeWidth={2}
-                 fillOpacity={1}
-                 fill="url(#colorScenarios)"
-                 dot={{ r: 4, fill: "#0ea5e9", strokeWidth: 2, stroke: "#fff" }}
-               />
+                <Area
+                  type="monotone"
+                  dataKey="scenarios"
+                  stroke="#0ea5e9"
+                  strokeWidth={2}
+                  fillOpacity={1}
+                  fill="url(#colorScenarios)"
+                  dot={{ r: 4, fill: "#0ea5e9", strokeWidth: 2, stroke: "#fff" }}
+                />
              </AreaChart>
            </ResponsiveContainer>
          </div>
@@ -211,13 +209,11 @@ function SchoolAdminDashboard() {
                  tick={{ fill: "#9ca3af", fontSize: 12 }}
                  dy={10}
                />
-               <YAxis
-                 axisLine={false}
-                 tickLine={false}
-                 tick={{ fill: "#9ca3af", fontSize: 12 }}
-                 domain={[0, 50]}
-                 ticks={[0, 5, 10, 15, 20, 25, 30, 35, 40, 45, 50]}
-               />
+                <YAxis
+                  axisLine={false}
+                  tickLine={false}
+                  tick={{ fill: "#9ca3af", fontSize: 12 }}
+                />
                <Tooltip
                  contentStyle={{
                    borderRadius: "8px",
@@ -225,15 +221,15 @@ function SchoolAdminDashboard() {
                    boxShadow: "0 4px 6px -1px rgb(0 0 0 / 0.1)",
                  }}
                />
-               <Area
-                 type="monotone"
-                 dataKey="value"
-                 stroke="#3b82f6"
-                 strokeWidth={2}
-                 fillOpacity={1}
-                 fill="url(#colorEducators)"
-                 dot={{ r: 4, fill: "#3b82f6", strokeWidth: 2, stroke: "#fff" }}
-               />
+                <Area
+                  type="monotone"
+                  dataKey="educators"
+                  stroke="#3b82f6"
+                  strokeWidth={2}
+                  fillOpacity={1}
+                  fill="url(#colorEducators)"
+                  dot={{ r: 4, fill: "#3b82f6", strokeWidth: 2, stroke: "#fff" }}
+                />
              </AreaChart>
            </ResponsiveContainer>
          </div>
@@ -273,13 +269,11 @@ function SchoolAdminDashboard() {
                  tick={{ fill: "#9ca3af", fontSize: 12 }}
                  dy={10}
                />
-               <YAxis
-                 axisLine={false}
-                 tickLine={false}
-                 tick={{ fill: "#9ca3af", fontSize: 12 }}
-                 domain={[0, 100]}
-                 ticks={[0, 10, 20, 30, 40, 50, 60, 70, 80, 90, 100]}
-               />
+                <YAxis
+                  axisLine={false}
+                  tickLine={false}
+                  tick={{ fill: "#9ca3af", fontSize: 12 }}
+                />
                <Tooltip
                  contentStyle={{
                    borderRadius: "8px",
@@ -287,15 +281,15 @@ function SchoolAdminDashboard() {
                    boxShadow: "0 4px 6px -1px rgb(0 0 0 / 0.1)",
                  }}
                />
-               <Area
-                 type="monotone"
-                 dataKey="value"
-                 stroke="#10b981"
-                 strokeWidth={2}
-                 fillOpacity={1}
-                 fill="url(#colorStudents)"
-                 dot={{ r: 4, fill: "#10b981", strokeWidth: 2, stroke: "#fff" }}
-               />
+                <Area
+                  type="monotone"
+                  dataKey="students"
+                  stroke="#10b981"
+                  strokeWidth={2}
+                  fillOpacity={1}
+                  fill="url(#colorStudents)"
+                  dot={{ r: 4, fill: "#10b981", strokeWidth: 2, stroke: "#fff" }}
+                />
              </AreaChart>
            </ResponsiveContainer>
          </div>

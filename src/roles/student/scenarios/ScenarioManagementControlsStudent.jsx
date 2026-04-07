@@ -9,7 +9,6 @@ function ScenarioManagementControlsStudent({
 }) {
   return (
     <div className="mb-8 flex flex-col sm:flex-row sm:items-center justify-between gap-4">
-      {/* Left Side: Search Input */}
       <div className="relative w-full max-w-sm">
         <div className="absolute inset-y-0 left-0 pl-3 flex items-center pointer-events-none">
           <Search className="h-4 w-4 text-gray-400" />
@@ -23,7 +22,6 @@ function ScenarioManagementControlsStudent({
         />
       </div>
 
-      {/* Right Side: Sort By Dropdown */}
       <div className="flex items-center gap-3">
         <span className="text-sm text-gray-500 font-medium">Sort By:</span>
         <div className="relative">

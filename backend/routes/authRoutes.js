@@ -1,4 +1,3 @@
-// WHOLE_PROJECT/routes/authRoutes.js
 import express from "express";
 import { body, validationResult } from "express-validator";
 import otpGenerator from "otp-generator";
@@ -13,44 +12,47 @@ import { protect } from "../middleware/authMiddleware.js";
 
 const router = express.Router();
 
-// Multer config for profile pictures
 const storage = multer.diskStorage({
   destination: (req, file, cb) => {
-    cb(null, 'uploads/');
+    cb(null, "uploads/");
   },
   filename: (req, file, cb) => {
-    const uniqueSuffix = Date.now() + '-' + Math.round(Math.random() * 1E9);
-    cb(null, file.fieldname + '-' + uniqueSuffix + path.extname(file.originalname));
-  }
+    const uniqueSuffix = Date.now() + "-" + Math.round(Math.random() * 1e9);
+    cb(
+      null,
+      file.fieldname + "-" + uniqueSuffix + path.extname(file.originalname),
+    );
+  },
 });
 
 const fileFilter = (req, file, cb) => {
   const allowedTypes = /jpeg|jpg|png|gif/;
-  const extname = allowedTypes.test(path.extname(file.originalname).toLowerCase());
+  const extname = allowedTypes.test(
+    path.extname(file.originalname).toLowerCase(),
+  );
   const mimetype = allowedTypes.test(file.mimetype);
 
   if (mimetype && extname) {
     return cb(null, true);
   } else {
-    cb(new Error('Only image files are allowed!'));
+    cb(new Error("Only image files are allowed!"));
   }
 };
 
 const upload = multer({
   storage: storage,
-  limits: { fileSize: 2 * 1024 * 1024 }, // 2MB limit
-  fileFilter: fileFilter
+  limits: { fileSize: 2 * 1024 * 1024 },
+  fileFilter: fileFilter,
 });
 
 const OTP_EXPIRY = parseInt(process.env.OTP_EXPIRY_SECONDS || "300", 10);
 const MAX_LOGIN_FAIL_ATTEMPTS = parseInt(
   process.env.MAX_OTP_ATTEMPTS || "5",
-  10
+  10,
 );
 const LOCKOUT_DURATION_SECONDS =
   parseInt(process.env.LOCKOUT_DURATION_MINUTES || "20", 10) * 60;
 
-// --- Helper function to generate OTP ---
 const generateOTP = () => {
   return otpGenerator.generate(6, {
     upperCaseAlphabets: false,
@@ -59,7 +61,6 @@ const generateOTP = () => {
   });
 };
 
-// --- Store OTP and Attempt Info in Redis ---
 const storeOTPAndAttempts = async (email, otp) => {
   const lowerEmail = email.toLowerCase();
   if (redisClient && redisClient.status === "ready") {
@@ -68,12 +69,11 @@ const storeOTPAndAttempts = async (email, otp) => {
       key,
       JSON.stringify({ otp, attempts: 0 }),
       "EX",
-      OTP_EXPIRY
+      OTP_EXPIRY,
     );
   }
 };
 
-// --- Verify OTP, Handle Attempts and Lockout ---
 const verifyOTPAndHandleAttempts = async (email, providedOtp) => {
   const lowerEmail = email.toLowerCase();
   if (!redisClient || redisClient.status !== "ready") {
@@ -119,7 +119,7 @@ const verifyOTPAndHandleAttempts = async (email, providedOtp) => {
         lockoutKey,
         newLockoutUntilTimestamp.toString(),
         "EX",
-        LOCKOUT_DURATION_SECONDS
+        LOCKOUT_DURATION_SECONDS,
       );
     } else {
       const ttl = await redisClient.ttl(key);
@@ -128,7 +128,7 @@ const verifyOTPAndHandleAttempts = async (email, providedOtp) => {
           key,
           JSON.stringify({ otp: storedOtp, attempts }),
           "EX",
-          ttl
+          ttl,
         );
       }
     }
@@ -141,7 +141,6 @@ const verifyOTPAndHandleAttempts = async (email, providedOtp) => {
   }
 };
 
-// @desc    Register/Create a new user account
 router.post(
   "/register",
   [
@@ -168,7 +167,8 @@ router.post(
     if (!errors.isEmpty())
       return res.status(400).json({ errors: errors.array() });
 
-    const { name, email, password, roleToCreate, creatorRole, schoolId } = req.body;
+    const { name, email, password, roleToCreate, creatorRole, schoolId } =
+      req.body;
     const lowerEmail = email.toLowerCase();
     const lowerRoleToCreate = roleToCreate.toLowerCase();
 
@@ -179,17 +179,17 @@ router.post(
         const allowedCreations = {
           superadmin: ["school_admin"],
           school_admin: ["educator", "student"],
-          educator: ["student"]
+          educator: ["student"],
         };
 
         if (!allowedCreations[lowerCreatorRole]?.includes(lowerRoleToCreate)) {
           return res.status(403).json({
-            message: `${creatorRole} cannot create ${roleToCreate} role.`
+            message: `${creatorRole} cannot create ${roleToCreate} role.`,
           });
         }
       } else if (lowerRoleToCreate !== "student") {
         return res.status(403).json({
-          message: "Public registration is only for students."
+          message: "Public registration is only for students.",
         });
       }
 
@@ -218,10 +218,9 @@ router.post(
       console.error("Registration Error:", err);
       res.status(500).json({ message: "Server Error" });
     }
-  }
+  },
 );
 
-// @desc    Authenticate user & get user info (Login)
 router.post(
   "/login",
   [
@@ -238,7 +237,7 @@ router.post(
 
     try {
       const user = await User.findOne({ email: lowerEmail }).select(
-        "+password"
+        "+password",
       );
 
       if (!user)
@@ -251,7 +250,7 @@ router.post(
       const token = jwt.sign(
         { id: user._id, role: user.role },
         process.env.JWT_SECRET,
-        { expiresIn: "24h" }
+        { expiresIn: "24h" },
       );
 
       res.json({
@@ -268,10 +267,9 @@ router.post(
       console.error("Login Error:", err);
       res.status(500).json({ message: "Server Error" });
     }
-  }
+  },
 );
 
-// @desc    Request Password Reset
 router.post(
   "/forgot-password",
   [body("email").isEmail().normalizeEmail()],
@@ -280,7 +278,6 @@ router.post(
     const lowerEmail = email.toLowerCase();
 
     try {
-      // Check Redis for lockout (omitted for brevity, assume similar logic to login)
       const user = await User.findOne({ email: lowerEmail });
       if (!user)
         return res
@@ -296,10 +293,9 @@ router.post(
       console.error("Forgot Password Error:", error);
       res.status(500).json({ message: "Server Error" });
     }
-  }
+  },
 );
 
-// @desc    Verify OTP
 router.post(
   "/verify-otp",
   [
@@ -320,10 +316,9 @@ router.post(
     } catch (error) {
       res.status(500).json({ message: "Server Error" });
     }
-  }
+  },
 );
 
-// @desc    Reset Password
 router.post(
   "/reset-password",
   [
@@ -342,12 +337,9 @@ router.post(
     } catch (error) {
       res.status(500).json({ message: "Server Error" });
     }
-  }
+  },
 );
 
-// @desc    Update user profile (name, phone)
-// @route   PUT /api/auth/profile
-// @access  Private
 router.put(
   "/profile",
   protect,
@@ -387,12 +379,9 @@ router.put(
       console.error("Profile update error:", error);
       res.status(500).json({ message: "Server Error" });
     }
-  }
+  },
 );
 
-// @desc    Change user email
-// @route   PUT /api/auth/change-email
-// @access  Private
 router.put(
   "/change-email",
   protect,
@@ -438,18 +427,17 @@ router.put(
       console.error("Change email error:", error);
       res.status(500).json({ message: "Server Error" });
     }
-  }
+  },
 );
 
-// @desc    Change user password
-// @route   PUT /api/auth/change-password
-// @access  Private
 router.put(
   "/change-password",
   protect,
   [
     body("currentPassword", "Current password is required").exists(),
-    body("newPassword", "New password must be at least 6 characters").isLength({ min: 6 }),
+    body("newPassword", "New password must be at least 6 characters").isLength({
+      min: 6,
+    }),
     body("confirmPassword", "Confirm password is required").exists(),
   ],
   async (req, res) => {
@@ -484,16 +472,13 @@ router.put(
       console.error("Change password error:", error);
       res.status(500).json({ message: "Server Error" });
     }
-  }
+  },
 );
 
-// @desc    Upload profile picture
-// @route   POST /api/auth/upload-profile-picture
-// @access  Private
 router.post(
   "/upload-profile-picture",
   protect,
-  upload.single('profilePicture'),
+  upload.single("profilePicture"),
   async (req, res) => {
     const userId = req.user.id;
 
@@ -507,9 +492,6 @@ router.post(
         return res.status(404).json({ message: "User not found" });
       }
 
-      // Remove old profile picture if exists (optional, for cleanup)
-      // For simplicity, just update the path
-
       user.profilePicture = `/uploads/${req.file.filename}`;
       await user.save();
 
@@ -521,12 +503,9 @@ router.post(
       console.error("Upload profile picture error:", error);
       res.status(500).json({ message: "Server Error" });
     }
-  }
+  },
 );
 
-// @desc    Remove profile picture
-// @route   DELETE /api/auth/profile-picture
-// @access  Private
 router.delete("/profile-picture", protect, async (req, res) => {
   const userId = req.user.id;
 
@@ -535,9 +514,6 @@ router.delete("/profile-picture", protect, async (req, res) => {
     if (!user) {
       return res.status(404).json({ message: "User not found" });
     }
-
-    // Optional: delete file from filesystem
-    // For simplicity, just set to null
 
     user.profilePicture = null;
     await user.save();

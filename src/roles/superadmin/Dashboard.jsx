@@ -1,7 +1,7 @@
 import React, { useEffect } from "react";
 import { useDispatch, useSelector } from "react-redux";
-import { fetchDashboardData } from "../../redux/slices/dashboardSlice"; // Adjust path if needed
-import DashboardStats from "../../components/Dashboard/DashbordStats"; // Ensure filename matches (DashbordStats vs DashboardStats)
+import { fetchDashboardData } from "../../redux/slices/dashboardSlice";
+import DashboardStats from "../../components/Dashboard/DashbordStats";
 import SchoolCard from "../../components/Dashboard/SchoolCard";
 import { useAuth } from "../../AuthContext";
 
@@ -9,7 +9,7 @@ function SuperAdminDashboard() {
   const dispatch = useDispatch();
   const { user } = useAuth();
   const { stats, schools, loading, error } = useSelector(
-    (state) => state.dashboard
+    (state) => state.dashboard,
   );
 
   useEffect(() => {
@@ -32,19 +32,16 @@ function SuperAdminDashboard() {
 
   return (
     <div className="p-2 space-y-8">
-      {/* Welcome Section */}
       <div>
         <h1 className="text-2xl font-bold text-gray-800">
           Welcome Back, {user?.name || "Admin"}!
         </h1>
       </div>
 
-      {/* Top Stats Cards */}
       <section>
         <DashboardStats stats={stats} />
       </section>
 
-      {/* Schools Grid Section */}
       <section>
         <h2 className="text-lg font-bold text-gray-800 mb-4">Schools</h2>
 

@@ -27,8 +27,23 @@ axios.interceptors.response.use(
 
 export const AuthProvider = ({ children }) => {
   const dispatch = useDispatch();
-  const [user, setUser] = useState(null);
-  const [loading, setLoading] = useState(true);
+  const [user, setUser] = useState(() => {
+    const stored = localStorage.getItem("currentUser");
+    if (stored) {
+      try {
+        const parsed = JSON.parse(stored);
+        const token = localStorage.getItem("token");
+        if (token) {
+          axios.defaults.headers.common["Authorization"] = `Bearer ${token}`;
+        }
+        return parsed;
+      } catch {
+        return null;
+      }
+    }
+    return null;
+  });
+  const [loading, setLoading] = useState(false);
   const processUserSession = useCallback((userData) => {
     if (userData && userData._id) {
       setUser(userData);
@@ -47,24 +62,6 @@ export const AuthProvider = ({ children }) => {
       }
     }
   }, []);
-
-  useEffect(() => {
-    const storedUserString = localStorage.getItem("currentUser");
-    const storedToken = localStorage.getItem("token");
-
-    if (storedUserString && storedToken) {
-      try {
-        const storedUser = JSON.parse(storedUserString);
-        axios.defaults.headers.common["Authorization"] =
-          `Bearer ${storedToken}`;
-        processUserSession(storedUser);
-      } catch (error) {
-        console.error("Failed to parse stored user, clearing session:", error);
-        processUserSession(null);
-      }
-    }
-    setLoading(false);
-  }, [processUserSession]);
 
   const login = async (email, password) => {
     setLoading(true);
@@ -151,7 +148,7 @@ export const AuthProvider = ({ children }) => {
 
   return (
     <AuthContext.Provider value={value}>
-      {!loading && children}
+      {children}
     </AuthContext.Provider>
   );
 };
