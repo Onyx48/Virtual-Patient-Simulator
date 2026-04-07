@@ -7,7 +7,6 @@ import {
 } from "@heroicons/react/24/outline";
 
 function DashboardStats({ stats }) {
-  // CORRECTED: Only 3 cards as per your screenshot
   const statConfig = [
     {
       id: 1,
@@ -38,7 +37,6 @@ function DashboardStats({ stats }) {
   return (
     <div className="flex flex-wrap md:flex-nowrap gap-4 sm:gap-6 justify-start mb-6">
       {statConfig.map((item) => {
-        // If value is 0, display 0. If undefined, default to 0.
         const value =
           stats && stats[item.key] !== undefined ? stats[item.key] : 0;
 

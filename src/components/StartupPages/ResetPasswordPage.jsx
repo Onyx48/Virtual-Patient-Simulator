@@ -1,17 +1,13 @@
-// src/components/StartupPages/ResetPasswordPage.jsx
 import React, { useState } from "react";
 import { useLocation, useNavigate, useParams } from "react-router-dom";
 import axios from "axios";
-import formBgImage from "./Login-bg.jpg"; // Ensure path is correct
-// ... (errorIcon and validation functions for password)
+import formBgImage from "./Login-bg.jpg";
 
 function ResetPasswordPage() {
   const navigate = useNavigate();
   const location = useLocation();
   const { token } = useParams(); // If using a token in the URL: /reset-password/:token
 
-  // Get email from location state (passed from OtpVerificationPage)
-  // Or, if using a token that encodes email or can be verified by backend to get email, adjust accordingly
   const email = location.state?.email;
   const verifiedOtp = location.state?.otp; // If you passed the OTP itself (less secure than a token)
 
@@ -71,7 +67,7 @@ function ResetPasswordPage() {
 
       await axios.post("/api/auth/reset-password", payload);
       setSuccessMessage(
-        "Password has been reset successfully! You can now log in."
+        "Password has been reset successfully! You can now log in.",
       );
       // Optionally clear form and redirect after a delay
       setTimeout(() => {
@@ -80,7 +76,7 @@ function ResetPasswordPage() {
     } catch (err) {
       setApiError(
         err.response?.data?.message ||
-          "Failed to reset password. Please try again."
+          "Failed to reset password. Please try again.",
       );
     } finally {
       setIsLoading(false);

@@ -2,14 +2,13 @@ import { createSlice, createAsyncThunk } from "@reduxjs/toolkit";
 import axios from "axios";
 import { getAuthHeaders } from "../../lib/utils.js";
 
-// Async thunk for fetching dashboard data
 export const fetchDashboardData = createAsyncThunk(
   "dashboard/fetchDashboardData",
   async (_, { rejectWithValue }) => {
     try {
       const [statsResponse, schoolsResponse] = await Promise.all([
         axios.get("/api/dashboard/stats", getAuthHeaders()),
-        axios.get("/api/dashboard/schools-detailed", getAuthHeaders()), // Updated to fetch detailed data
+        axios.get("/api/dashboard/schools-detailed", getAuthHeaders()),
       ]);
       return {
         stats: statsResponse.data,
@@ -17,10 +16,10 @@ export const fetchDashboardData = createAsyncThunk(
       };
     } catch (error) {
       return rejectWithValue(
-        error.response?.data || "Failed to fetch dashboard data"
+        error.response?.data || "Failed to fetch dashboard data",
       );
     }
-  }
+  },
 );
 
 const dashboardSlice = createSlice({
@@ -32,7 +31,7 @@ const dashboardSlice = createSlice({
       activeEducators: 0,
       activeStudents: 0,
     },
-    schools: [], // This will now contain { name, students, educators, activeScenarios }
+    schools: [],
     loading: false,
     error: null,
   },

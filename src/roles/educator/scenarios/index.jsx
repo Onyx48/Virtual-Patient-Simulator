@@ -41,7 +41,7 @@ function ScenariosPage() {
         (scenario) =>
           scenario.scenarioName?.toLowerCase().includes(lowerCaseSearchTerm) ||
           scenario.description?.toLowerCase().includes(lowerCaseSearchTerm) ||
-          scenario.educator?.name?.toLowerCase().includes(lowerCaseSearchTerm), // Handling populated educator object
+          scenario.educator?.name?.toLowerCase().includes(lowerCaseSearchTerm),
       );
     }
 
@@ -157,7 +157,6 @@ function ScenariosPage() {
         onSort={handleSort}
       />
 
-      {/* Assign Scenarios Modal */}
       {isAssignModalOpen && (
         <AssignScenariosModal
           onClose={() => setIsAssignModalOpen(false)}

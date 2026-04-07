@@ -1,8 +1,6 @@
-// WHOLE_PROJECT/db.js
 import mongoose from "mongoose";
 import dotenv from "dotenv";
 
-// Explicitly load .env
 dotenv.config();
 
 const connectDB = async () => {
@@ -13,7 +11,7 @@ const connectDB = async () => {
 
     if (!process.env.MONGODB_URI) {
       throw new Error(
-        "MONGODB_URI is not defined. Check .env placement or spelling."
+        "MONGODB_URI is not defined. Check .env placement or spelling.",
       );
     }
 
@@ -21,7 +19,7 @@ const connectDB = async () => {
 
     console.log(
       "MongoDB Connected successfully to database:",
-      mongoose.connection.name
+      mongoose.connection.name,
     );
   } catch (err) {
     console.error("MongoDB Connection Error:", err.message);

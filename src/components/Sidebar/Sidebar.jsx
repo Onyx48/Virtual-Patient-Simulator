@@ -12,7 +12,6 @@ import {
   ArrowLeftOnRectangleIcon,
 } from "@heroicons/react/24/outline";
 
-// Helper to check if user has permission
 const hasAccess = (userRole, allowedRoles) => {
   return allowedRoles.includes(userRole);
 };
@@ -28,32 +27,30 @@ function Sidebar() {
       icon: <Squares2X2Icon className="w-5 h-5" />,
       allowedRoles: ["superadmin", "school_admin", "educator", "student"],
     },
-     {
-       name: "Schools",
-       path: "/schools",
-       icon: <BuildingLibraryIcon className="w-5 h-5" />,
-       allowedRoles: ["superadmin"],
-     },
-     {
-       name: "Scenarios",
-       path: "/scenarios",
-       icon: <BookOpenIcon className="w-5 h-5" />,
-       // Hidden for Superadmin
-       allowedRoles: ["school_admin", "educator", "student"],
-     },
-     {
-       name: "Students",
-       path: "/students",
-       icon: <UsersIcon className="w-5 h-5" />,
-       // Visible for Educator and School Admin
-       allowedRoles: ["school_admin", "educator"],
-     },
-     {
-       name: "Educators",
-       path: "/educators",
-       icon: <UsersIcon className="w-5 h-5" />,
-       allowedRoles: ["school_admin"],
-     },
+    {
+      name: "Schools",
+      path: "/schools",
+      icon: <BuildingLibraryIcon className="w-5 h-5" />,
+      allowedRoles: ["superadmin"],
+    },
+    {
+      name: "Scenarios",
+      path: "/scenarios",
+      icon: <BookOpenIcon className="w-5 h-5" />,
+      allowedRoles: ["school_admin", "educator", "student"],
+    },
+    {
+      name: "Students",
+      path: "/students",
+      icon: <UsersIcon className="w-5 h-5" />,
+      allowedRoles: ["school_admin", "educator"],
+    },
+    {
+      name: "Educators",
+      path: "/educators",
+      icon: <UsersIcon className="w-5 h-5" />,
+      allowedRoles: ["school_admin"],
+    },
   ];
 
   const supportItems = [
@@ -79,15 +76,12 @@ function Sidebar() {
 
   return (
     <aside className="fixed top-0 left-0 h-screen w-64 bg-[#0F0F0F] text-gray-400 flex flex-col transition-all duration-300 z-50 font-sans">
-       {/* Logo Area */}
-       <div className="h-16 flex items-center px-6 border-b border-gray-800">
-         <div className="flex items-center gap-2">
-           <div className="h-8 w-8 bg-orange-600 rounded flex items-center justify-center">
-           </div>
-         </div>
-       </div>
+      <div className="h-16 flex items-center px-6 border-b border-gray-800">
+        <div className="flex items-center gap-2">
+          <div className="h-8 w-8 bg-orange-600 rounded flex items-center justify-center"></div>
+        </div>
+      </div>
 
-      {/* Main Menu */}
       <div className="flex-1 overflow-y-auto py-6 px-3 space-y-1 custom-scrollbar">
         <p className="px-3 text-xs font-semibold text-gray-500 uppercase tracking-wider mb-2">
           Main Menu
@@ -109,7 +103,7 @@ function Sidebar() {
               {item.icon}
               {item.name}
             </NavLink>
-          ) : null
+          ) : null,
         )}
 
         <div className="my-6 border-t border-gray-800 mx-3"></div>
@@ -134,11 +128,10 @@ function Sidebar() {
               {item.icon}
               {item.name}
             </NavLink>
-          ) : null
+          ) : null,
         )}
       </div>
 
-      {/* Logout Area */}
       <div className="p-4 border-t border-gray-800">
         <button
           onClick={logout}

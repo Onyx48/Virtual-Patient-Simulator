@@ -1,17 +1,13 @@
-// src/components/Container/Header.jsx
 import React from "react";
 import { useLocation, useNavigate } from "react-router-dom";
 import { useAuth } from "../../AuthContext";
 
-// Icons (example using Heroicons)
 import {
   BellIcon,
   QuestionMarkCircleIcon,
   UserCircleIcon,
 } from "@heroicons/react/24/outline";
-// import searchIconPng from "./search.png";
 
-// Helper to format roles for display
 const formatRoleForDisplay = (role) => {
   if (!role) return "";
   switch (role.toLowerCase()) {
@@ -24,12 +20,12 @@ const formatRoleForDisplay = (role) => {
     case "student":
       return "Student";
     default:
-      return role.charAt(0).toUpperCase() + role.slice(1).replace(/_/g, " "); // Basic capitalization for other roles
+      return role.charAt(0).toUpperCase() + role.slice(1).replace(/_/g, " ");
   }
 };
 
 function Header() {
-  const { user } = useAuth(); // Only need user for display
+  const { user } = useAuth();
   const location = useLocation();
   const navigate = useNavigate();
 
@@ -87,7 +83,7 @@ function Header() {
         </button>
         <div className="relative">
           <button
-            onClick={() => navigate('/settings')}
+            onClick={() => navigate("/settings")}
             className="flex items-center space-x-2 focus:outline-none"
           >
             {user?.profilePictureUrl ? (
@@ -104,7 +100,6 @@ function Header() {
                 <span className="font-semibold text-gray-700">{user.name}</span>
                 <span className="text-xs text-orange-500 font-medium">
                   {formatRoleForDisplay(user.role)}{" "}
-                  {/* Use helper for display */}
                 </span>
               </div>
             )}

@@ -9,7 +9,7 @@ function SchoolManagementControls({
   searchTerm,
   onSearchChange,
   onAddNewClick,
-  onApplyFilters, // Placeholder for future filter modal logic
+  onApplyFilters,
 }) {
   return (
     <div className="flex flex-col sm:flex-row justify-between items-center mb-6 gap-4">
@@ -38,7 +38,6 @@ function SchoolManagementControls({
         </button>
       </div>
 
-      {/* New School Button */}
       {onAddNewClick && (
         <button
           onClick={onAddNewClick}

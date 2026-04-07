@@ -1,4 +1,3 @@
-// WHOLE_PROJECT/routes/users.js
 import express from "express";
 import User from "../models/userModel.js";
 import School from "../models/schoolModel.js";
@@ -7,27 +6,20 @@ import { checkAccess } from "../middleware/roleAccessMiddleware.js";
 
 const router = express.Router();
 
-// Debugging: Check if User model is loaded correctly
 console.log("User Model Status:", User ? "Loaded" : "FAILED IMPORT");
 
-// @desc    Get all users (scoped)
-// @route   GET /api/users
-// @access  Private (Educator, School Admin, Superadmin)
 router.get("/", protect, checkAccess("manageUsers"), async (req, res) => {
   try {
     let query = {};
 
-    // Apply query params
     const { role, schoolId } = req.query;
     if (role) query.role = role;
     if (schoolId) query.schoolId = schoolId;
 
-    // Apply role-based scoping
     if (req.scope) {
       if (req.scope.schoolId) {
-        query.schoolId = req.scope.schoolId; // School admin sees only users in their school
+        query.schoolId = req.scope.schoolId;
       }
-      // Note: Educator scope might need additional filtering for their students/educators
     }
 
     const users = await User.find(query)
@@ -40,37 +32,28 @@ router.get("/", protect, checkAccess("manageUsers"), async (req, res) => {
   }
 });
 
-// @desc    Create a new user
-// @route   POST /api/users
-// @access  Private (Educator, School Admin, Superadmin)
 router.post("/", protect, checkAccess("manageUsers"), async (req, res) => {
   try {
-    // 1. Destructure inputs
-    const { name, email, password, role, schoolId, department } =
-      req.body;
+    const { name, email, password, role, schoolId, department } = req.body;
     console.log("Creating user. Department:", department, "Role:", role);
 
-    // 2. Validate inputs
     if (!name || !email || !password || !role) {
       return res
         .status(400)
         .json({ message: "Name, email, password, and role are required." });
     }
 
-    // 3. Normalize role
     const normalizedRole = role.toLowerCase();
 
-    // 4. Validate Role against allowed list
     const allowedRoles = ["student", "educator", "school_admin", "superadmin"];
     if (!allowedRoles.includes(normalizedRole)) {
       return res.status(400).json({
         message: `Invalid role '${role}'. Must be one of: ${allowedRoles.join(
-          ", "
+          ", ",
         )}`,
       });
     }
 
-    // 5. Enforce creation hierarchy
     const allowedCreations = {
       superadmin: ["school_admin"],
       school_admin: ["educator", "student"],
@@ -83,7 +66,6 @@ router.post("/", protect, checkAccess("manageUsers"), async (req, res) => {
       });
     }
 
-    // 6. For school_admin, ensure school exists and is not already assigned
     if (normalizedRole === "school_admin") {
       const school = await School.findById(schoolId);
       if (!school) {
@@ -96,7 +78,6 @@ router.post("/", protect, checkAccess("manageUsers"), async (req, res) => {
       }
     }
 
-    // 7. Check if user exists
     const userExists = await User.findOne({ email });
     if (userExists) {
       return res
@@ -104,18 +85,13 @@ router.post("/", protect, checkAccess("manageUsers"), async (req, res) => {
         .json({ message: "User with this email already exists" });
     }
 
-    // 8. Determine schoolId based on creator role
     let finalSchoolId = schoolId;
     if (req.user.role === "school_admin") {
-      // School admin can only create users in their school
       finalSchoolId = req.user.schoolId;
     } else if (req.user.role === "educator") {
-      // Educator creates users in their school
       finalSchoolId = req.user.schoolId;
     }
-    // Superadmin can specify any schoolId or leave undefined
 
-    // Validate final schoolId
     if (
       (normalizedRole === "educator" || normalizedRole === "school_admin") &&
       !finalSchoolId
@@ -125,18 +101,11 @@ router.post("/", protect, checkAccess("manageUsers"), async (req, res) => {
       });
     }
 
-    // 9. Determine Supervisor and Department
-
-    // --- SUPERVISOR LOGIC ---
-    // Only students get supervisor field (their educator)
     let supervisor = null;
     if (req.user.role === "educator" && normalizedRole === "student") {
       supervisor = req.user._id;
     }
 
-    // --- DEPARTMENT LOGIC FIXED ---
-    // If role is student, force department to be undefined so it isn't saved.
-    // If role is educator/admin, use provided department or default to Science.
     const finalDepartment =
       normalizedRole === "student" ? undefined : department || "Science";
 
@@ -147,13 +116,12 @@ router.post("/", protect, checkAccess("manageUsers"), async (req, res) => {
       role: normalizedRole,
       schoolId: finalSchoolId,
       supervisor: supervisor,
-      department: finalDepartment, // Updated department logic
+      department: finalDepartment,
     };
 
     const newUser = new User(userData);
     await newUser.save();
 
-    // 10. For school_admin, assign to school
     if (normalizedRole === "school_admin") {
       await School.findByIdAndUpdate(finalSchoolId, {
         assignedAdmin: {
@@ -164,7 +132,6 @@ router.post("/", protect, checkAccess("manageUsers"), async (req, res) => {
       });
     }
 
-    // 11. Response
     const userResponse = {
       _id: newUser._id,
       name: newUser.name,
@@ -184,16 +151,12 @@ router.post("/", protect, checkAccess("manageUsers"), async (req, res) => {
   }
 });
 
-// @desc    Get single user by ID
-// @route   GET /api/users/:id
-// @access  Private (Educator, School Admin, Superadmin)
 router.get("/:id", protect, checkAccess("manageUsers"), async (req, res) => {
   try {
     const user = await User.findById(req.params.id)
       .select("-password")
       .populate("schoolId");
     if (user) {
-      // Check scope for school_admin
       if (
         req.scope.schoolId &&
         user.schoolId &&
@@ -217,9 +180,6 @@ router.get("/:id", protect, checkAccess("manageUsers"), async (req, res) => {
   }
 });
 
-// @desc    Update user
-// @route   PUT /api/users/:id
-// @access  Private (Educator, School Admin, Superadmin)
 router.put("/:id", protect, checkAccess("manageUsers"), async (req, res) => {
   const { id } = req.params;
   const { name, email, role, schoolId, department } = req.body;
@@ -230,7 +190,6 @@ router.put("/:id", protect, checkAccess("manageUsers"), async (req, res) => {
       return res.status(404).json({ message: "User not found" });
     }
 
-    // Check scope for school_admin
     if (
       req.scope.schoolId &&
       user.schoolId &&
@@ -244,12 +203,10 @@ router.put("/:id", protect, checkAccess("manageUsers"), async (req, res) => {
     user.name = name || user.name;
     user.email = email || user.email;
 
-    // Update department if provided
     if (department !== undefined) {
       user.department = department;
     }
 
-    // Update schoolId if provided
     if (schoolId !== undefined) {
       user.schoolId = schoolId;
     }
@@ -271,7 +228,6 @@ router.put("/:id", protect, checkAccess("manageUsers"), async (req, res) => {
       user.role = normalizedRole;
     }
 
-    // Check for school_admin uniqueness if role is school_admin and schoolId is provided
     if (user.role === "school_admin" && schoolId !== undefined) {
       const school = await School.findById(schoolId);
       if (!school) {
@@ -287,7 +243,6 @@ router.put("/:id", protect, checkAccess("manageUsers"), async (req, res) => {
       }
     }
 
-    // Handle school assignment changes
     const oldSchoolId = user.schoolId;
     const oldRole = user.role;
     const newRole = user.role;
@@ -295,7 +250,6 @@ router.put("/:id", protect, checkAccess("manageUsers"), async (req, res) => {
 
     const updatedUser = await user.save();
 
-    // Clear old assignment if role changed from school_admin or schoolId changed
     if (
       oldRole === "school_admin" &&
       (newRole !== "school_admin" ||
@@ -308,7 +262,6 @@ router.put("/:id", protect, checkAccess("manageUsers"), async (req, res) => {
       }
     }
 
-    // Set new assignment if now school_admin
     if (newRole === "school_admin" && newSchoolId) {
       await School.findByIdAndUpdate(newSchoolId, {
         assignedAdmin: {
@@ -325,9 +278,6 @@ router.put("/:id", protect, checkAccess("manageUsers"), async (req, res) => {
   }
 });
 
-// @desc    Delete user
-// @route   DELETE /api/users/:id
-// @access  Private (Educator, School Admin, Superadmin)
 router.delete("/:id", protect, checkAccess("manageUsers"), async (req, res) => {
   const { id } = req.params;
   try {
@@ -336,7 +286,6 @@ router.delete("/:id", protect, checkAccess("manageUsers"), async (req, res) => {
       return res.status(404).json({ message: "User not found" });
     }
 
-    // Check scope for school_admin
     if (
       req.scope.schoolId &&
       user.schoolId &&

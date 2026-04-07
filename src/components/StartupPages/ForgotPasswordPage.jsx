@@ -1,11 +1,11 @@
 import React, { useState } from "react";
 import { Link, useNavigate } from "react-router-dom";
-import formBgImage from "./Login-bg.jpg"; // Reusing the same image
+import formBgImage from "./Login-bg.jpg";
 import axios from "axios";
 
 function ForgotPasswordPage() {
   const [email, setEmail] = useState("");
-  const [emailError, setEmailError] = useState(""); // For validation error
+  const [emailError, setEmailError] = useState("");
   const [successMessage, setSuccessMessage] = useState("");
   const [isLoading, setIsLoading] = useState(false);
   const navigate = useNavigate();
@@ -16,7 +16,7 @@ function ForgotPasswordPage() {
     } else if (!/\S+@\S+\.\S+/.test(emailToValidate)) {
       return "Please enter a valid email address.";
     }
-    return ""; // No error
+    return "";
   };
 
   const handleSubmit = async (e) => {
@@ -32,10 +32,8 @@ function ForgotPasswordPage() {
           email,
         });
         setSuccessMessage(
-          response.data.message || "If an account exists, an OTP will be sent."
+          response.data.message || "If an account exists, an OTP will be sent.",
         );
-        // Optionally navigate to OTP page or show message to check email
-        // navigate('/verify-otp', { state: { email } }); // If you want to auto-navigate
       } catch (error) {
         const apiError = error.response?.data;
         if (apiError?.lockoutUntil) {
@@ -43,11 +41,11 @@ function ForgotPasswordPage() {
           const now = new Date().getTime();
           const remaining = Math.ceil((lockoutTimestamp - now) / 1000);
           setEmailError(
-            `Account locked. Try again in ${Math.ceil(remaining / 60)} min(s).`
+            `Account locked. Try again in ${Math.ceil(remaining / 60)} min(s).`,
           );
         } else {
           setEmailError(
-            apiError?.message || "Failed to send OTP. Please try again."
+            apiError?.message || "Failed to send OTP. Please try again.",
           );
         }
       } finally {
@@ -58,7 +56,6 @@ function ForgotPasswordPage() {
   const handleEmailChange = (e) => {
     setEmail(e.target.value);
     if (emailError) {
-      // Clear error when user starts typing
       setEmailError(validateEmail(e.target.value));
     }
   };
@@ -102,14 +99,12 @@ function ForgotPasswordPage() {
                   placeholder="your.email@example.com"
                   value={email}
                   onChange={handleEmailChange}
-                  onBlur={() => setEmailError(validateEmail(email))} // Validate on blur
+                  onBlur={() => setEmailError(validateEmail(email))}
                   className={`block w-full p-3 text-lg rounded-md bg-gray-800 border placeholder-gray-500 text-white focus:outline-none focus:ring-2 focus:ring-custom-orange focus:border-transparent ${
                     emailError
                       ? "border-red-500 ring-red-500"
                       : "border-gray-700"
                   }`}
-                  // aria-invalid={emailError ? "true" : "false"} // For accessibility
-                  // aria-describedby={emailError ? "email-error" : undefined}
                 />
                 {emailError && (
                   <div className="absolute inset-y-0 right-0 pr-3 flex items-center pointer-events-none">
@@ -155,7 +150,7 @@ function ForgotPasswordPage() {
             </div>
             <div className="px-4 pb-2 pt-2">
               <Link
-                to="/login" // Assuming your login route is /login
+                to="/login"
                 className="uppercase block w-full p-3 text-lg rounded-md border border-gray-700 hover:bg-gray-800 focus:outline-none focus:ring-2 focus:ring-gray-600 focus:ring-opacity-50 text-gray-300 font-semibold"
               >
                 Cancel
@@ -187,7 +182,6 @@ function ForgotPasswordPage() {
         </div>
       </div>
 
-      {/* Right Panel (Image) */}
       <div
         className="lg:flex w-1/2 hidden bg-gray-500 bg-no-repeat bg-cover relative items-center"
         style={{ backgroundImage: `url(${formBgImage})` }}

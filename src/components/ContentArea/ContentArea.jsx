@@ -2,36 +2,30 @@ import React, { lazy, Suspense } from "react";
 import { Routes, Route, Navigate } from "react-router-dom";
 import { useAuth } from "../../AuthContext";
 
-// Import Dashboards
 const StudentDashboard = lazy(() => import("../../roles/student/Dashboard"));
 const EducatorDashboard = lazy(() => import("../../roles/educator/Dashboard"));
-const SuperAdminDashboard = lazy(() => import("../../roles/superadmin/Dashboard"));
-const SchoolAdminDashboard = lazy(() =>
-  import("../../roles/school_admin/Dashboard")
+const SuperAdminDashboard = lazy(
+  () => import("../../roles/superadmin/Dashboard"),
+);
+const SchoolAdminDashboard = lazy(
+  () => import("../../roles/school_admin/Dashboard"),
 );
 
-// Schools Pages
 import SchoolsPage from "../../roles/superadmin/schools/Schools";
 import SchoolFormPage from "../../roles/superadmin/schools/SchoolFormPage";
 
-// Scenarios Pages
 import ScenariosPage from "../../roles/educator/scenarios/index.jsx";
 import SchoolAdminScenariosPage from "../../roles/school_admin/scenarios/index.jsx";
 import StudentScenariosPage from "../StudentScenariosPage.jsx";
 import StudentScenarioDetails from "../../roles/student/scenarios/StudentScenarioDetails.jsx";
 import ScenarioFormPage from "../shared/ScenarioFormPage";
 
-// Students Pages (New Wrappers)
 import EducatorStudentsPage from "../../roles/educator/students/Student.jsx";
 import SchoolAdminStudentsPage from "../../roles/school_admin/students/Student.jsx";
-// You might want a generic fallback for superadmin if they access /students
-// For now, I will use SchoolAdminStudentsPage for superadmin as well since they share full access permissions
 import StudentsPage from "../StudentsPage.jsx";
 
-// Educators Pages
 import SchoolAdminEducatorsPage from "../../roles/school_admin/educators/Educator.jsx";
 
-// Other Pages
 import AccountSettingsPage from "../settings/SettingsPage";
 import HelpCenterPage from "../HelpCenter/HelpCenterPage";
 import ReportPage from "../Report/ReportPage";
@@ -111,7 +105,6 @@ function ContentArea() {
           }
         />
 
-        {/* Scenarios Routes */}
         <Route
           path="/scenarios"
           element={
@@ -155,7 +148,6 @@ function ContentArea() {
           }
         />
 
-        {/* Students Route */}
         <Route
           path="/students/*"
           element={
@@ -167,14 +159,12 @@ function ContentArea() {
               ) : user?.role === "school_admin" ? (
                 <SchoolAdminStudentsPage />
               ) : (
-                // Fallback for Superadmin or others to the shared component directly
                 <StudentsPage role={user?.role} />
               )}
             </RoleBasedRoute>
           }
         />
 
-        {/* Educators Route */}
         <Route
           path="/educators"
           element={
@@ -184,7 +174,6 @@ function ContentArea() {
           }
         />
 
-        {/* Settings Route */}
         <Route
           path="/settings/*"
           element={
@@ -201,7 +190,6 @@ function ContentArea() {
           }
         />
 
-        {/* Help Center Route */}
         <Route
           path="/help-center"
           element={
@@ -218,7 +206,6 @@ function ContentArea() {
           }
         />
 
-        {/* Report Route */}
         <Route
           path="/report"
           element={

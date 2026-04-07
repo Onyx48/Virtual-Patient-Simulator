@@ -1,11 +1,9 @@
-// src/components/StartupPages/LoginPage.jsx
 import React, { useState } from "react";
 import { Link, useNavigate } from "react-router-dom";
 import loginImage from "./Login-bg.jpg";
 import { useAuth } from "../../AuthContext";
 import { toast } from "react-hot-toast";
 
-// ... (validateEmail, validatePassword, errorIcon remain the same) ...
 const validateEmail = (emailToValidate) => {
   if (!emailToValidate.trim()) return "Email is required.";
   if (!/\S+@\S+\.\S+/.test(emailToValidate))
@@ -37,15 +35,15 @@ const errorIcon = (
 );
 
 function LoginPage() {
-  const { login } = useAuth(); // Get login function from context
+  const { login } = useAuth();
   const navigate = useNavigate();
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
-  const [rememberMe, setRememberMe] = useState(false); // Keep if you plan to implement this
+  const [rememberMe, setRememberMe] = useState(false);
 
   const [emailError, setEmailError] = useState("");
   const [passwordError, setPasswordError] = useState("");
-  const [apiError, setApiError] = useState(""); // For general API errors from login
+  const [apiError, setApiError] = useState("");
   const [isLoading, setIsLoading] = useState(false);
 
   const handleSubmit = async (e) => {
@@ -55,15 +53,12 @@ function LoginPage() {
 
     setEmailError(currentEmailError);
     setPasswordError(currentPasswordError);
-    setApiError(""); // Clear previous API errors
+    setApiError("");
 
     if (!currentEmailError && !currentPasswordError) {
       setIsLoading(true);
       try {
-        await login(email, password); // Call the login function from AuthContext
-        // AuthContext's useEffect will set the user, and PublicRoute will redirect.
-        // Or, you can navigate explicitly after login is confirmed by AuthContext.
-        // navigate('/'); // Navigation will be handled by PublicRoute/ProtectedRoute
+        await login(email, password);
       } catch (err) {
         const message =
           err.response?.data?.message ||
@@ -82,13 +77,13 @@ function LoginPage() {
   const handleEmailChange = (e) => {
     setEmail(e.target.value);
     if (emailError) setEmailError(validateEmail(e.target.value));
-    if (apiError) setApiError(""); // Clear API error on input change
+    if (apiError) setApiError("");
   };
 
   const handlePasswordChange = (e) => {
     setPassword(e.target.value);
     if (passwordError) setPasswordError(validatePassword(e.target.value));
-    if (apiError) setApiError(""); // Clear API error on input change
+    if (apiError) setApiError("");
   };
 
   return (
@@ -151,7 +146,6 @@ function LoginPage() {
               )}
             </div>
 
-            {/* Password Input */}
             <div className="pb-2 pt-4">
               <label
                 htmlFor="password-login"

@@ -9,7 +9,7 @@ const redisOptions = {
   lazyConnect: false,
   showFriendlyErrorStack: true,
   retryStrategy(times) {
-    const delay = Math.min(times * 50, 2000); // delay will be 50, 100, 150 ... up to 2 sec
+    const delay = Math.min(times * 50, 2000);
     console.log(
       `Redis: Retrying connection (attempt ${times}), delay ${delay}ms`,
     );

@@ -3,10 +3,7 @@ import React, { useState, useMemo } from "react";
 import ScenarioManagementControls from "./ScenarioManagementControls.jsx";
 import ScenarioTable from "./ScenarioTable.jsx";
 import ScenarioModal from "./ScenarioModal.jsx";
-import initialScenarios from "./initialScenarios.json"
-
-
-
+import initialScenarios from "./initialScenarios.json";
 
 function ScenarioPage() {
   const [scenarios, setScenarios] = useState(initialScenarios);
@@ -21,16 +18,14 @@ function ScenarioPage() {
   const handleSaveScenario = (scenarioData) => {
     console.log("Saving scenario:", scenarioData);
     if (scenarioData.id) {
-      // Update
       setScenarios((prevScenarios) =>
         prevScenarios.map((scenario) =>
           scenario.id === scenarioData.id
             ? { ...scenario, ...scenarioData }
-            : scenario
-        )
+            : scenario,
+        ),
       );
     } else {
-      // Add
       const newScenarioWithId = {
         ...scenarioData,
         id: Date.now() + Math.random(),
@@ -51,12 +46,12 @@ function ScenarioPage() {
         (scenario) =>
           scenario.scenarioName.toLowerCase().includes(lowerCaseSearchTerm) ||
           scenario.description.toLowerCase().includes(lowerCaseSearchTerm) ||
-          scenario.educator.toLowerCase().includes(lowerCaseSearchTerm)
+          scenario.educator.toLowerCase().includes(lowerCaseSearchTerm),
       );
     }
 
     const hasActiveFilters = Object.values(filterCriteria).some(
-      (value) => value !== "" && value !== null && value !== undefined
+      (value) => value !== "" && value !== null && value !== undefined,
     );
     if (hasActiveFilters) {
       currentData = currentData.filter((scenario) => {

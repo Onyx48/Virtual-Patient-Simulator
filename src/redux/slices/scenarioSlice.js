@@ -2,7 +2,6 @@ import { createAsyncThunk, createSlice } from "@reduxjs/toolkit";
 import axios from "axios";
 import { getAuthHeaders } from "../../lib/utils.js";
 
-// Async thunks for scenarios
 export const fetchScenarios = createAsyncThunk(
   "scenarios/fetchScenarios",
   async (_, { rejectWithValue }) => {
@@ -11,10 +10,10 @@ export const fetchScenarios = createAsyncThunk(
       return response.data;
     } catch (error) {
       return rejectWithValue(
-        error.response?.data || "Failed to fetch scenarios"
+        error.response?.data || "Failed to fetch scenarios",
       );
     }
-  }
+  },
 );
 
 export const addScenario = createAsyncThunk(
@@ -24,14 +23,13 @@ export const addScenario = createAsyncThunk(
       const response = await axios.post(
         "/api/scenarios",
         scenarioData,
-        getAuthHeaders()
+        getAuthHeaders(),
       );
-      // RETURN ONLY THE SCENARIO OBJECT
       return response.data.scenario;
     } catch (error) {
       return rejectWithValue(error.response?.data || "Failed to add scenario");
     }
-  }
+  },
 );
 
 export const updateScenario = createAsyncThunk(
@@ -41,16 +39,15 @@ export const updateScenario = createAsyncThunk(
       const response = await axios.put(
         `/api/scenarios/${id}`,
         updates,
-        getAuthHeaders()
+        getAuthHeaders(),
       );
-      // RETURN ONLY THE SCENARIO OBJECT
       return response.data.scenario;
     } catch (error) {
       return rejectWithValue(
-        error.response?.data || "Failed to update scenario"
+        error.response?.data || "Failed to update scenario",
       );
     }
-  }
+  },
 );
 
 export const deleteScenario = createAsyncThunk(
@@ -61,10 +58,10 @@ export const deleteScenario = createAsyncThunk(
       return id;
     } catch (error) {
       return rejectWithValue(
-        error.response?.data || "Failed to delete scenario"
+        error.response?.data || "Failed to delete scenario",
       );
     }
-  }
+  },
 );
 
 export const assignScenarios = createAsyncThunk(
@@ -78,34 +75,32 @@ export const assignScenarios = createAsyncThunk(
           axios.put(
             `/api/scenarios/${change.scenarioId}`,
             { assignedTo: change.assignedToIds },
-            getAuthHeaders()
-          )
+            getAuthHeaders(),
+          ),
         );
       });
 
-       await Promise.all(promises);
+      await Promise.all(promises);
 
-       // Update Redux state immediately with the new assignments
-       // Note: We can't easily populate user objects here without additional API calls,
-       // so we'll rely on the fetchScenarios() call to get populated data
+      dispatch(fetchScenarios());
 
-       // Also dispatch fetchScenarios as backup to ensure populated data
-       dispatch(fetchScenarios());
+      if (typeof window !== "undefined") {
+        window.dispatchEvent(new CustomEvent("scenarioAssignmentsChanged"));
+      }
 
-       // Dispatch custom event to notify student components to refetch
-       if (typeof window !== 'undefined') {
-         window.dispatchEvent(new CustomEvent('scenarioAssignmentsChanged'));
-       }
+      dispatch(fetchScenarios());
 
-       // Also dispatch fetchScenarios to ensure Redux state is up to date
-       dispatch(fetchScenarios());
-
-       return { message: "Assignments updated successfully" };
+      return { message: "Assignments updated successfully" };
     } catch (error) {
-      console.error("Assign scenarios error:", error.response?.data || error.message);
-      return rejectWithValue(error.response?.data || "Failed to update assignments");
+      console.error(
+        "Assign scenarios error:",
+        error.response?.data || error.message,
+      );
+      return rejectWithValue(
+        error.response?.data || "Failed to update assignments",
+      );
     }
-  }
+  },
 );
 
 const scenarioSlice = createSlice({
@@ -143,7 +138,7 @@ const scenarioSlice = createSlice({
       })
       .addCase(updateScenario.fulfilled, (state, action) => {
         const index = state.scenarios.findIndex(
-          (s) => s._id === action.payload._id || s.id === action.payload._id
+          (s) => s._id === action.payload._id || s.id === action.payload._id,
         );
         if (index !== -1) {
           state.scenarios[index] = action.payload;
@@ -151,7 +146,7 @@ const scenarioSlice = createSlice({
       })
       .addCase(deleteScenario.fulfilled, (state, action) => {
         state.scenarios = state.scenarios.filter(
-          (s) => (s._id || s.id) !== action.payload
+          (s) => (s._id || s.id) !== action.payload,
         );
       });
   },
