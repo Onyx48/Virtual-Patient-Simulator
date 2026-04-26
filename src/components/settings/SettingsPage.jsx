@@ -115,7 +115,7 @@ function SettingsPage() {
     if (user) {
       setUserData({
         profilePictureUrl: user.profilePicture
-          ? `http://localhost:5001${user.profilePicture}`
+          ? `https://vpsbackend.metawingsxr.com${user.profilePicture}`
           : initialUserData.profilePictureUrl,
         fullName: user.name || initialUserData.fullName,
         email: user.email || initialUserData.email,

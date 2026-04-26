@@ -6,10 +6,12 @@ import { resolve } from "node:path";
 export default defineConfig({
   plugins: [react()],
   server: {
+    host: "0.0.0.0",
     port: 5173,
+    allowedHosts: ["vpsdashboard.metawingsxr.com"],
     proxy: {
       "/api": {
-        target: "http://localhost:5001",
+        target: "https://vpsbackend.metawingsxr.com/",
         changeOrigin: true,
       },
     },
