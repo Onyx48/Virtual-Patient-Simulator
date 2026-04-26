@@ -144,7 +144,7 @@ function SettingsPage() {
     }
   };
 
-  const handleProfilePictureChange = async (e) => {
+  /*   const handleProfilePictureChange = async (e) => {
     const file = e.target.files[0];
     if (file) {
       const allowedTypes = [
@@ -188,7 +188,6 @@ function SettingsPage() {
         toast.error(
           error.response?.data?.message || "Failed to upload profile picture",
         );
-        // Reset to original
         setUserData({
           ...userData,
           profilePictureUrl: user?.profilePicture
@@ -199,9 +198,9 @@ function SettingsPage() {
         setUploading(false);
       }
     }
-  };
+  }; */
 
-  const handleRemoveProfilePicture = async () => {
+  /*   const handleRemoveProfilePicture = async () => {
     try {
       await axios.delete("/api/auth/profile-picture");
       updateProfile({ profilePicture: null });
@@ -216,7 +215,7 @@ function SettingsPage() {
         error.response?.data?.message || "Failed to remove profile picture",
       );
     }
-  };
+  }; */
 
   const handlePasswordSubmit = async () => {
     if (passwordData.newPassword !== passwordData.confirmPassword) {
@@ -258,7 +257,7 @@ function SettingsPage() {
 
         <form onSubmit={handleSubmit(onSubmit)} className="space-y-8">
           {/* Profile Picture Section */}
-          <div className="flex items-center space-x-6">
+          {/* <div className="flex items-center space-x-6">
             {user?.profilePicture ? (
               <img
                 src={userData.profilePictureUrl}
@@ -313,7 +312,7 @@ function SettingsPage() {
                 JPG, GIF or PNG. Max size of 2MB.
               </p>
             </div>
-          </div>
+          </div> */}
 
           <div>
             <h2 className="text-lg font-semibold text-gray-900 mb-4">

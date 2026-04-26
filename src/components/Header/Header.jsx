@@ -86,15 +86,15 @@ function Header() {
             onClick={() => navigate("/settings")}
             className="flex items-center space-x-2 focus:outline-none"
           >
-            {user?.profilePictureUrl ? (
+            {/* {user?.profilePictureUrl ? (
               <img
                 src={user.profilePictureUrl}
                 alt="User"
                 className="w-8 h-8 rounded-full object-cover"
               />
-            ) : (
+            ) : ( */}
               <UserCircleIcon className="w-8 h-8 text-gray-500" />
-            )}
+            {/* )} */}
             {user && (
               <div className="flex flex-col text-xs text-left leading-tight">
                 <span className="font-semibold text-gray-700">{user.name}</span>
