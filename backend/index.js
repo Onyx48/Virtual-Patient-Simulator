@@ -16,7 +16,7 @@ connectDB();
 
 app.use(
   cors({
-    origin: "http://localhost:5173" || "https://vpsbackend.metawingsxr.com/",
+    origin: "https://vpsbackend.metawingsxr.com/",
     credentials: true,
   }),
 );
