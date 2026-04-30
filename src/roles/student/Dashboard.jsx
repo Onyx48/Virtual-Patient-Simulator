@@ -1,7 +1,6 @@
 import React, { useState, useEffect } from "react";
 import { useAuth } from "../../AuthContext";
-import axios from "axios";
-import { getAuthHeaders } from "../../lib/utils.js";
+import { COURSES } from "./data/mockCourses.js";
 import {
   Search,
   Bell,
@@ -33,18 +32,7 @@ const ACTIVITY_DATA = [4, 7, 5, 9, 6, 8, 10];
 
 export default function StudentDashboard() {
   const { user } = useAuth();
-  const [loading, setLoading] = useState(true);
-  const [studentStats, setStudentStats] = useState({
-    completedCount: 12,
-    availableCount: 4,
-    averageScore: 88,
-  });
-
-  useEffect(() => {
-    // Simulated fetch logic for the refactor
-    const timer = setTimeout(() => setLoading(false), 500);
-    return () => clearTimeout(timer);
-  }, []);
+  const [loading, setLoading] = useState(false);
 
   if (loading)
     return (
