@@ -1,13 +1,19 @@
 // src/components/ScenariosPage.jsx
-import React, { useState } from 'react';
-import ScenarioManagementControls from '../roles/educator/scenarios/ScenarioManagementControls.jsx'; // Temporarily import, later make shared
-import ScenarioTable from '../roles/educator/scenarios/ScenarioTable.jsx';
-import ScenarioModal from './ScenarioModal.jsx';
-import { useEntityFilters } from '../lib/hooks/useEntityFilters.js';
-import { useSorting } from '../lib/hooks/useSorting.js';
+import React, { useState } from "react";
+import ScenarioManagementControls from "../roles/educator/scenarios/CourseManagementControl.jsx"; // Temporarily import, later make shared
+import ScenarioTable from "../roles/educator/scenarios/ScenarioTable.jsx";
+import ScenarioModal from "./ScenarioModal.jsx";
+import { useEntityFilters } from "../lib/hooks/useEntityFilters.js";
+import { useSorting } from "../lib/hooks/useSorting.js";
 
-function ScenariosPage({ scenarios, onAdd, onEdit, canEdit = true, canAdd = true }) {
-  const [searchTerm, setSearchTerm] = useState('');
+function ScenariosPage({
+  scenarios,
+  onAdd,
+  onEdit,
+  canEdit = true,
+  canAdd = true,
+}) {
+  const [searchTerm, setSearchTerm] = useState("");
   const [filterCriteria, setFilterCriteria] = useState({});
   const [isModalOpen, setIsModalOpen] = useState(false);
   const [editingScenario, setEditingScenario] = useState(null);
@@ -17,7 +23,7 @@ function ScenariosPage({ scenarios, onAdd, onEdit, canEdit = true, canAdd = true
     scenarios,
     searchTerm,
     filterCriteria,
-    ['scenarioName', 'description', 'educator']
+    ["scenarioName", "description", "educator"],
   );
 
   // Sort scenarios

@@ -1,7 +1,7 @@
 import React, { useState, useMemo } from "react";
 import { useNavigate } from "react-router-dom";
 
-import ScenarioManagementControls from "./ScenarioManagementControls.jsx";
+import ScenarioManagementControls from "./CourseManagementControl.jsx";
 import ScenarioTable from "./ScenarioTable.jsx";
 
 import initialScenarios from "./initialScenarios.json";

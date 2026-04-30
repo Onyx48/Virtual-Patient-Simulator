@@ -1,458 +1,267 @@
-import React, { useState, useMemo, useEffect } from "react";
+import React, { useState, useEffect } from "react";
 import { useAuth } from "../../AuthContext";
 import axios from "axios";
 import { getAuthHeaders } from "../../lib/utils.js";
 import {
-  ResponsiveContainer,
-  PieChart,
-  Pie,
-  Cell,
-  BarChart,
-  Bar,
-  XAxis,
-  YAxis,
-  CartesianGrid,
-  Tooltip,
-} from "recharts";
-import {
-  AlertCircle,
-  Calendar,
+  Search,
   Bell,
-  CheckCircle,
-  MoreHorizontal,
-  ChevronLeft,
+  Trophy,
+  Calendar,
+  Clock,
+  ArrowRight,
+  PlayCircle,
+  BookOpen,
+  FileText,
+  TrendingUp,
 } from "lucide-react";
-import ScenarioManagementControlsStudent from "./scenarios/ScenarioManagementControlsStudent";
-import ScenarioTableStudent from "./scenarios/ScenrioGridStudent";
-import StudentScenarioDetails from "./scenarios/StudentScenarioDetails";
 
-const notices = [
-  {
-    title: "Welcome to Your Dashboard",
-    sub: "Complete scenarios to track your progress",
-    icon: "star",
-    color: "bg-yellow-100 text-yellow-500",
-  },
-];
+// shadcn/ui imports
+import {
+  Card,
+  CardContent,
+  CardHeader,
+  CardTitle,
+  CardDescription,
+} from "@/components/ui/card";
+import { Button } from "@/components/ui/button";
+import { Input } from "@/components/ui/input";
+import { Badge } from "@/components/ui/badge";
+import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
+import { ResponsiveContainer, BarChart, Bar, Cell } from "recharts";
 
-function StudentDashboard() {
+const ACTIVITY_DATA = [4, 7, 5, 9, 6, 8, 10];
+
+export default function StudentDashboard() {
   const { user } = useAuth();
-  const [scenariosList, setScenariosList] = useState([]);
   const [loading, setLoading] = useState(true);
-  const [currentView, setCurrentView] = useState("dashboard");
-  const [selectedScenario, setSelectedScenario] = useState(null);
-  const [searchTerm, setSearchTerm] = useState("");
-  const [filters, setFilters] = useState({});
-  const [sortConfig, setSortConfig] = useState(null);
   const [studentStats, setStudentStats] = useState({
-    completedCount: 0,
-    availableCount: 0,
-    averageScore: null,
-    scenarioScores: [],
-    totalAssigned: 0,
+    completedCount: 12,
+    availableCount: 4,
+    averageScore: 88,
   });
 
   useEffect(() => {
-    const fetchData = async () => {
-      try {
-        const [statsResponse, scenariosResponse] = await Promise.all([
-          axios.get("/api/dashboard/student-stats", getAuthHeaders()),
-          axios.get("/api/scenarios", getAuthHeaders()),
-        ]);
+    // Simulated fetch logic for the refactor
+    const timer = setTimeout(() => setLoading(false), 500);
+    return () => clearTimeout(timer);
+  }, []);
 
-        const stats = statsResponse.data;
-        setStudentStats(stats);
-
-        const allScenarios = scenariosResponse.data;
-        const assignedScenarios = allScenarios.filter(
-          (scenario) =>
-            scenario.assignedTo &&
-            scenario.assignedTo.some((a) => a._id === user._id),
-        );
-
-        const mapped = assignedScenarios.map((scenario) => {
-          const scenarioStat = stats.scenarioScores.find(
-            (s) => s.scenarioId === scenario._id,
-          );
-          return {
-            id: scenario._id,
-            scenarioName: scenario.scenarioName,
-            description: scenario.description || "",
-            difficulty: scenario.difficulty || "Medium",
-            highestScore:
-              scenarioStat?.bestScore !== null
-                ? Math.round(scenarioStat.bestScore * 100)
-                : null,
-            status: scenarioStat?.isCompleted ? "Completed" : "Available",
-          };
-        });
-        setScenariosList(mapped);
-      } catch (error) {
-        console.error("Error fetching data:", error);
-      } finally {
-        setLoading(false);
-      }
-    };
-    if (user) fetchData();
-  }, [user]);
-
-  const filteredScenarios = useMemo(() => {
-    let filtered = scenariosList;
-    if (searchTerm) {
-      filtered = filtered.filter((s) =>
-        s.scenarioName.toLowerCase().includes(searchTerm.toLowerCase()),
-      );
-    }
-    if (sortConfig) {
-      filtered.sort((a, b) => {
-        const aVal = a[sortConfig.key];
-        const bVal = b[sortConfig.key];
-        if (aVal < bVal) return sortConfig.direction === "asc" ? -1 : 1;
-        if (aVal > bVal) return sortConfig.direction === "asc" ? 1 : -1;
-        return 0;
-      });
-    }
-    return filtered;
-  }, [scenariosList, searchTerm, sortConfig]);
-
-  const hasRealData = studentStats.totalAssigned > 0;
-
-  const performanceData = useMemo(() => {
-    if (!studentStats.scenarioScores.length) return [];
-    return studentStats.scenarioScores
-      .filter((s) => s.bestScore !== null)
-      .map((s, idx) => ({
-        name: `Scenario ${idx + 1}`,
-        score: Math.round(s.bestScore * 100),
-      }));
-  }, [studentStats.scenarioScores]);
-
-  const learningContentData = useMemo(() => {
-    if (!hasRealData) return [];
-    return [
-      { name: "Completed", value: studentStats.completedCount },
-      { name: "Remaining", value: studentStats.availableCount },
-    ];
-  }, [studentStats, hasRealData]);
-
-  if (loading) return <div className="p-8">Loading dashboard...</div>;
-
-  return (
-    <div className="p-8 bg-gray-50 min-h-screen font-sans">
-      {currentView === "dashboard" && (
-        <React.Fragment>
-          <div className="mb-8">
-            <h2 className="text-2xl font-bold text-gray-800">
-              Welcome Back, {user.name.split(" ")[0]}!
-            </h2>
-            <p className="text-gray-500 text-sm mt-1">
-              {hasRealData
-                ? "Here's an overview of your learning progress."
-                : "Start a scenario to begin your learning journey."}
-            </p>
-          </div>
-
-          <div className="grid grid-cols-1 md:grid-cols-3 gap-6 mb-8">
-            <StatCard
-              title="Completed Scenarios"
-              value={studentStats.completedCount}
-              sub={hasRealData ? "Total assigned" : "No scenarios yet"}
-              subValue={
-                studentStats.totalAssigned > 0
-                  ? studentStats.totalAssigned
-                  : null
-              }
-            />
-            <StatCard
-              title="Available Scenarios"
-              value={studentStats.availableCount}
-              sub="Remaining scenarios"
-              trend={null}
-            />
-            <StatCard
-              title="Avg Score"
-              value={
-                studentStats.averageScore !== null
-                  ? `${studentStats.averageScore}%`
-                  : "N/A"
-              }
-              sub={hasRealData ? "Across all completed" : "No scores yet"}
-            />
-          </div>
-
-          <div className="grid grid-cols-1 lg:grid-cols-3 gap-6 mb-8">
-            <div className="bg-white p-6 rounded-xl shadow-sm border border-gray-100 flex flex-col justify-between">
-              <h3 className="font-semibold text-gray-800 mb-4">
-                Learning Content
-              </h3>
-
-              {hasRealData && studentStats.totalAssigned > 0 ? (
-                <>
-                  <div className="h-48 relative flex justify-center items-center">
-                    <ResponsiveContainer width="100%" height="100%">
-                      <PieChart>
-                        <Pie
-                          data={learningContentData}
-                          cx="50%"
-                          cy="70%"
-                          startAngle={180}
-                          endAngle={0}
-                          innerRadius={60}
-                          outerRadius={80}
-                          paddingAngle={0}
-                          dataKey="value"
-                          stroke="none"
-                        >
-                          <Cell key="cell-0" fill="#0ea5e9" />
-                          <Cell key="cell-1" fill="#22c55e" />
-                        </Pie>
-                      </PieChart>
-                    </ResponsiveContainer>
-
-                    <div className="absolute top-2/3 left-1/2 transform -translate-x-1/2 -translate-y-1/2 text-center mt-6">
-                      <div className="text-xs text-gray-400">
-                        Total Scenarios
-                      </div>
-                      <div className="text-3xl font-bold text-gray-800">
-                        {studentStats.totalAssigned}
-                      </div>
-                    </div>
-                  </div>
-
-                  <div className="flex justify-between px-4 mt-2">
-                    <div className="flex items-center gap-2">
-                      <span className="w-1 h-4 bg-blue-500 rounded-full"></span>
-                      <div className="flex flex-col leading-none">
-                        <span className="text-xs text-gray-500">Completed</span>
-                        <span className="text-xs font-bold text-gray-800">
-                          {studentStats.completedCount}
-                        </span>
-                      </div>
-                    </div>
-                    <div className="flex items-center gap-2">
-                      <span className="w-1 h-4 bg-green-500 rounded-full"></span>
-                      <div className="flex flex-col leading-none">
-                        <span className="text-xs text-gray-500">Available</span>
-                        <span className="text-xs font-bold text-gray-800">
-                          {studentStats.availableCount}
-                        </span>
-                      </div>
-                    </div>
-                  </div>
-                </>
-              ) : (
-                <div className="h-48 flex items-center justify-center">
-                  <p className="text-gray-400 text-sm">No data available</p>
-                </div>
-              )}
-            </div>
-
-            <div className="bg-white p-6 rounded-xl shadow-sm border border-gray-100 lg:col-span-2">
-              <div className="flex justify-between items-center mb-6">
-                <h3 className="font-semibold text-gray-800">
-                  Performance Trend
-                </h3>
-              </div>
-
-              {performanceData.length > 0 ? (
-                <div className="h-60">
-                  <ResponsiveContainer width="100%" height="100%">
-                    <BarChart data={performanceData} barSize={32}>
-                      <CartesianGrid
-                        strokeDasharray="3 3"
-                        vertical={false}
-                        stroke="#f3f4f6"
-                      />
-                      <XAxis
-                        dataKey="name"
-                        axisLine={false}
-                        tickLine={false}
-                        tick={{ fill: "#9ca3af", fontSize: 12 }}
-                        dy={10}
-                      />
-                      <YAxis
-                        axisLine={false}
-                        tickLine={false}
-                        tick={{ fill: "#9ca3af", fontSize: 12 }}
-                        domain={[0, 100]}
-                        ticks={[0, 25, 50, 75, 100]}
-                      />
-                      <Tooltip
-                        cursor={{ fill: "#f9fafb" }}
-                        contentStyle={{
-                          borderRadius: "8px",
-                          border: "none",
-                          boxShadow: "0 4px 6px -1px rgb(0 0 0 / 0.1)",
-                        }}
-                      />
-                      <Bar
-                        dataKey="score"
-                        fill="#ea580c"
-                        radius={[4, 4, 0, 0]}
-                      />
-                    </BarChart>
-                  </ResponsiveContainer>
-                </div>
-              ) : (
-                <div className="h-60 flex items-center justify-center">
-                  <p className="text-gray-400 text-sm">
-                    No scores available yet
-                  </p>
-                </div>
-              )}
-            </div>
-          </div>
-
-          <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
-            <div className="bg-white p-6 rounded-xl shadow-sm border border-gray-100 lg:col-span-2">
-              <div className="flex justify-between items-center mb-4">
-                <h3 className="font-semibold text-gray-800">Scenarios</h3>
-                <button
-                  onClick={() => setCurrentView("scenarios")}
-                  className="text-xs text-gray-500 border border-gray-200 px-3 py-1 rounded hover:bg-gray-50 transition-colors"
-                >
-                  View All
-                </button>
-              </div>
-              <div className="overflow-x-auto">
-                <table className="w-full text-left border-collapse">
-                  <thead>
-                    <tr className="bg-gray-50 text-gray-500 text-xs uppercase tracking-wider">
-                      <th className="p-3 font-medium first:rounded-tl-lg first:pl-4">
-                        Name
-                      </th>
-                      <th className="p-3 font-medium">Status</th>
-                      <th className="p-3 font-medium text-right last:rounded-tr-lg last:pr-4">
-                        Score
-                      </th>
-                    </tr>
-                  </thead>
-                  <tbody className="divide-y divide-gray-100">
-                    {filteredScenarios.length > 0 ? (
-                      filteredScenarios.map((scenario, index) => (
-                        <tr
-                          key={index}
-                          className="hover:bg-gray-50 transition-colors group cursor-pointer"
-                          onClick={() => {
-                            setSelectedScenario(scenario);
-                            setCurrentView("scenario-details");
-                          }}
-                        >
-                          <td className="p-3 pl-4 text-sm font-medium text-gray-800">
-                            {scenario.scenarioName}
-                          </td>
-                          <td className="p-3">
-                            <span
-                              className={`text-xs px-2.5 py-1 rounded-full font-medium ${
-                                scenario.status === "Completed"
-                                  ? "bg-green-100 text-green-700"
-                                  : "bg-blue-50 text-blue-600"
-                              }`}
-                            >
-                              {scenario.status}
-                            </span>
-                          </td>
-                          <td className="p-3 pr-4 text-sm font-bold text-gray-800 text-right">
-                            {scenario.highestScore !== null
-                              ? `${scenario.highestScore}%`
-                              : "N/A"}
-                          </td>
-                        </tr>
-                      ))
-                    ) : (
-                      <tr>
-                        <td
-                          colSpan="3"
-                          className="p-8 text-center text-gray-400"
-                        >
-                          No scenarios assigned yet
-                        </td>
-                      </tr>
-                    )}
-                  </tbody>
-                </table>
-              </div>
-            </div>
-
-            <div className="bg-white p-6 rounded-xl shadow-sm border border-gray-100">
-              <h3 className="font-semibold text-gray-800 mb-4">Notice Board</h3>
-              <div className="space-y-5">
-                {notices.map((notice, index) => (
-                  <div
-                    key={index}
-                    className="flex gap-4 items-start relative group"
-                  >
-                    <div
-                      className={`p-2.5 rounded-lg shrink-0 ${notice.color}`}
-                    >
-                      {notice.icon === "alert" && <AlertCircle size={18} />}
-                      {notice.icon === "calendar" && <Calendar size={18} />}
-                      {notice.icon === "bell" && <Bell size={18} />}
-                      {notice.icon === "star" && <CheckCircle size={18} />}
-                    </div>
-                    <div className="flex-1 min-w-0">
-                      <div className="text-sm font-semibold text-gray-800 truncate">
-                        {notice.title}
-                      </div>
-                      <div className="text-xs text-gray-500 mt-0.5 truncate">
-                        {notice.sub}
-                      </div>
-                    </div>
-                    <button className="text-gray-300 hover:text-gray-600 transition-colors">
-                      <MoreHorizontal size={16} />
-                    </button>
-                  </div>
-                ))}
-              </div>
-            </div>
-          </div>
-        </React.Fragment>
-      )}
-
-      {currentView === "scenarios" && (
-        <div className="animate-in fade-in duration-300">
-          <button
-            onClick={() => setCurrentView("dashboard")}
-            className="flex items-center gap-2 text-sm text-gray-500 hover:text-gray-900 mb-6 transition-colors"
-          >
-            <ChevronLeft size={16} /> Back to Dashboard
-          </button>
-          <ScenarioManagementControlsStudent
-            searchTerm={searchTerm}
-            onSearchChange={setSearchTerm}
-            onApplyFilters={setFilters}
-            initialFilters={filters}
-            sortConfig={sortConfig}
-            onSortChange={(key, direction) =>
-              setSortConfig(key ? { key, direction } : null)
-            }
-          />
-          <ScenarioTableStudent data={filteredScenarios} />
-        </div>
-      )}
-
-      {currentView === "scenario-details" && (
-        <div className="animate-in fade-in duration-300">
-          <StudentScenarioDetails onBack={() => setCurrentView("scenarios")} />
-        </div>
-      )}
-    </div>
-  );
-}
-
-function StatCard({ title, value, sub, subValue }) {
-  return (
-    <div className="bg-white p-6 rounded-xl shadow-sm border border-gray-100 hover:shadow-md transition-shadow">
-      <h4 className="text-sm text-gray-500 font-medium mb-2">{title}</h4>
-      <div className="text-3xl font-bold text-gray-900 mb-2">{value}</div>
-      <div className="text-xs text-gray-400">
-        {sub}
-        {subValue !== null && (
-          <span className="font-medium text-gray-600"> ({subValue})</span>
-        )}
+  if (loading)
+    return (
+      <div className="p-10 text-muted-foreground animate-pulse">
+        Loading dashboard...
       </div>
+    );
+
+  return (
+    <div className="flex-1 min-h-screen bg-slate-50/50">
+      {/* --- TOP NAV --- */}
+      <header className="h-20 bg-white border-b flex items-center justify-between px-10 sticky top-0 z-20">
+        <div className="relative w-96">
+          <Search
+            className="absolute left-3 top-1/2 -translate-y-1/2 text-muted-foreground"
+            size={18}
+          />
+          <Input
+            placeholder="Search courses, assignments..."
+            className="pl-10 bg-slate-100 border-none rounded-lg"
+          />
+        </div>
+
+        <div className="flex items-center gap-6">
+          <Badge
+            variant="secondary"
+            className="bg-indigo-50 text-indigo-700 hover:bg-indigo-100 px-4 py-1.5 gap-2 border-none font-bold"
+          >
+            <Trophy size={14} /> Level 12 | 2,450 pts
+          </Badge>
+          <div className="relative cursor-pointer text-slate-400 hover:text-indigo-600 transition-colors">
+            <Bell size={22} />
+            <span className="absolute top-0 right-0 w-2.5 h-2.5 bg-red-500 rounded-full border-2 border-white" />
+          </div>
+          <div className="flex items-center gap-3 border-l pl-6">
+            <div className="text-right">
+              <p className="text-sm font-black text-slate-900 leading-none">
+                {user?.name}
+              </p>
+              <p className="text-[10px] text-muted-foreground mt-1 uppercase font-bold tracking-tighter">
+                Student
+              </p>
+            </div>
+            <Avatar className="h-10 w-10 border rounded-xl">
+              <AvatarImage
+                src={`https://ui-avatars.com/api/?name=${user?.name}&background=6366f1&color=fff`}
+              />
+              <AvatarFallback>{user?.name?.charAt(0)}</AvatarFallback>
+            </Avatar>
+          </div>
+        </div>
+      </header>
+
+      <main className="p-10 max-w-7xl mx-auto space-y-10">
+        <div className="grid grid-cols-1 lg:grid-cols-12 gap-8">
+          {/* --- HERO SECTION --- */}
+          <Card className="lg:col-span-8 border-none shadow-sm bg-white p-2">
+            <CardHeader className="p-8 pb-4">
+              <CardTitle className="text-4xl font-black tracking-tight text-slate-900">
+                Welcome back, {user?.name.split(" ")[0]}!
+              </CardTitle>
+              <CardDescription className="text-lg mt-4 max-w-md leading-relaxed text-slate-500 font-medium">
+                You're making great progress. You have{" "}
+                <span className="font-bold text-slate-900">
+                  {studentStats.availableCount} assignments
+                </span>{" "}
+                due this week.
+              </CardDescription>
+            </CardHeader>
+            <CardContent className="p-8 pt-0 flex flex-col justify-end h-full">
+              <div className="mt-12">
+                <Button
+                  size="lg"
+                  className="bg-[#6366F1] hover:bg-[#5558E3] rounded-2xl px-10 h-14 font-black shadow-indigo-100 shadow-xl transition-all active:scale-95"
+                >
+                  Continue Learning <ArrowRight className="ml-3" size={20} />
+                </Button>
+              </div>
+            </CardContent>
+          </Card>
+
+          {/* --- DEADLINES --- */}
+          <Card className="lg:col-span-4 border-none shadow-sm">
+            <CardHeader className="flex flex-row items-center justify-between">
+              <CardTitle className="text-xl font-black">
+                Upcoming Deadlines
+              </CardTitle>
+              <Calendar size={20} className="text-muted-foreground" />
+            </CardHeader>
+            <CardContent className="space-y-4">
+              <div className="bg-[#FFF8F8] border-l-4 border-red-500 p-5 rounded-2xl">
+                <div className="flex justify-between items-start mb-2">
+                  <span className="text-sm font-black text-slate-900">
+                    15-Day Check-in
+                  </span>
+                  <Badge className="bg-red-100 text-red-600 hover:bg-red-100 text-[10px] font-black border-none">
+                    URGENT
+                  </Badge>
+                </div>
+                <p className="text-xs text-slate-500 mb-4">
+                  Intro to Artificial Intelligence
+                </p>
+                <div className="flex items-center gap-2 text-red-600 text-xs font-bold">
+                  <Clock size={14} /> 18h 42m remaining
+                </div>
+              </div>
+            </CardContent>
+          </Card>
+        </div>
+
+        {/* --- COURSE GRID --- */}
+        <section>
+          <h2 className="text-2xl font-black text-slate-900 mb-8">
+            Current Courses
+          </h2>
+          <div className="grid grid-cols-1 md:grid-cols-3 gap-8">
+            {[
+              {
+                title: "Advanced ML",
+                code: "CS-401",
+                icon: PlayCircle,
+                progress: 85,
+                color: "text-blue-500",
+              },
+              {
+                title: "Data Ethics",
+                code: "PHI-202",
+                icon: BookOpen,
+                progress: 42,
+                color: "text-green-500",
+              },
+              {
+                title: "Cloud Systems",
+                code: "ENG-305",
+                icon: FileText,
+                progress: 68,
+                color: "text-orange-500",
+              },
+            ].map((course, i) => (
+              <Card
+                key={i}
+                className="border-none shadow-sm group hover:shadow-xl transition-all duration-300 rounded-[32px]"
+              >
+                <CardHeader className="flex flex-row items-start justify-between">
+                  <div
+                    className={`p-3 rounded-2xl bg-slate-50 ${course.color}`}
+                  >
+                    <course.icon size={24} />
+                  </div>
+                  <Badge
+                    variant="outline"
+                    className="font-black border-slate-100"
+                  >
+                    {course.progress}%
+                  </Badge>
+                </CardHeader>
+                <CardContent>
+                  <CardTitle className="text-xl font-black group-hover:text-indigo-600 transition-colors">
+                    {course.title}
+                  </CardTitle>
+                  <p className="text-xs text-muted-foreground font-bold mt-2">
+                    {course.code} • Prof. Chen
+                  </p>
+                  <div className="mt-8 pt-4 border-t border-slate-50 flex items-center gap-2 text-xs font-bold text-slate-800">
+                    <course.icon size={14} className="text-indigo-600" /> Next:
+                    Module 4 Session
+                  </div>
+                </CardContent>
+              </Card>
+            ))}
+          </div>
+        </section>
+
+        {/* --- STATS --- */}
+        <section className="grid grid-cols-1 lg:grid-cols-2 gap-8">
+          <Card className="border-none shadow-sm p-8 flex items-center gap-8 rounded-[32px]">
+            <div className="w-20 h-20 rounded-full border-[6px] border-green-50 flex items-center justify-center relative">
+              <TrendingUp className="text-green-500" size={28} />
+              <div className="absolute inset-0 rounded-full border-t-[6px] border-green-500 border-l-[6px]" />
+            </div>
+            <div>
+              <p className="text-[10px] font-black text-muted-foreground uppercase tracking-widest">
+                Current GPA
+              </p>
+              <div className="flex items-baseline gap-2 mt-1">
+                <span className="text-4xl font-black text-slate-900">3.85</span>
+                <span className="text-sm font-bold text-slate-300">/ 4.0</span>
+              </div>
+            </div>
+          </Card>
+
+          <Card className="border-none shadow-sm p-8 flex justify-between items-center rounded-[32px]">
+            <div>
+              <p className="text-[10px] font-black text-muted-foreground uppercase tracking-widest">
+                Completed Sessions
+              </p>
+              <h3 className="text-4xl font-black text-slate-900 mt-1">
+                {studentStats.completedCount}
+              </h3>
+            </div>
+            <div className="h-16 w-32">
+              <ResponsiveContainer width="100%" height="100%">
+                <BarChart data={ACTIVITY_DATA.map((v) => ({ val: v }))}>
+                  <Bar dataKey="val" radius={[3, 3, 0, 0]}>
+                    {ACTIVITY_DATA.map((_, index) => (
+                      <Cell
+                        key={`cell-${index}`}
+                        fill={index === 6 ? "#4F46E5" : "#C7D2FE"}
+                      />
+                    ))}
+                  </Bar>
+                </BarChart>
+              </ResponsiveContainer>
+            </div>
+          </Card>
+        </section>
+      </main>
     </div>
   );
 }
-
-export default StudentDashboard;

@@ -1,7 +1,7 @@
 import React, { useState, useMemo, useEffect } from "react";
 import { useSelector, useDispatch } from "react-redux";
 
-import ScenarioManagementControls from "../../educator/scenarios/ScenarioManagementControls.jsx";
+import ScenarioManagementControls from "../../educator/scenarios/CourseManagementControl.jsx";
 import ScenarioTable from "../../educator/scenarios/ScenarioTable.jsx";
 
 import { fetchScenarios } from "../../../redux/slices/scenarioSlice.js";

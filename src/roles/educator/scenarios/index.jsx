@@ -3,7 +3,7 @@ import { useSelector, useDispatch } from "react-redux";
 import { useNavigate } from "react-router-dom";
 import { useAuth } from "../../../AuthContext";
 
-import ScenarioManagementControls from "./ScenarioManagementControls.jsx";
+import ScenarioManagementControls from "./CourseManagementControl.jsx";
 import ScenarioTable from "./ScenarioTable.jsx";
 // import AssignScenariosModal from "../../components/shared/AssignScenariosModal";
 
