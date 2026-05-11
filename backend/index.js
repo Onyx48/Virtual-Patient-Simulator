@@ -40,6 +40,14 @@ app.get("/", (req, res) => {
   res.json({ message: "Backend server (Single User Model) is running!" });
 });
 
+app.get("/debug/env", (req, res) => {
+  res.json({
+    AWS_REGION: process.env.AWS_REGION,
+    EMAIL_FROM: process.env.EMAIL_FROM,
+    AWS_ACCESS_KEY_ID: process.env.AWS_ACCESS_KEY_ID ? "present" : "missing"
+  });
+});
+
 app.use("*", (req, res) => {
   res.status(404).json({
     message: `Cannot ${req.method} ${req.originalUrl} - Route not found`,

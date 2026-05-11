@@ -1,43 +1,123 @@
-import nodemailer from "nodemailer";
+import { SESClient, SendEmailCommand } from "@aws-sdk/client-ses";
 import "dotenv/config";
 
-const transporter = nodemailer.createTransport({
-  host: process.env.EMAIL_HOST,
-  port: parseInt(process.env.EMAIL_PORT || "587", 10),
-  secure: process.env.EMAIL_SECURE === "true", // true for 465, false for other ports (like 587 with STARTTLS)
-  auth: {
-    user: process.env.EMAIL_USER,
-    pass: process.env.EMAIL_PASS,
+console.log("📧 Email Service Init - AWS_REGION:", process.env.AWS_REGION);
+console.log("📧 Email Service Init - EMAIL_FROM:", process.env.EMAIL_FROM);
+console.log("📧 Email Service Init - AWS_ACCESS_KEY_ID:", process.env.AWS_ACCESS_KEY_ID ? "SET" : "UNDEFINED");
+
+const sesClient = new SESClient({
+  region: process.env.AWS_REGION,
+  credentials: {
+    accessKeyId: process.env.AWS_ACCESS_KEY_ID,
+    secretAccessKey: process.env.AWS_SECRET_ACCESS_KEY,
   },
-  // For services like Gmail, you might need to allow "less secure app access"
-  // or use an "App Password" if 2FA is enabled.
-  // tls: {
-  //     rejectUnauthorized: false // Often needed for local development or self-signed certs
-  // }
 });
 
+// ─── OTP Email ───
 export const sendOTPEmail = async (toEmail, otp) => {
-  const mailOptions = {
-    from: process.env.EMAIL_FROM,
-    to: toEmail,
-    subject: "Your One-Time Password (OTP)",
-    html: `
+  console.log("[EMAIL] sendOTPEmail called — to:", toEmail, "otp:", otp);
+  console.log("[EMAIL] Using EMAIL_FROM:", process.env.EMAIL_FROM);
+  console.log("[EMAIL] Using AWS_REGION:", process.env.AWS_REGION);
+  console.log("[EMAIL] AWS_ACCESS_KEY_ID set:", !!process.env.AWS_ACCESS_KEY_ID);
+  const command = new SendEmailCommand({
+    Source: process.env.EMAIL_FROM, // must be a verified SES identity
+    Destination: { ToAddresses: [toEmail] },
+    Message: {
+      Subject: { Data: "Your One-Time Password (OTP)" },
+      Body: {
+        Html: {
+          Data: `
             <div style="font-family: Arial, sans-serif; line-height: 1.6;">
-                <h2>Your OTP Code</h2>
-                <p>Please use the following OTP to proceed. This OTP is valid for 5 minutes.</p>
-                <p style="font-size: 24px; font-weight: bold; letter-spacing: 2px; color: #333;">${otp}</p>
-                <p>If you did not request this OTP, please ignore this email.</p>
-                <p>Thanks,<br/>Your App Team</p>
-            </div>
-        `,
-  };
+              <h2>Your OTP Code</h2>
+              <p>Use the following OTP to proceed. It is valid for <strong>5 minutes</strong>.</p>
+              <p style="font-size:28px;font-weight:bold;letter-spacing:4px;color:#333;">
+                ${otp}
+              </p>
+              <p>If you did not request this, please ignore this email.</p>
+              <p>Thanks,<br/>Your App Team</p>
+            </div>`,
+        },
+      },
+    },
+  });
 
   try {
-    const info = await transporter.sendMail(mailOptions);
-    console.log("OTP Email sent: " + info.response);
+    console.log("[EMAIL] Sending OTP email via SES...");
+    const result = await sesClient.send(command);
+    console.log("[EMAIL] OTP email sent. MessageId:", result.MessageId);
     return true;
   } catch (error) {
-    console.error("Error sending OTP email:", error);
-    return false;
+    console.error("[EMAIL] Error sending OTP email via SES:", error);
+    throw error;
+  }
+};
+
+// Welcome Email
+export const sendWelcomeEmail = async ({ toEmail, name, password }) => {
+  console.log("[EMAIL] sendWelcomeEmail called — to:", toEmail, "name:", name);
+  console.log("[EMAIL] Using EMAIL_FROM:", process.env.EMAIL_FROM);
+  console.log("[EMAIL] Using AWS_REGION:", process.env.AWS_REGION);
+  console.log("[EMAIL] AWS_ACCESS_KEY_ID set:", !!process.env.AWS_ACCESS_KEY_ID);
+  const command = new SendEmailCommand({
+    Source: process.env.EMAIL_FROM,
+    Destination: { ToAddresses: [toEmail] },
+    Message: {
+      Subject: { Data: "Welcome — Your Account Has Been Created" },
+      Body: {
+        Html: {
+          Data: `
+            <div style="font-family:Arial,sans-serif;max-width:520px;margin:0 auto;
+                        border:1px solid #e5e7eb;border-radius:8px;overflow:hidden;">
+
+              <!-- Header -->
+              <div style="background:#4F46E5;padding:28px 32px;">
+                <h1 style="margin:0;color:#fff;font-size:22px;">Welcome to the Platform</h1>
+              </div>
+
+              <!-- Body -->
+              <div style="padding:28px 32px;color:#374151;">
+                <p style="margin-top:0;">Hi <strong>${name}</strong>,</p>
+               <p>Your profile has been created. Here are your login credentials:</p>
+                <!-- Credentials box -->
+                <div style="background:#F9FAFB;border:1px solid #E5E7EB;
+                            border-radius:6px;padding:16px 20px;margin:20px 0;">
+                  <table style="width:100%;border-collapse:collapse;font-size:14px;">
+                    <tr>
+                      <td style="padding:6px 0;color:#6B7280;width:110px;">Email</td>
+                      <td style="padding:6px 0;font-weight:600;color:#111827;">${toEmail}</td>
+                    </tr>
+                    <tr>
+                      <td style="padding:6px 0;color:#6B7280;">Password</td>
+                      <td style="padding:6px 0;font-weight:600;color:#111827;
+                                 letter-spacing:1px;">${password}</td>
+                    </tr>
+                  </table>
+                </div>
+
+
+                <p style="margin-bottom:0;margin-top:24px;font-size:13px;color:#6B7280;">
+                  If you did not expect this email, contact your administrator immediately.
+                </p>
+              </div>
+
+              <!-- Footer -->
+              <div style="background:#F3F4F6;padding:16px 32px;
+                          font-size:12px;color:#9CA3AF;text-align:center;">
+                © ${new Date().getFullYear()} Your App. All rights reserved.
+              </div>
+            </div>`,
+        },
+      },
+    },
+  });
+
+  try {
+    console.log("[EMAIL] Sending welcome email via SES...");
+    const result = await sesClient.send(command);
+    console.log("[EMAIL] Welcome email sent. MessageId:", result.MessageId);
+    return true;
+  } catch (error) {
+    console.error("[EMAIL] Error sending welcome email via SES:", error);
+    throw error;
   }
 };

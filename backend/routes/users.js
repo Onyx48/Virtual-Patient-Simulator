@@ -3,6 +3,7 @@ import User from "../models/userModel.js";
 import School from "../models/schoolModel.js";
 import { protect } from "../middleware/authMiddleware.js";
 import { checkAccess } from "../middleware/roleAccessMiddleware.js";
+import { sendWelcomeEmail } from "../utils/emailService.js";
 
 const router = express.Router();
 
@@ -33,6 +34,7 @@ router.get("/", protect, checkAccess("manageUsers"), async (req, res) => {
 });
 
 router.post("/", protect, checkAccess("manageUsers"), async (req, res) => {
+  console.log("[USERS] POST route hit. Body:", req.body);
   try {
     const { name, email, password, role, schoolId, department } = req.body;
     console.log("Creating user. Department:", department, "Role:", role);
@@ -121,6 +123,12 @@ router.post("/", protect, checkAccess("manageUsers"), async (req, res) => {
 
     const newUser = new User(userData);
     await newUser.save();
+    console.log("[USER] Calling sendWelcomeEmail for user:", email);
+    sendWelcomeEmail({
+      toEmail: email,
+      name,
+      password,
+    }).catch((err) => console.error("[USER] Welcome email failed:", err));
 
     if (normalizedRole === "school_admin") {
       await School.findByIdAndUpdate(finalSchoolId, {

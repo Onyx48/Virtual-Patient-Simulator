@@ -9,6 +9,7 @@ import jwt from "jsonwebtoken";
 import multer from "multer";
 import path from "path";
 import { protect } from "../middleware/authMiddleware.js";
+import { sendWelcomeEmail } from "../utils/emailService.js";
 
 const router = express.Router();
 
@@ -163,9 +164,12 @@ router.post(
       .withMessage("Invalid School ID"),
   ],
   async (req, res) => {
+    console.log("[REGISTER] Route hit. Body:", req.body);
     const errors = validationResult(req);
-    if (!errors.isEmpty())
+    if (!errors.isEmpty()) {
+      console.log("[REGISTER] Validation errors:", errors.array());
       return res.status(400).json({ errors: errors.array() });
+    }
 
     const { name, email, password, roleToCreate, creatorRole, schoolId } =
       req.body;
@@ -206,6 +210,19 @@ router.post(
         ...(schoolId && { schoolId }),
       });
       await user.save();
+      if (creatorRole) {
+        console.log("[AUTH] Calling sendWelcomeEmail for:", lowerEmail);
+        sendWelcomeEmail({ toEmail: lowerEmail, name, password }).catch((err) =>
+          console.error("[AUTH] Welcome email failed:", err),
+        );
+      }
+
+      console.log("[AUTH] Calling sendWelcomeEmail for user:", lowerEmail);
+      sendWelcomeEmail({
+        toEmail: lowerEmail,
+        name,
+        password,
+      }).catch((err) => console.error("[AUTH] Welcome email failed:", err));
 
       res.status(201).json({
         _id: user._id,
@@ -286,7 +303,9 @@ router.post(
 
       const otp = generateOTP();
       await storeOTPAndAttempts(lowerEmail, otp);
-      await sendOTPEmail(lowerEmail, otp);
+      sendOTPEmail(lowerEmail, otp)
+        .then(() => console.log("[AUTH] OTP email sent successfully"))
+        .catch((err) => console.error("[AUTH] OTP email failed:", err));
 
       res.status(200).json({ message: "OTP sent." });
     } catch (error) {
