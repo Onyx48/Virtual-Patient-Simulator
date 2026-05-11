@@ -123,7 +123,6 @@ router.post("/", protect, checkAccess("manageUsers"), async (req, res) => {
 
     const newUser = new User(userData);
     await newUser.save();
-    console.log("[USER] Calling sendWelcomeEmail for user:", email);
     sendWelcomeEmail({
       toEmail: email,
       name,

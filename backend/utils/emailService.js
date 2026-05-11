@@ -1,10 +1,6 @@
 import { SESClient, SendEmailCommand } from "@aws-sdk/client-ses";
 import "dotenv/config";
 
-console.log("📧 Email Service Init - AWS_REGION:", process.env.AWS_REGION);
-console.log("📧 Email Service Init - EMAIL_FROM:", process.env.EMAIL_FROM);
-console.log("📧 Email Service Init - AWS_ACCESS_KEY_ID:", process.env.AWS_ACCESS_KEY_ID ? "SET" : "UNDEFINED");
-
 const sesClient = new SESClient({
   region: process.env.AWS_REGION,
   credentials: {
@@ -15,10 +11,6 @@ const sesClient = new SESClient({
 
 // ─── OTP Email ───
 export const sendOTPEmail = async (toEmail, otp) => {
-  console.log("[EMAIL] sendOTPEmail called — to:", toEmail, "otp:", otp);
-  console.log("[EMAIL] Using EMAIL_FROM:", process.env.EMAIL_FROM);
-  console.log("[EMAIL] Using AWS_REGION:", process.env.AWS_REGION);
-  console.log("[EMAIL] AWS_ACCESS_KEY_ID set:", !!process.env.AWS_ACCESS_KEY_ID);
   const command = new SendEmailCommand({
     Source: process.env.EMAIL_FROM, // must be a verified SES identity
     Destination: { ToAddresses: [toEmail] },
@@ -42,9 +34,7 @@ export const sendOTPEmail = async (toEmail, otp) => {
   });
 
   try {
-    console.log("[EMAIL] Sending OTP email via SES...");
     const result = await sesClient.send(command);
-    console.log("[EMAIL] OTP email sent. MessageId:", result.MessageId);
     return true;
   } catch (error) {
     console.error("[EMAIL] Error sending OTP email via SES:", error);
@@ -54,10 +44,6 @@ export const sendOTPEmail = async (toEmail, otp) => {
 
 // Welcome Email
 export const sendWelcomeEmail = async ({ toEmail, name, password }) => {
-  console.log("[EMAIL] sendWelcomeEmail called — to:", toEmail, "name:", name);
-  console.log("[EMAIL] Using EMAIL_FROM:", process.env.EMAIL_FROM);
-  console.log("[EMAIL] Using AWS_REGION:", process.env.AWS_REGION);
-  console.log("[EMAIL] AWS_ACCESS_KEY_ID set:", !!process.env.AWS_ACCESS_KEY_ID);
   const command = new SendEmailCommand({
     Source: process.env.EMAIL_FROM,
     Destination: { ToAddresses: [toEmail] },
@@ -66,55 +52,56 @@ export const sendWelcomeEmail = async ({ toEmail, name, password }) => {
       Body: {
         Html: {
           Data: `
-            <div style="font-family:Arial,sans-serif;max-width:520px;margin:0 auto;
-                        border:1px solid #e5e7eb;border-radius:8px;overflow:hidden;">
+  <div style="font-family:Arial,sans-serif;max-width:520px;margin:0 auto;
+              border:1px solid #e5e7eb;border-radius:8px;overflow:hidden;">
 
-              <!-- Header -->
-              <div style="background:#4F46E5;padding:28px 32px;">
-                <h1 style="margin:0;color:#fff;font-size:22px;">Welcome to the Platform</h1>
-              </div>
+    <!-- Header -->
+    <div style="background:#4F46E5;padding:28px 32px;">
+      <h1 style="margin:0;color:#fff;font-size:22px;">Welcome to the Platform</h1>
+    </div>
 
-              <!-- Body -->
-              <div style="padding:28px 32px;color:#374151;">
-                <p style="margin-top:0;">Hi <strong>${name}</strong>,</p>
-               <p>Your profile has been created. Here are your login credentials:</p>
-                <!-- Credentials box -->
-                <div style="background:#F9FAFB;border:1px solid #E5E7EB;
-                            border-radius:6px;padding:16px 20px;margin:20px 0;">
-                  <table style="width:100%;border-collapse:collapse;font-size:14px;">
-                    <tr>
-                      <td style="padding:6px 0;color:#6B7280;width:110px;">Email</td>
-                      <td style="padding:6px 0;font-weight:600;color:#111827;">${toEmail}</td>
-                    </tr>
-                    <tr>
-                      <td style="padding:6px 0;color:#6B7280;">Password</td>
-                      <td style="padding:6px 0;font-weight:600;color:#111827;
-                                 letter-spacing:1px;">${password}</td>
-                    </tr>
-                  </table>
-                </div>
+    <!-- Body -->
+    <div style="padding:28px 32px;color:#374151;">
+      <p style="margin-top:0;">Hi <strong>${name}</strong>,</p>
+      <p>Your profile has been created. Here are your login credentials:</p>
 
+      <!-- Credentials box -->
+      <div style="background:#F9FAFB;border:1px solid #E5E7EB;
+                  border-radius:6px;padding:16px 20px;margin:20px 0;">
 
-                <p style="margin-bottom:0;margin-top:24px;font-size:13px;color:#6B7280;">
-                  If you did not expect this email, contact your administrator immediately.
-                </p>
-              </div>
+        <!-- Email row -->
+        <div style="margin-bottom:12px;">
+          <div style="font-size:12px;color:#6B7280;margin-bottom:2px;">Email</div>
+          <div style="font-size:14px;font-weight:600;color:#111827;word-break:break-all;">${toEmail}</div>
+        </div>
 
-              <!-- Footer -->
-              <div style="background:#F3F4F6;padding:16px 32px;
-                          font-size:12px;color:#9CA3AF;text-align:center;">
-                © ${new Date().getFullYear()} Your App. All rights reserved.
-              </div>
-            </div>`,
+        <!-- Password row -->
+        <div>
+          <div style="font-size:12px;color:#6B7280;margin-bottom:2px;">Password</div>
+          <div style="font-size:14px;font-weight:600;color:#111827;letter-spacing:1px;">${password}</div>
+        </div>
+
+      </div>
+
+      <p style="margin-bottom:0;margin-top:24px;font-size:13px;color:#6B7280;">
+        If you did not expect this email, contact your administrator immediately.
+      </p>
+    </div>
+
+    <!-- Footer -->
+    <div style="background:#F3F4F6;padding:16px 32px;
+                font-size:12px;color:#9CA3AF;text-align:center;">
+      © ${new Date().getFullYear()} Your App. All rights reserved.
+    </div>
+
+  </div>`,
         },
       },
     },
   });
 
   try {
-    console.log("[EMAIL] Sending welcome email via SES...");
     const result = await sesClient.send(command);
-    console.log("[EMAIL] Welcome email sent. MessageId:", result.MessageId);
     return true;
   } catch (error) {
     console.error("[EMAIL] Error sending welcome email via SES:", error);

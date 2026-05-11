@@ -303,9 +303,9 @@ router.post(
 
       const otp = generateOTP();
       await storeOTPAndAttempts(lowerEmail, otp);
-      sendOTPEmail(lowerEmail, otp)
-        .then(() => console.log("[AUTH] OTP email sent successfully"))
-        .catch((err) => console.error("[AUTH] OTP email failed:", err));
+      sendOTPEmail(lowerEmail, otp).catch((err) =>
+        console.error("OTP email failed:", err),
+      );
 
       res.status(200).json({ message: "OTP sent." });
     } catch (error) {

@@ -11,7 +11,7 @@ export default defineConfig({
     allowedHosts: ["vpsdashboard.metawingsxr.com"],
     proxy: {
       "/api": {
-        target: "http://localhost:5001", // "https://vpsbackend.metawingsxr.com/"
+        target: "https://vpsbackend.metawingsxr.com/",
         changeOrigin: true,
       },
     },
