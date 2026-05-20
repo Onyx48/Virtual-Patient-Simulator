@@ -6,7 +6,7 @@ import {
   FunnelIcon,
   PlusIcon,
   PencilSquareIcon,
-  UserCircleIcon,
+  TrashIcon,
   ChevronLeftIcon,
   ChevronRightIcon,
   ArrowUpTrayIcon,
@@ -15,6 +15,7 @@ import {
 import StudentModal from "../StudentModal";
 import AssignScenariosModal from "./AssignScenariosModal";
 import TranscriptViewerModal from "../ui/TranscriptViewerModal";
+import ConfirmationModal from "../ui/ConfirmationModal";
 import { toast } from "react-hot-toast";
 import { useAuth } from "../../AuthContext";
 
@@ -36,6 +37,11 @@ function StudentPage({ role }) {
   const [isAssignModalOpen, setIsAssignModalOpen] = useState(false);
   const [selectedStudent, setSelectedStudent] = useState(null);
   const [editingStudent, setEditingStudent] = useState(null);
+
+  const [isConfirmModalOpen, setIsConfirmModalOpen] = useState(false);
+  const [confirmTitle, setConfirmTitle] = useState("");
+  const [confirmMessage, setConfirmMessage] = useState("");
+  const [onConfirmAction, setOnConfirmAction] = useState(() => {});
 
   const [currentPage, setCurrentPage] = useState(1);
   const itemsPerPage = 8;
@@ -188,6 +194,24 @@ function StudentPage({ role }) {
   const handleEdit = (student) => {
     setEditingStudent(student);
     setIsStudentModalOpen(true);
+  };
+
+  const handleDelete = (id) => {
+    setConfirmTitle("Delete Student");
+    setConfirmMessage("Are you sure you want to delete this student?");
+    setOnConfirmAction(() => async () => {
+      try {
+        await axios.delete(`/api/users/${id}`, getAuthHeaders());
+        setStudents((prev) => prev.filter((s) => s.id !== id));
+        toast.success("Student deleted successfully");
+      } catch (error) {
+        toast.error(
+          "Failed to delete student: " +
+            (error.response?.data?.message || error.message),
+        );
+      }
+    });
+    setIsConfirmModalOpen(true);
   };
 
   const handleSaveStudent = async (formData) => {
@@ -389,18 +413,24 @@ function StudentPage({ role }) {
                   <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500">
                     <div className="flex items-center gap-4">
                       {role !== "school_admin" && (
-                        <button
-                          onClick={() => handleEdit(student)}
-                          className="flex items-center gap-1.5 text-gray-500 hover:text-gray-900 transition-colors"
-                        >
-                          <PencilSquareIcon className="w-4 h-4" />
-                          Edit
-                        </button>
+                        <>
+                          <button
+                            onClick={() => handleEdit(student)}
+                            className="flex items-center gap-1.5 text-gray-500 hover:text-gray-900 transition-colors"
+                          >
+                            <PencilSquareIcon className="w-4 h-4" />
+                            Edit
+                          </button>
+                          {/* 5. Replace Profile button with Delete button */}
+                          <button
+                            onClick={() => handleDelete(student.id)}
+                            className="flex items-center gap-1.5 text-red-400 hover:text-red-600 transition-colors"
+                          >
+                            <TrashIcon className="w-4 h-4" />
+                            Delete
+                          </button>
+                        </>
                       )}
-                      <button className="flex items-center gap-1.5 text-gray-500 hover:text-gray-900 transition-colors">
-                        <UserCircleIcon className="w-4 h-4" />
-                        Profile
-                      </button>
                     </div>
                   </td>
                 </tr>
@@ -435,7 +465,11 @@ function StudentPage({ role }) {
               <button
                 key={idx}
                 onClick={() => setCurrentPage(idx + 1)}
-                className={`w-8 h-8 rounded-lg text-sm font-medium transition-colors ${currentPage === idx + 1 ? "bg-orange-500 text-white shadow-sm" : "text-gray-600 hover:bg-gray-100"}`}
+                className={`w-8 h-8 rounded-lg text-sm font-medium transition-colors ${
+                  currentPage === idx + 1
+                    ? "bg-orange-500 text-white shadow-sm"
+                    : "text-gray-600 hover:bg-gray-100"
+                }`}
               >
                 {idx + 1}
               </button>
@@ -492,6 +526,17 @@ function StudentPage({ role }) {
           student={selectedStudent}
         />
       )}
+
+      <ConfirmationModal
+        isOpen={isConfirmModalOpen}
+        onClose={() => setIsConfirmModalOpen(false)}
+        onConfirm={() => {
+          onConfirmAction();
+          setIsConfirmModalOpen(false);
+        }}
+        title={confirmTitle}
+        message={confirmMessage}
+      />
     </div>
   );
 }
