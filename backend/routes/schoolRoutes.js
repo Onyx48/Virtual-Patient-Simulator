@@ -2,19 +2,20 @@
 import express from "express";
 import { body, validationResult } from "express-validator";
 import School from "../models/schoolModel.js";
+import User from "../models/userModel.js";
+import Student from "../models/studentModel.js";
+import Session from "../models/sessionModel.js";
 import { protect } from "../middleware/authMiddleware.js";
 import { checkAccess } from "../middleware/roleAccessMiddleware.js";
 
 const router = express.Router();
 
-// Helper to parse DD/MM/YYYY string to Date object
 const parseDateString = (dateString) => {
   if (!dateString) return null;
   const [day, month, year] = dateString.split("/").map(Number);
   return new Date(year, month - 1, day);
 };
 
-// --- Validation Middleware ---
 const schoolValidationRules = [
   body("schoolName", "School Name is required").notEmpty().trim(),
   body("email", "Please enter a valid email address")
@@ -213,7 +214,6 @@ router.put(
         return res.status(404).json({ message: "School not found." });
       }
 
-      // Update fields
       school.schoolName = schoolName;
       school.description = description;
       school.email = email;
@@ -253,11 +253,28 @@ router.delete(
   checkAccess("manageSchools"),
   async (req, res) => {
     try {
-      const school = await School.findByIdAndDelete(req.params.id);
+      const school = await School.findById(req.params.id);
       if (!school) {
         return res.status(404).json({ message: "School not found." });
       }
-      res.status(200).json({ message: "School deleted successfully." });
+
+      const schoolId = req.params.id;
+
+      await User.deleteMany({
+        schoolId: schoolId,
+        role: { $ne: "superadmin" },
+      });
+
+      await Student.deleteMany({ schoolId: schoolId });
+
+      await Session.deleteMany({ schoolId: schoolId });
+
+      // Finally delete the school
+      await School.findByIdAndDelete(schoolId);
+
+      res
+        .status(200)
+        .json({ message: "School and all related data deleted successfully." });
     } catch (err) {
       console.error("Delete School Error:", err);
       if (err.kind === "ObjectId") {

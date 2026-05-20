@@ -25,6 +25,7 @@ function SchoolsPage() {
   const [confirmTitle, setConfirmTitle] = useState("");
   const [confirmMessage, setConfirmMessage] = useState("");
   const [onConfirmAction, setOnConfirmAction] = useState(() => {});
+  const [isDeletingId, setIsDeletingId] = useState(null);
 
   const fetchSchools = useCallback(async () => {
     setIsLoading(true);
@@ -80,14 +81,18 @@ function SchoolsPage() {
   // Handle Delete
   const handleDeleteClick = (schoolId) => {
     setConfirmTitle("Delete School");
-    setConfirmMessage("Are you sure you want to delete this school?");
+    setConfirmMessage("Are you sure you want to delete this school? This action cannot be undone.");
     setOnConfirmAction(() => async () => {
+      setIsDeletingId(schoolId);
       try {
         await axios.delete(`/api/schools/${schoolId}`, getAuthHeaders());
+        toast.success("School deleted successfully.");
         fetchSchools();
       } catch (err) {
         console.error(err);
-        toast.error("Failed to delete school.");
+        toast.error(err.response?.data?.message || "Failed to delete school.");
+      } finally {
+        setIsDeletingId(null);
       }
     });
     setIsConfirmModalOpen(true);
@@ -137,6 +142,7 @@ function SchoolsPage() {
         onDeleteClick={handleDeleteClick}
         onSort={() => {}}
         canEdit={user?.role === "superadmin"}
+        isDeletingId={isDeletingId}
       />
 
       {isSchoolAdminModalOpen && (

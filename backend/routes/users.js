@@ -4,56 +4,55 @@ import School from "../models/schoolModel.js";
 import { protect } from "../middleware/authMiddleware.js";
 import { checkAccess } from "../middleware/roleAccessMiddleware.js";
 import { sendWelcomeEmail } from "../utils/emailService.js";
+import crypto from "crypto";
 
 const router = express.Router();
 
 console.log("User Model Status:", User ? "Loaded" : "FAILED IMPORT");
 
+// GET ALL USERS (with filters)
 router.get("/", protect, checkAccess("manageUsers"), async (req, res) => {
   try {
     let query = {};
-
     const { role, schoolId } = req.query;
     if (role) query.role = role;
     if (schoolId) query.schoolId = schoolId;
-
-    if (req.scope) {
-      if (req.scope.schoolId) {
-        query.schoolId = req.scope.schoolId;
-      }
+    if (req.scope?.schoolId) {
+      query.schoolId = req.scope.schoolId;
     }
-
     const users = await User.find(query)
       .select("-password")
       .populate("schoolId", "schoolName");
-
     res.status(200).json(users);
   } catch (err) {
     res.status(500).json({ message: err.message });
   }
 });
 
+// CREATE SINGLE USER
 router.post("/", protect, checkAccess("manageUsers"), async (req, res) => {
   console.log("[USERS] POST route hit. Body:", req.body);
   try {
-    const { name, email, password, role, schoolId, department } = req.body;
-    console.log("Creating user. Department:", department, "Role:", role);
+    let { password } = req.body;
+    const { name, email, role, schoolId, department } = req.body;
 
-    if (!name || !email || !password || !role) {
+    if (!name || !email || !role) {
       return res
         .status(400)
-        .json({ message: "Name, email, password, and role are required." });
+        .json({ message: "Name, email, and role are required." });
+    }
+    if (!password) {
+      password = crypto.randomBytes(8).toString("hex");
     }
 
     const normalizedRole = role.toLowerCase();
-
     const allowedRoles = ["student", "educator", "school_admin", "superadmin"];
     if (!allowedRoles.includes(normalizedRole)) {
-      return res.status(400).json({
-        message: `Invalid role '${role}'. Must be one of: ${allowedRoles.join(
-          ", ",
-        )}`,
-      });
+      return res
+        .status(400)
+        .json({
+          message: `Invalid role '${role}'. Must be one of: ${allowedRoles.join(", ")}`,
+        });
     }
 
     const allowedCreations = {
@@ -61,23 +60,24 @@ router.post("/", protect, checkAccess("manageUsers"), async (req, res) => {
       school_admin: ["educator", "student"],
       educator: ["student"],
     };
-
     if (!allowedCreations[req.user.role]?.includes(normalizedRole)) {
-      return res.status(403).json({
-        message: `${req.user.role} cannot create ${normalizedRole} role.`,
-      });
+      return res
+        .status(403)
+        .json({
+          message: `${req.user.role} cannot create ${normalizedRole} role.`,
+        });
     }
 
     if (normalizedRole === "school_admin") {
       const school = await School.findById(schoolId);
-      if (!school) {
+      if (!school)
         return res.status(400).json({ message: "Invalid school ID." });
-      }
-      if (school.assignedAdmin && school.assignedAdmin.id) {
-        return res.status(400).json({
-          message: "This school is already assigned to another school admin.",
-        });
-      }
+      if (school.assignedAdmin?.id)
+        return res
+          .status(400)
+          .json({
+            message: "This school is already assigned to another school admin.",
+          });
     }
 
     const userExists = await User.findOne({ email });
@@ -88,9 +88,7 @@ router.post("/", protect, checkAccess("manageUsers"), async (req, res) => {
     }
 
     let finalSchoolId = schoolId;
-    if (req.user.role === "school_admin") {
-      finalSchoolId = req.user.schoolId;
-    } else if (req.user.role === "educator") {
+    if (req.user.role === "school_admin" || req.user.role === "educator") {
       finalSchoolId = req.user.schoolId;
     }
 
@@ -98,9 +96,11 @@ router.post("/", protect, checkAccess("manageUsers"), async (req, res) => {
       (normalizedRole === "educator" || normalizedRole === "school_admin") &&
       !finalSchoolId
     ) {
-      return res.status(400).json({
-        message: "School ID is required for educators and school admins.",
-      });
+      return res
+        .status(400)
+        .json({
+          message: "School ID is required for educators and school admins.",
+        });
     }
 
     let supervisor = null;
@@ -117,17 +117,15 @@ router.post("/", protect, checkAccess("manageUsers"), async (req, res) => {
       password,
       role: normalizedRole,
       schoolId: finalSchoolId,
-      supervisor: supervisor,
+      supervisor,
       department: finalDepartment,
     };
-
     const newUser = new User(userData);
     await newUser.save();
-    sendWelcomeEmail({
-      toEmail: email,
-      name,
-      password,
-    }).catch((err) => console.error("[USER] Welcome email failed:", err));
+
+    sendWelcomeEmail({ toEmail: email, name, password }).catch((err) =>
+      console.error("[USER] Welcome email failed:", err),
+    );
 
     if (normalizedRole === "school_admin") {
       await School.findByIdAndUpdate(finalSchoolId, {
@@ -150,14 +148,105 @@ router.post("/", protect, checkAccess("manageUsers"), async (req, res) => {
     };
     res.status(201).json({ success: true, user: userResponse });
   } catch (err) {
-    if (err.name === "ValidationError") {
+    if (err.name === "ValidationError")
       return res.status(400).json({ message: err.message });
-    }
     console.error("Server Error in POST /api/users:", err);
     res.status(500).json({ message: err.message });
   }
 });
 
+// BULK CREATE USERS (STUDENTS OR EDUCATORS)
+router.post("/bulk", protect, checkAccess("manageUsers"), async (req, res) => {
+  const { users, role } = req.body;
+  const creator = req.user;
+
+  if (!users || !Array.isArray(users) || users.length === 0) {
+    return res
+      .status(400)
+      .json({ message: "User data is missing or not an array." });
+  }
+  if (!role || !["student", "educator"].includes(role)) {
+    return res
+      .status(400)
+      .json({
+        message:
+          "A valid role ('student' or 'educator') is required for bulk creation.",
+      });
+  }
+
+  const results = { successCount: 0, failureCount: 0, errors: [] };
+
+  for (const user of users) {
+    try {
+      const { name, email, department } = user;
+      if (!name || !email) {
+        results.failureCount++;
+        results.errors.push({
+          email: email || "N/A",
+          reason: "Missing name or email.",
+        });
+        continue;
+      }
+
+      const lowerEmail = email.toLowerCase();
+      const userExists = await User.findOne({ email: lowerEmail });
+      if (userExists) {
+        results.failureCount++;
+        results.errors.push({ email, reason: "Email already exists." });
+        continue;
+      }
+
+      const password = crypto.randomBytes(8).toString("hex");
+      const newUserData = {
+        name,
+        email: lowerEmail,
+        password,
+        role,
+        schoolId: creator.schoolId,
+      };
+
+      if (role === "student" && creator.role === "educator") {
+        newUserData.supervisor = creator._id;
+      }
+
+      if (role === "educator") {
+        const allowedDepartments = [
+          "Science",
+          "History",
+          "English",
+          "Mathematics",
+        ];
+        const finalDepartment = allowedDepartments.includes(department)
+          ? department
+          : "Science";
+        newUserData.department = finalDepartment;
+      }
+
+      const newUser = new User(newUserData);
+      await newUser.save();
+
+      sendWelcomeEmail({ toEmail: lowerEmail, name, password }).catch((err) =>
+        console.error(`[BULK] Welcome email failed for ${lowerEmail}:`, err),
+      );
+      results.successCount++;
+    } catch (error) {
+      results.failureCount++;
+      results.errors.push({
+        email: user.email,
+        reason: error.message || "Server error during creation.",
+      });
+    }
+  }
+
+  return res
+    .status(207)
+    .json({
+      message: `Bulk operation completed. Success: ${results.successCount}, Failures: ${results.failureCount}.`,
+      ...results,
+    });
+});
+
+// GET SINGLE USER BY ID
 router.get("/:id", protect, checkAccess("manageUsers"), async (req, res) => {
   try {
     const user = await User.findById(req.params.id)
@@ -166,8 +255,7 @@ router.get("/:id", protect, checkAccess("manageUsers"), async (req, res) => {
     if (user) {
       if (
         req.scope.schoolId &&
-        user.schoolId &&
-        user.schoolId._id.toString() !== req.scope.schoolId.toString()
+        user.schoolId?._id.toString() !== req.scope.schoolId.toString()
       ) {
         return res
           .status(403)
@@ -178,129 +266,66 @@ router.get("/:id", protect, checkAccess("manageUsers"), async (req, res) => {
       res.status(404).json({ message: "User not found" });
     }
   } catch (err) {
-    if (err.kind === "ObjectId") {
+    if (err.kind === "ObjectId")
       return res
         .status(404)
         .json({ message: "User not found (invalid ID format)" });
-    }
     res.status(500).json({ message: err.message });
   }
 });
 
+// UPDATE USER
 router.put("/:id", protect, checkAccess("manageUsers"), async (req, res) => {
   const { id } = req.params;
   const { name, email, role, schoolId, department } = req.body;
 
   try {
     const user = await User.findById(id).populate("schoolId");
-    if (!user) {
-      return res.status(404).json({ message: "User not found" });
-    }
+    if (!user) return res.status(404).json({ message: "User not found" });
 
     if (
       req.scope.schoolId &&
-      user.schoolId &&
-      user.schoolId._id.toString() !== req.scope.schoolId.toString()
+      user.schoolId?._id.toString() !== req.scope.schoolId.toString()
     ) {
-      return res.status(403).json({
-        message: "Access denied: Cannot manage user from another school",
-      });
+      return res
+        .status(403)
+        .json({
+          message: "Access denied: Cannot manage user from another school",
+        });
     }
 
     user.name = name || user.name;
     user.email = email || user.email;
-
-    if (department !== undefined) {
-      user.department = department;
-    }
-
-    if (schoolId !== undefined) {
-      user.schoolId = schoolId;
-    }
+    if (department !== undefined) user.department = department;
+    if (schoolId !== undefined) user.schoolId = schoolId;
 
     if (role) {
-      const normalizedRole = role.toLowerCase();
-      const allowedRoles = [
-        "student",
-        "educator",
-        "school_admin",
-        "superadmin",
-      ];
-      if (!allowedRoles.includes(normalizedRole)) {
-        return res.status(400).json({
-          message: `Invalid role. Must be: ${allowedRoles.join(", ")}`,
-        });
-      }
-
-      user.role = normalizedRole;
+      user.role = role.toLowerCase();
     }
-
-    if (user.role === "school_admin" && schoolId !== undefined) {
-      const school = await School.findById(schoolId);
-      if (!school) {
-        return res.status(400).json({ message: "Invalid school ID." });
-      }
-      if (
-        school.assignedAdmin &&
-        school.assignedAdmin.toString() !== user._id.toString()
-      ) {
-        return res.status(400).json({
-          message: "This school is already assigned to another school admin.",
-        });
-      }
-    }
-
-    const oldSchoolId = user.schoolId;
-    const oldRole = user.role;
-    const newRole = user.role;
-    const newSchoolId = user.schoolId;
 
     const updatedUser = await user.save();
-
-    if (
-      oldRole === "school_admin" &&
-      (newRole !== "school_admin" ||
-        newSchoolId?.toString() !== oldSchoolId?.toString())
-    ) {
-      if (oldSchoolId) {
-        await School.findByIdAndUpdate(oldSchoolId, {
-          assignedAdmin: { id: null, name: "", email: "" },
-        });
-      }
-    }
-
-    if (newRole === "school_admin" && newSchoolId) {
-      await School.findByIdAndUpdate(newSchoolId, {
-        assignedAdmin: {
-          id: updatedUser._id,
-          name: updatedUser.name,
-          email: updatedUser.email,
-        },
-      });
-    }
-
     res.status(200).json({ success: true, user: updatedUser });
   } catch (err) {
     res.status(500).json({ message: err.message });
   }
 });
 
+// DELETE USER
 router.delete("/:id", protect, checkAccess("manageUsers"), async (req, res) => {
   const { id } = req.params;
   try {
-    const user = await User.findById(id).populate("schoolId");
-    if (!user) {
-      return res.status(404).json({ message: "User not found" });
-    }
+    const user = await User.findById(id);
+    if (!user) return res.status(404).json({ message: "User not found" });
 
     if (
       req.scope.schoolId &&
-      user.schoolId &&
-      user.schoolId._id.toString() !== req.scope.schoolId.toString()
+      user.schoolId?.toString() !== req.scope.schoolId.toString()
     ) {
-      return res.status(403).json({
-        message: "Access denied: Cannot delete user from another school",
-      });
+      return res
+        .status(403)
+        .json({
+          message: "Access denied: Cannot delete user from another school",
+        });
     }
 
     if (user.role === "school_admin" && user.schoolId) {

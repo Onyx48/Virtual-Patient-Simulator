@@ -1,12 +1,15 @@
 import React from "react";
-import {
-  PencilSquareIcon,
-  TrashIcon,
-  ArrowsUpDownIcon,
-} from "@heroicons/react/24/outline";
+import { ArrowsUpDownIcon } from "@heroicons/react/24/outline";
 import { format } from "date-fns";
 
-function SchoolTable({ data, onEditClick, onDeleteClick, onSort, canEdit }) {
+function SchoolTable({
+  data,
+  onEditClick,
+  onDeleteClick,
+  onSort,
+  canEdit,
+  isDeletingId,
+}) {
   const handleSort = (key) => {
     if (onSort) onSort(key);
   };
@@ -124,23 +127,24 @@ function SchoolTable({ data, onEditClick, onDeleteClick, onSort, canEdit }) {
                       : "Unassigned"}
                   </td>
                   <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500">
-                    <div className="flex items-center gap-3">
+                    <div className="flex gap-2">
                       {canEdit && (
                         <button
                           onClick={() => onEditClick(school)}
-                          className="text-gray-400 hover:text-blue-600 transition-colors p-1 rounded-md hover:bg-blue-50"
-                          title="Edit"
+                          className="bg-blue-500 hover:bg-blue-600 text-white px-3 py-1 rounded text-sm transition-colors"
                         >
-                          <PencilSquareIcon className="h-5 w-5" />
+                          Edit
                         </button>
                       )}
                       {canEdit && onDeleteClick && (
                         <button
                           onClick={() => onDeleteClick(school._id)}
-                          className="text-gray-400 hover:text-red-600 transition-colors p-1 rounded-md hover:bg-red-50"
-                          title="Delete"
+                          disabled={isDeletingId === school._id}
+                          className="bg-red-500 hover:bg-red-600 text-white px-3 py-1 rounded text-sm transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
                         >
-                          <TrashIcon className="h-5 w-5" />
+                          {isDeletingId === school._id
+                            ? "Deleting..."
+                            : "Delete"}
                         </button>
                       )}
                     </div>
@@ -150,7 +154,7 @@ function SchoolTable({ data, onEditClick, onDeleteClick, onSort, canEdit }) {
             ) : (
               <tr>
                 <td
-                  colSpan="7"
+                  colSpan="8"
                   className="px-6 py-10 text-center text-sm text-gray-500"
                 >
                   No schools found matching your search.

@@ -1,5 +1,6 @@
-import React, { useState, useEffect, useMemo } from "react";
+import React, { useState, useEffect, useMemo, useRef } from "react";
 import axios from "axios";
+import Papa from "papaparse";
 import {
   MagnifyingGlassIcon,
   PlusIcon,
@@ -7,6 +8,7 @@ import {
   TrashIcon,
   ChevronLeftIcon,
   ChevronRightIcon,
+  ArrowUpTrayIcon,
 } from "@heroicons/react/24/outline";
 
 import EducatorModal from "./EducatorModal";
@@ -26,6 +28,9 @@ function EducatorsPage() {
   const [searchTerm, setSearchTerm] = useState("");
   const [departmentFilter, setDepartmentFilter] = useState("");
 
+  const [isUploading, setIsUploading] = useState(false);
+  const fileInputRef = useRef(null);
+
   const [isModalOpen, setIsModalOpen] = useState(false);
   const [editingEducator, setEditingEducator] = useState(null);
   const [isConfirmModalOpen, setIsConfirmModalOpen] = useState(false);
@@ -43,7 +48,6 @@ function EducatorsPage() {
         "/api/users?role=educator",
         getAuthHeaders(),
       );
-
       const mappedData = response.data.map((user) => ({
         id: user._id,
         visualId: `VS${user._id.slice(-6).toUpperCase()}`,
@@ -54,6 +58,7 @@ function EducatorsPage() {
       setEducators(mappedData);
     } catch (error) {
       console.error("Error fetching educators:", error);
+      toast.error("Could not fetch educators.");
     } finally {
       setLoading(false);
     }
@@ -66,6 +71,100 @@ function EducatorsPage() {
   const handleAddNew = () => {
     setEditingEducator(null);
     setIsModalOpen(true);
+  };
+
+  const handleBulkUploadClick = () => {
+    fileInputRef.current.click();
+  };
+
+  const handleFileChange = (event) => {
+    const file = event.target.files[0];
+    if (!file) return;
+
+    setIsUploading(true);
+    const uploadToast = toast.loading("Parsing CSV file...");
+
+    Papa.parse(file, {
+      header: true,
+      skipEmptyLines: true,
+      complete: async (results) => {
+        const nameAliases = ["name", "full name", "fullname"];
+        const emailAliases = ["email", "email address"];
+        const departmentAliases = ["department", "subject"];
+
+        const firstRow = results.data[0] || {};
+        const actualHeaders = Object.keys(firstRow).map((h) => h.toLowerCase());
+
+        const hasHeader = (aliases) =>
+          aliases.some((alias) => actualHeaders.includes(alias));
+
+        let missingHeaders = [];
+        if (!hasHeader(nameAliases))
+          missingHeaders.push("'name' or 'full name'");
+        if (!hasHeader(emailAliases))
+          missingHeaders.push("'email' or 'email address'");
+
+        if (missingHeaders.length > 0) {
+          toast.error(
+            `CSV is missing required columns: ${missingHeaders.join(", ")}`,
+            { id: uploadToast, duration: 6000 },
+          );
+          setIsUploading(false);
+          if (fileInputRef.current) fileInputRef.current.value = "";
+          return;
+        }
+
+        const findValue = (row, aliases) => {
+          for (const key in row) {
+            if (aliases.includes(key.toLowerCase())) {
+              return row[key];
+            }
+          }
+          return undefined;
+        };
+
+        const processedData = results.data.map((row) => ({
+          name: findValue(row, nameAliases),
+          email: findValue(row, emailAliases),
+          department: findValue(row, departmentAliases),
+        }));
+
+        toast.loading("Uploading educators...", { id: uploadToast });
+        try {
+          const response = await axios.post(
+            "/api/users/bulk",
+            { users: processedData, role: "educator" },
+            getAuthHeaders(),
+          );
+          toast.success(
+            `Upload complete! ${response.data.successCount} created.`,
+            { id: uploadToast, duration: 5000 },
+          );
+          if (response.data.failureCount > 0) {
+            console.error("Bulk upload failures:", response.data.errors);
+            toast.error(
+              `${response.data.failureCount} educators failed to upload. Check console.`,
+            );
+          }
+          await fetchEducators();
+        } catch (error) {
+          toast.error(
+            "Bulk upload failed: " +
+              (error.response?.data?.message || "Server error"),
+            { id: uploadToast },
+          );
+        } finally {
+          setIsUploading(false);
+          if (fileInputRef.current) fileInputRef.current.value = "";
+        }
+      },
+      error: (error) => {
+        toast.error("Failed to parse CSV: " + error.message, {
+          id: uploadToast,
+        });
+        setIsUploading(false);
+      },
+    });
   };
 
   const handleEdit = (educator) => {
@@ -94,7 +193,6 @@ function EducatorsPage() {
   const handleSave = async (formData) => {
     try {
       if (formData.id) {
-        // Edit Existing Educator
         await axios.put(
           `/api/users/${formData.id}`,
           {
@@ -111,7 +209,6 @@ function EducatorsPage() {
           {
             name: formData.educatorName,
             email: formData.emailAddress,
-            password: formData.password,
             role: "educator",
             department: formData.department,
             schoolId: user.schoolId,
@@ -120,7 +217,6 @@ function EducatorsPage() {
         );
         toast.success("Educator created successfully");
       }
-      // Refresh list
       await fetchEducators();
       setIsModalOpen(false);
     } catch (error) {
@@ -163,13 +259,12 @@ function EducatorsPage() {
             </div>
             <input
               type="text"
-              placeholder="Search for a educator"
+              placeholder="Search for an educator"
               className="block w-full pl-10 pr-3 py-2.5 border border-gray-200 rounded-lg bg-gray-50 text-sm focus:ring-2 focus:ring-orange-500 focus:border-transparent outline-none transition-all"
               value={searchTerm}
               onChange={(e) => setSearchTerm(e.target.value)}
             />
           </div>
-
           <div className="relative">
             <select
               value={departmentFilter}
@@ -200,7 +295,23 @@ function EducatorsPage() {
           </div>
         </div>
 
-        <div>
+        <div className="flex items-center gap-3">
+          <input
+            type="file"
+            ref={fileInputRef}
+            onChange={handleFileChange}
+            accept=".csv"
+            style={{ display: "none" }}
+            disabled={isUploading}
+          />
+          <button
+            onClick={handleBulkUploadClick}
+            disabled={isUploading}
+            className="flex items-center gap-2 px-5 py-2.5 bg-white border border-gray-200 text-gray-700 hover:bg-gray-50 text-sm font-bold rounded-lg transition-colors shadow-sm disabled:opacity-50"
+          >
+            <ArrowUpTrayIcon className="h-5 w-5" />
+            {isUploading ? "Uploading..." : "Upload Bulk Educators"}
+          </button>
           <button
             onClick={handleAddNew}
             className="flex items-center gap-2 px-5 py-2.5 bg-black hover:bg-gray-800 text-white text-sm font-bold rounded-lg transition-colors shadow-sm"
@@ -319,11 +430,7 @@ function EducatorsPage() {
               <button
                 key={idx}
                 onClick={() => setCurrentPage(idx + 1)}
-                className={`w-8 h-8 rounded-lg text-sm font-medium transition-colors ${
-                  currentPage === idx + 1
-                    ? "bg-orange-500 text-white shadow-sm"
-                    : "text-gray-600 hover:bg-gray-100"
-                }`}
+                className={`w-8 h-8 rounded-lg text-sm font-medium transition-colors ${currentPage === idx + 1 ? "bg-orange-500 text-white shadow-sm" : "text-gray-600 hover:bg-gray-100"}`}
               >
                 {idx + 1}
               </button>
@@ -348,7 +455,6 @@ function EducatorsPage() {
         </div>
       </div>
 
-      {/* Modal */}
       {isModalOpen && (
         <div className="fixed inset-0 z-50 bg-black/40 backdrop-blur-sm flex justify-center items-center p-4">
           <EducatorModal
@@ -358,7 +464,6 @@ function EducatorsPage() {
           />
         </div>
       )}
-
       <ConfirmationModal
         isOpen={isConfirmModalOpen}
         onClose={() => setIsConfirmModalOpen(false)}

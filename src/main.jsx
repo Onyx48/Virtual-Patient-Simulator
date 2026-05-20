@@ -11,7 +11,7 @@ import axios from "axios";
 const container = document.getElementById("root");
 const root = ReactDOM.createRoot(container);
 axios.defaults.baseURL =
-  "https://vpsbackend.metawingsxr.com/" || "http://localhost:5001";
+  "http://localhost:5001" || "https://vpsbackend.metawingsxr.com/";
 
 root.render(
   <React.StrictMode>

@@ -2,7 +2,13 @@ import React, { useState } from "react";
 import { useForm } from "react-hook-form";
 import { XMarkIcon } from "@heroicons/react/24/outline";
 
-function StudentModal({ onSave, onClose, studentData, role, defaultSchoolName }) {
+function StudentModal({
+  onSave,
+  onClose,
+  studentData,
+  role,
+  defaultSchoolName,
+}) {
   console.log("StudentModal studentData:", studentData);
   const isEdit = !!studentData;
   const [isSubmitting, setIsSubmitting] = useState(false);
@@ -22,7 +28,6 @@ function StudentModal({ onSave, onClose, studentData, role, defaultSchoolName })
       : {
           studentName: "",
           emailAddress: "",
-          password: "",
           schoolName: role === "educator" ? defaultSchoolName : "",
           grade: "",
         },
@@ -30,14 +35,13 @@ function StudentModal({ onSave, onClose, studentData, role, defaultSchoolName })
 
   const onSubmit = async (data) => {
     setIsSubmitting(true);
-    // Prepare data object for parent component
     const submissionData = {
       id: studentData?.id,
       user_id: studentData?.user_id,
       name: data.studentName,
       email: data.emailAddress,
-      password: data.password,
-      schoolName: !isEdit && role === "educator" ? defaultSchoolName : data.schoolName,
+      schoolName:
+        !isEdit && role === "educator" ? defaultSchoolName : data.schoolName,
       grade: data.grade,
     };
 
@@ -92,28 +96,8 @@ function StudentModal({ onSave, onClose, studentData, role, defaultSchoolName })
           )}
         </div>
 
-        {!isEdit && (
-          <div className="space-y-1.5">
-            <label className="block text-sm font-semibold text-gray-700">
-              Password
-            </label>
-            <input
-              type="password"
-              {...register("password", {
-                required: "Password is required",
-                minLength: { value: 6, message: "Min 6 chars" },
-              })}
-              className="w-full px-4 py-2.5 rounded-lg border border-gray-300 focus:ring-2 focus:ring-orange-500 focus:border-transparent outline-none transition-all text-sm"
-              placeholder="••••••••"
-            />
-            {errors.password && (
-              <p className="text-xs text-red-500">{errors.password.message}</p>
-            )}
-          </div>
-        )}
-
         <div className="grid grid-cols-2 gap-5">
-          {!(role === 'educator' && !isEdit) && (
+          {!(role === "educator" && !isEdit) && (
             <div className="space-y-1.5 col-span-2">
               <label className="block text-sm font-semibold text-gray-700">
                 School Name
@@ -121,7 +105,7 @@ function StudentModal({ onSave, onClose, studentData, role, defaultSchoolName })
               <input
                 type="text"
                 {...register("schoolName")}
-                readOnly={role === 'educator'}
+                readOnly={role === "educator"}
                 className="w-full px-4 py-2.5 rounded-lg border border-gray-300 focus:ring-2 focus:ring-orange-500 focus:border-transparent outline-none transition-all text-sm"
                 placeholder="School Name"
               />
@@ -145,8 +129,8 @@ function StudentModal({ onSave, onClose, studentData, role, defaultSchoolName })
             {isSubmitting
               ? "Saving..."
               : isEdit
-              ? "Update Student"
-              : "Create Student"}
+                ? "Update Student"
+                : "Create Student"}
           </button>
         </div>
       </form>

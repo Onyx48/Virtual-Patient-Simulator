@@ -20,7 +20,6 @@ function EducatorModal({ onSave, onClose, educatorData }) {
       : {
           educatorName: "",
           emailAddress: "",
-          password: "",
           department: "Science",
         },
   });
@@ -31,7 +30,6 @@ function EducatorModal({ onSave, onClose, educatorData }) {
       id: educatorData?.id,
       educatorName: data.educatorName,
       emailAddress: data.emailAddress,
-      password: data.password,
       department: data.department,
     };
 
@@ -94,26 +92,6 @@ function EducatorModal({ onSave, onClose, educatorData }) {
           )}
         </div>
 
-        {!isEdit && (
-          <div className="space-y-1.5">
-            <label className="block text-sm font-semibold text-gray-700">
-              Password
-            </label>
-            <input
-              type="password"
-              {...register("password", {
-                required: "Password is required",
-                minLength: { value: 6, message: "Min 6 chars" },
-              })}
-              className="w-full px-4 py-2.5 rounded-lg border border-gray-300 focus:ring-2 focus:ring-orange-500 focus:border-transparent outline-none transition-all text-sm"
-              placeholder="••••••••"
-            />
-            {errors.password && (
-              <p className="text-xs text-red-500">{errors.password.message}</p>
-            )}
-          </div>
-        )}
-
         <div className="space-y-1.5">
           <label className="block text-sm font-semibold text-gray-700">
             Department
@@ -123,7 +101,6 @@ function EducatorModal({ onSave, onClose, educatorData }) {
               {...register("department", {
                 required: "Department is required",
               })}
-              // REMOVED: value={watch("department")} to fix the selection bug
               className="w-full px-4 py-2.5 rounded-lg border border-gray-300 focus:ring-2 focus:ring-orange-500 focus:border-transparent outline-none transition-all text-sm appearance-none bg-white cursor-pointer"
             >
               <option value="Science">Science</option>
