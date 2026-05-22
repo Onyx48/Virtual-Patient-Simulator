@@ -10,7 +10,6 @@ import {
 } from "../../redux/slices/scenarioSlice.js";
 import { Sparkles, ArrowUp, Loader, X, AlertCircle } from "lucide-react";
 
-// Import React Quill for Rich Text Editing
 import ReactQuill from "react-quill-new";
 import "react-quill-new/dist/quill.snow.css";
 
@@ -185,7 +184,7 @@ function ScenarioFormPage() {
     setIsAiLoading(true);
 
     try {
-      const url = `${AI_SERVICE_URL}/add-scenario`; // Ensure this matches your AI backend endpoint
+      const url = `${AI_SERVICE_URL}/add-scenario`;
       const payload = {
         educator_id: user?._id || user?.id,
         scenario_prompt: aiInput,
@@ -207,12 +206,10 @@ function ScenarioFormPage() {
         setValue("difficulty", returnedJson.difficulty_level);
       if (returnedJson.status) setValue("status", returnedJson.status);
 
-      // 2. Map Rich Text Editors
       if (returnedJson.scenario_prompt) {
         setValue("scenarioPrompt", returnedJson.scenario_prompt);
       }
 
-      // Auto-convert questions array to bullet points for the rich text editor
       if (
         returnedJson.questions_for_feedback &&
         Array.isArray(returnedJson.questions_for_feedback)
@@ -220,10 +217,9 @@ function ScenarioFormPage() {
         const questionsHtml = `<ul>${returnedJson.questions_for_feedback.map((q) => `<li>${q}</li>`).join("")}</ul>`;
         setValue("questionsForFeedback", questionsHtml);
       } else if (returnedJson.questions_for_feedback) {
-        setValue("questionsForFeedback", returnedJson.questions_for_feedback); // Fallback if string
+        setValue("questionsForFeedback", returnedJson.questions_for_feedback);
       }
 
-      // 3. Map Radio/Checkbox Movements seamlessly
       if (returnedJson.movements) {
         setValue("movements", returnedJson.movements);
       }
@@ -269,7 +265,6 @@ function ScenarioFormPage() {
       />
 
       <div className="bg-white w-full max-w-[800px] rounded-lg shadow-2xl flex flex-col relative my-auto">
-        {/* Top X Close Button (Overlapping boundary like screenshot) */}
         <div className="absolute -top-4 right-1/2 transform translate-x-1/2 z-10">
           <button
             onClick={() => navigate("/scenarios")}
@@ -279,14 +274,11 @@ function ScenarioFormPage() {
           </button>
         </div>
 
-        {/* Header Title */}
         <div className="flex justify-between items-center p-6 pb-2 border-b-0">
           <h2 className="text-xl font-bold text-gray-800">Add Scenario</h2>
         </div>
 
-        {/* Scrollable Form Body */}
         <div className="p-6 pt-0 overflow-y-auto max-h-[85vh]">
-          {/* Top AI Prompt Bar - NOW WITH SPARKLES */}
           <div className="mb-6 p-1 rounded-lg border border-purple-300 bg-white shadow-sm flex items-center relative z-0">
             <div className="pl-3 text-orange-400">
               {isAiLoading ? (
@@ -369,7 +361,6 @@ function ScenarioFormPage() {
               </div>
             </div>
 
-            {/* Short Description */}
             <div>
               <label className="block text-xs font-semibold text-gray-700 mb-1">
                 Short Description
@@ -382,7 +373,6 @@ function ScenarioFormPage() {
               />
             </div>
 
-            {/* Animation Triggers - Shoulder */}
             <div>
               <h3 className="text-sm font-bold text-gray-800 mb-2">
                 Animation triggers - Shoulder
@@ -414,7 +404,6 @@ function ScenarioFormPage() {
               </div>
             </div>
 
-            {/* Animation Triggers - Neck */}
             <div className="pt-2">
               <h3 className="text-sm font-bold text-gray-800 mb-2">
                 Animation triggers - Neck
@@ -458,7 +447,6 @@ function ScenarioFormPage() {
               ></textarea>
             </div>
 
-            {/* Scenario Prompt (React Quill) */}
             <div>
               <label className="block text-xs font-semibold text-gray-700 mb-1">
                 Scenario Prompt
@@ -480,7 +468,6 @@ function ScenarioFormPage() {
               </div>
             </div>
 
-            {/* Questions for Feedback (React Quill) */}
             <div className="pt-2">
               <label className="block text-xs font-semibold text-gray-700 mb-1">
                 Questions for & Feedback
@@ -504,7 +491,6 @@ function ScenarioFormPage() {
           </form>
         </div>
 
-        {/* Bottom Action Footer */}
         <div className="p-4 border-t border-gray-100 flex justify-end gap-3 bg-white rounded-b-lg">
           <button
             type="button"
