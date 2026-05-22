@@ -1,24 +1,27 @@
 import React, { useState, useEffect } from "react";
 import { useDispatch, useSelector } from "react-redux";
 import { useNavigate, useParams } from "react-router-dom";
-import { useForm } from "react-hook-form";
+import { useForm, Controller } from "react-hook-form";
 import { useAuth } from "../../AuthContext";
 import axios from "axios";
-import { addScenario } from "../../redux/slices/scenarioSlice.js";
 import {
-  ArrowLeft,
-  Sparkles,
-  ArrowUp,
-  Loader,
-  X,
-  AlertCircle,
-} from "lucide-react";
+  addScenario,
+  updateScenario,
+} from "../../redux/slices/scenarioSlice.js";
+import { Sparkles, ArrowUp, Loader, X, AlertCircle } from "lucide-react";
+
+// Import React Quill for Rich Text Editing
+import ReactQuill from "react-quill-new";
+import "react-quill-new/dist/quill.snow.css";
+
 const AI_SERVICE_URL =
   import.meta.env.VITE_AI_SERVICE_URL || "http://localhost:8888";
+
+// Error Modal Component
 const ErrorModal = ({ isOpen, message, onClose }) => {
   if (!isOpen) return null;
   return (
-    <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/50 backdrop-blur-sm">
+    <div className="fixed inset-0 z-[60] flex items-center justify-center p-4 bg-black/50 backdrop-blur-sm">
       <div className="bg-white rounded-xl shadow-2xl max-w-md w-full overflow-hidden animate-in fade-in zoom-in duration-200">
         <div className="bg-red-50 px-6 py-4 border-b border-red-100 flex items-center justify-between">
           <div className="flex items-center gap-2 text-red-700 font-bold">
@@ -48,161 +51,185 @@ const ErrorModal = ({ isOpen, message, onClose }) => {
   );
 };
 
+// Movement Configuration Definitions mapping exactly to the screenshot
+const SHOULDER_MOVEMENTS = [
+  { id: "flexion", label: "Flexion", options: ["Full", "90_Ltd", "120_Ltd"] },
+  { id: "extension", label: "Extension", options: ["Full", "Ltd"] },
+  { id: "abduction", label: "Abduction", options: ["Full", "Ltd"] },
+  {
+    id: "external_rotation",
+    label: "External_Rotation",
+    options: ["Full", "Ltd"],
+  },
+  {
+    id: "internal_rotation",
+    label: "Internal_Rotation",
+    options: ["Full", "Ltd"],
+  },
+  {
+    id: "horizontal_adduction",
+    label: "Horizontal_Adduction",
+    options: ["Full", "Ltd"],
+  },
+  {
+    id: "hand_behind_back",
+    label: "Hand_behind_Back",
+    options: ["Full", "Ltd"],
+  },
+  {
+    id: "hand_behind_neck",
+    label: "Hand_behind_Neck",
+    options: ["Full", "Ltd"],
+  },
+];
+
+const NECK_MOVEMENTS = [
+  { id: "flexion", label: "Flexion", options: ["Full", "Ltd"] },
+  { id: "extension", label: "Extension", options: ["Full", "Ltd"] },
+  { id: "left_rotation", label: "Left_Rotation", options: ["Full", "Ltd"] },
+  { id: "right_rotation", label: "Right_Rotation", options: ["Full", "Ltd"] },
+  { id: "protraction", label: "Protraction", options: ["Full", "Ltd"] },
+  { id: "retraction", label: "Retraction", options: ["Full", "Ltd"] },
+  {
+    id: "right_lateral_flexion",
+    label: "Right_Lateral_Flexion",
+    options: ["Full", "Ltd"],
+  },
+  {
+    id: "left_lateral_flexion",
+    label: "Left_Lateral_Flexion",
+    options: ["Full", "Ltd"],
+  },
+];
+
+// Rich Text Editor Toolbar Configuration
+const quillModules = {
+  toolbar: [
+    [{ font: [] }, { size: [] }],
+    ["bold", "italic", "underline", "strike"],
+    [{ color: [] }, { background: [] }],
+    [{ script: "sub" }, { script: "super" }],
+    [{ header: "1" }, { header: "2" }, "blockquote", "code-block"],
+    [
+      { list: "ordered" },
+      { list: "bullet" },
+      { indent: "-1" },
+      { indent: "+1" },
+    ],
+    [{ direction: "rtl" }, { align: [] }],
+    ["link", "image", "video"],
+    ["clean"],
+  ],
+};
+
 function ScenarioFormPage() {
   const navigate = useNavigate();
   const { id } = useParams();
   const { user } = useAuth();
   const { scenarios } = useSelector((state) => state.scenarios);
   const dispatch = useDispatch();
+
+  const isDbEdit = !!id;
   const selectedScenario = id
     ? scenarios.find((s) => s._id === id || s.id === id)
     : null;
-  const isDbEdit = !!id;
-  const title = isDbEdit
-    ? "Edit Scenario (AI Generated Only)"
-    : "Add Scenario (AI Generated Only)";
-  const { register, handleSubmit, setValue, watch } = useForm({
+
+  const { register, handleSubmit, setValue, control } = useForm({
     defaultValues: {
       scenarioName: "",
-      template: "",
-      scenarioPrompt: "",
-      aiAvatarRole: "",
-      aiInstructions: "",
-      aiQuestions: "",
       difficulty: "Medium",
       status: "Draft",
-      description: "",
-      permissions: "Read Only",
-      animationTriggers: { shoulder: [], neck: [] },
+      shortDescription: "",
+      movements: {
+        shoulder: {},
+        neck: {},
+      },
+      hdml: "",
+      scenarioPrompt: "",
+      questionsForFeedback: "",
     },
   });
-  const [shoulderTags, setShoulderTags] = useState([]);
-  const [neckTags, setNeckTags] = useState([]);
+
   const [aiInput, setAiInput] = useState("");
   const [isAiLoading, setIsAiLoading] = useState(false);
   const [isSaving, setIsSaving] = useState(false);
-  const [currentApiKey, setCurrentApiKey] = useState("");
-  const [aiGeneratedId, setAiGeneratedId] = useState(null);
   const [errorPopup, setErrorPopup] = useState({ open: false, message: "" });
-  const currentDifficulty = watch("difficulty");
+
   const isSchoolAdmin = user?.role === "school_admin";
   const isEducator = user?.role === "educator";
+
   useEffect(() => {
     if (!isEducator && !isSchoolAdmin) navigate("/dashboard");
   }, [isEducator, isSchoolAdmin, navigate]);
+
   useEffect(() => {
     if (isDbEdit && selectedScenario) {
-      console.log("Loading Existing Scenario Data...", selectedScenario);
-      const fields = [
-        "scenarioName",
-        "template",
-        "scenarioPrompt",
-        "aiAvatarRole",
-        "aiInstructions",
-        "aiQuestions",
-        "difficulty",
-        "status",
-        "description",
-        "permissions",
-      ];
-      fields.forEach((field) => setValue(field, selectedScenario[field] || ""));
-      if (selectedScenario.animationTriggers) {
-        setShoulderTags(selectedScenario.animationTriggers.shoulder || []);
-        setNeckTags(selectedScenario.animationTriggers.neck || []);
-      }
-
-      if (selectedScenario.apiKey) {
-        setCurrentApiKey(selectedScenario.apiKey);
-      }
+      setValue("scenarioName", selectedScenario.scenarioName || "");
+      setValue("difficulty", selectedScenario.difficulty || "Medium");
+      setValue("status", selectedScenario.status || "Draft");
+      setValue("shortDescription", selectedScenario.shortDescription || "");
+      setValue("scenarioPrompt", selectedScenario.scenarioPrompt || "");
+      setValue(
+        "questionsForFeedback",
+        selectedScenario.questionsForFeedback || "",
+      );
+      if (selectedScenario.movements)
+        setValue("movements", selectedScenario.movements);
+      if (selectedScenario.hdml) setValue("hdml", selectedScenario.hdml);
     }
   }, [isDbEdit, selectedScenario, setValue]);
-  useEffect(() => {
-    setValue("animationTriggers.shoulder", shoulderTags);
-    setValue("animationTriggers.neck", neckTags);
-  }, [shoulderTags, neckTags, setValue]);
+
   const handleAskAI = async (e) => {
     e.preventDefault();
     if (!aiInput) return;
-    console.log("--- STARTING AI REQUEST ---");
     setIsAiLoading(true);
 
     try {
-      let response;
-      const headers = { "Content-Type": "application/json" };
+      const url = `${AI_SERVICE_URL}/add-scenario`; // Ensure this matches your AI backend endpoint
+      const payload = {
+        educator_id: user?._id || user?.id,
+        scenario_prompt: aiInput,
+      };
 
-      if (currentApiKey) {
-        const url = `${AI_SERVICE_URL}/edit-scenario`;
-        const payload = { api_key: currentApiKey, scenario_prompt: aiInput };
-        console.log(`Sending POST to ${url}`);
-        response = await axios.post(url, payload, { headers });
-      } else {
-        const url = `${AI_SERVICE_URL}/add-scenario`;
-        const payload = {
-          educator_id: user?._id || user?.id,
-          scenario_prompt: aiInput,
-        };
-        console.log(`Sending POST to ${url}`);
-        response = await axios.post(url, payload, { headers });
-      }
+      const response = await axios.post(url, payload, {
+        headers: { "Content-Type": "application/json" },
+      });
 
-      console.log("--- AI RESPONSE RECEIVED ---");
       const rawData = response.data;
-      const actualData = rawData.response ? rawData.response : rawData;
-      console.log("Unwrapped Data:", actualData);
+      const returnedJson = rawData.response ? rawData.response : rawData;
 
-      const returnedApiKey = actualData.apiKey || actualData.api_key;
-      const returnedJson = actualData.json || actualData;
+      // 1. Map Text & Dropdown Fields
+      if (returnedJson.scenario_name) {
+        setValue("scenarioName", returnedJson.scenario_name);
+        setValue("shortDescription", returnedJson.scenario_name);
+      }
+      if (returnedJson.difficulty_level)
+        setValue("difficulty", returnedJson.difficulty_level);
+      if (returnedJson.status) setValue("status", returnedJson.status);
 
-      if (returnedApiKey) {
-        setCurrentApiKey(returnedApiKey);
+      // 2. Map Rich Text Editors
+      if (returnedJson.scenario_prompt) {
+        setValue("scenarioPrompt", returnedJson.scenario_prompt);
       }
 
-      if (returnedJson) {
-        if (returnedJson._id) {
-          setAiGeneratedId(returnedJson._id);
-        }
-
-        if (returnedJson.scenarioName || returnedJson.scenario_name) {
-          const name = returnedJson.scenarioName || returnedJson.scenario_name;
-          setValue("scenarioName", name);
-          setValue("description", name);
-        }
-
-        if (returnedJson.scenarioPrompt || returnedJson.scenario_prompt)
-          setValue(
-            "scenarioPrompt",
-            returnedJson.scenarioPrompt || returnedJson.scenario_prompt,
-          );
-
-        const questions =
-          returnedJson.aiQuestions ||
-          returnedJson.ai_questions ||
-          returnedJson.questions_for_feedback;
-        if (questions) {
-          const val = Array.isArray(questions)
-            ? questions.join("\n")
-            : questions;
-          setValue("aiQuestions", val);
-        }
-
-        if (returnedJson.difficulty || returnedJson.difficulty_level)
-          setValue(
-            "difficulty",
-            returnedJson.difficulty || returnedJson.difficulty_level,
-          );
-
-        if (returnedJson.status) setValue("status", returnedJson.status);
-
-        const triggers =
-          returnedJson.animationTriggers || returnedJson.animation_triggers;
-        if (triggers) {
-          if (triggers.shoulder) setShoulderTags(triggers.shoulder);
-          if (triggers.neck) setNeckTags(triggers.neck);
-        }
+      // Auto-convert questions array to bullet points for the rich text editor
+      if (
+        returnedJson.questions_for_feedback &&
+        Array.isArray(returnedJson.questions_for_feedback)
+      ) {
+        const questionsHtml = `<ul>${returnedJson.questions_for_feedback.map((q) => `<li>${q}</li>`).join("")}</ul>`;
+        setValue("questionsForFeedback", questionsHtml);
+      } else if (returnedJson.questions_for_feedback) {
+        setValue("questionsForFeedback", returnedJson.questions_for_feedback); // Fallback if string
       }
+
+      // 3. Map Radio/Checkbox Movements seamlessly
+      if (returnedJson.movements) {
+        setValue("movements", returnedJson.movements);
+      }
+
       setAiInput("");
     } catch (error) {
-      console.error("--- AI REQUEST FAILED ---");
       const msg = error.response
         ? JSON.stringify(error.response.data)
         : error.message;
@@ -211,208 +238,292 @@ function ScenarioFormPage() {
       setIsAiLoading(false);
     }
   };
+
   const onSubmit = async (data) => {
     setIsSaving(true);
-
-    const finalData = {
-      ...data,
-      apiKey: currentApiKey,
-      animationTriggers: {
-        shoulder: shoulderTags,
-        neck: neckTags,
-      },
-    };
-
-    if (!isDbEdit && aiGeneratedId) {
-      finalData._id = aiGeneratedId;
-    }
-
     try {
       if (isDbEdit) {
-        const token =
-          localStorage.getItem("token") ||
-          (localStorage.getItem("userInfo") &&
-            JSON.parse(localStorage.getItem("userInfo"))?.token);
-        if (!token) {
-          throw new Error(
-            "Authentication token missing. Please log out and log back in.",
-          );
-        }
-        const config = {
-          headers: {
-            Authorization: `Bearer ${token}`,
-            "Content-Type": "application/json",
-          },
-        };
-        await axios.put(`/api/scenarios/${id}`, finalData, config);
+        await dispatch(updateScenario({ id, updates: data })).unwrap();
       } else {
-        await dispatch(addScenario(finalData)).unwrap();
+        await dispatch(addScenario(data)).unwrap();
       }
       navigate("/scenarios");
     } catch (err) {
-      console.error("Failed to save to DB:", err);
-      let errMsg = "Unknown error occurred";
-      if (err.response?.data?.errors) {
-        errMsg = err.response.data.errors.map((e) => e.msg).join(", ");
-      } else if (err.response?.data?.message) {
-        errMsg = err.response.data.message;
-      } else {
-        errMsg = err.message;
-      }
-      setErrorPopup({ open: true, message: errMsg });
+      setErrorPopup({
+        open: true,
+        message: err.message || "Failed to save scenario.",
+      });
     } finally {
       setIsSaving(false);
     }
   };
+
   if (!isEducator && !isSchoolAdmin) return null;
-  const readOnlyClass =
-    "w-full px-4 py-3 rounded-lg border border-gray-200 text-sm bg-gray-100 text-gray-600 cursor-not-allowed focus:outline-none";
-  const disabledContainerClass = "opacity-60 pointer-events-none";
+
   return (
-    <div className="min-h-screen bg-gray-50 flex flex-col items-center py-8 px-4">
+    <div className="fixed inset-0 z-50 bg-black/60 backdrop-blur-sm flex justify-center items-start pt-10 pb-10 px-4 overflow-y-auto">
       <ErrorModal
         isOpen={errorPopup.open}
         message={errorPopup.message}
         onClose={() => setErrorPopup({ ...errorPopup, open: false })}
       />
-      <div className="w-full max-w-4xl mb-6 flex items-center justify-between">
-        <button
-          onClick={() => navigate("/scenarios")}
-          className="flex items-center text-sm font-medium text-gray-500 bg-white px-4 py-2 rounded-lg border shadow-sm"
-        >
-          <ArrowLeft className="w-4 h-4 mr-2" /> Go Back
-        </button>
-        <button
-          onClick={handleSubmit(onSubmit)}
-          disabled={isSaving || isAiLoading}
-          className="px-6 py-2 rounded-lg bg-[#F59E0B] text-white text-sm font-bold hover:bg-amber-600 shadow-md transition-colors disabled:opacity-50 flex items-center gap-2"
-        >
-          {isSaving && <Loader className="w-4 h-4 animate-spin" />}
-          {isSaving
-            ? "Saving..."
-            : isDbEdit
-              ? "Save Scenario"
-              : "Publish Scenario"}
-        </button>
-      </div>
-      <div className="w-full max-w-4xl bg-white rounded-2xl shadow-sm border border-gray-100 overflow-hidden relative pb-24">
-        <div className="px-8 py-6 border-b border-gray-100 flex items-center gap-3">
-          <h1 className="text-xl font-bold text-gray-900">{title}</h1>
-          <span className="px-3 py-1 rounded-full text-xs font-semibold bg-gray-100 text-gray-600">
-            {watch("status")}
-          </span>
+
+      <div className="bg-white w-full max-w-[800px] rounded-lg shadow-2xl flex flex-col relative my-auto">
+        {/* Top X Close Button (Overlapping boundary like screenshot) */}
+        <div className="absolute -top-4 right-1/2 transform translate-x-1/2 z-10">
+          <button
+            onClick={() => navigate("/scenarios")}
+            className="bg-gray-700 text-white p-2 rounded-full hover:bg-gray-900 shadow-md transition-colors"
+          >
+            <X size={24} />
+          </button>
         </div>
 
-        <form className="p-8 space-y-6">
-          <div>
-            <label className="block text-xs font-bold text-gray-900 mb-2">
-              Scenario Name (Read Only)
-            </label>
+        {/* Header Title */}
+        <div className="flex justify-between items-center p-6 pb-2 border-b-0">
+          <h2 className="text-xl font-bold text-gray-800">Add Scenario</h2>
+        </div>
+
+        {/* Scrollable Form Body */}
+        <div className="p-6 pt-0 overflow-y-auto max-h-[85vh]">
+          {/* Top AI Prompt Bar - NOW WITH SPARKLES */}
+          <div className="mb-6 p-1 rounded-lg border border-purple-300 bg-white shadow-sm flex items-center relative z-0">
+            <div className="pl-3 text-orange-400">
+              {isAiLoading ? (
+                <Loader className="w-5 h-5 animate-spin" />
+              ) : (
+                <Sparkles className="w-5 h-5 text-orange-400" />
+              )}
+            </div>
             <input
-              {...register("scenarioName", { required: true })}
-              className={readOnlyClass}
-              readOnly
-              placeholder="Waiting for AI generation..."
+              type="text"
+              value={aiInput}
+              onChange={(e) => setAiInput(e.target.value)}
+              onKeyDown={(e) => e.key === "Enter" && handleAskAI(e)}
+              disabled={isAiLoading}
+              placeholder="Provide input for AI to create scenario"
+              className="w-full px-3 py-2 text-sm outline-none bg-transparent placeholder-gray-400 text-gray-700"
             />
+            <button
+              onClick={handleAskAI}
+              disabled={isAiLoading || !aiInput}
+              className="mr-1 w-8 h-8 flex justify-center items-center rounded-full bg-black text-white hover:bg-gray-800 disabled:opacity-50 transition"
+            >
+              <ArrowUp className="w-4 h-4" />
+            </button>
           </div>
 
-          <div>
-            <label className="block text-xs font-bold text-gray-900 mb-2">
-              Scenario Prompt (Read Only)
-            </label>
-            <textarea
-              {...register("scenarioPrompt")}
-              rows={3}
-              className={readOnlyClass}
-              readOnly
-            />
-          </div>
+          <form id="scenario-form" className="space-y-6">
+            {/* ID & Scenario Name */}
+            <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+              <div>
+                <label className="block text-xs font-semibold text-gray-700 mb-1">
+                  ID
+                </label>
+                <input
+                  type="text"
+                  disabled
+                  className="w-full border border-gray-300 p-2.5 rounded-md bg-gray-50 text-sm text-gray-500"
+                  placeholder="Auto-generated"
+                />
+              </div>
+              <div>
+                <label className="block text-xs font-semibold text-gray-700 mb-1">
+                  Scenario Name
+                </label>
+                <input
+                  {...register("scenarioName")}
+                  type="text"
+                  className="w-full border border-gray-300 p-2.5 rounded-md text-sm focus:ring-1 focus:ring-blue-500 outline-none"
+                  placeholder="e.g. _MVA_1"
+                />
+              </div>
+            </div>
 
-          <div className="grid grid-cols-1 gap-6">
-            <div className={disabledContainerClass}>
-              <label className="block text-xs font-bold text-gray-900 mb-2">
-                Difficulty (Read Only)
+            {/* Difficulty Level & Status */}
+            <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+              <div>
+                <label className="block text-xs font-semibold text-gray-700 mb-1">
+                  Difficulty Level
+                </label>
+                <select
+                  {...register("difficulty")}
+                  className="w-full border border-gray-300 p-2.5 rounded-md text-sm bg-white outline-none focus:ring-1 focus:ring-blue-500"
+                >
+                  <option value="Low">Low</option>
+                  <option value="Medium">Medium</option>
+                  <option value="High">High</option>
+                </select>
+              </div>
+              <div>
+                <label className="block text-xs font-semibold text-gray-700 mb-1">
+                  Status
+                </label>
+                <select
+                  {...register("status")}
+                  className="w-full border border-gray-300 p-2.5 rounded-md text-sm bg-white outline-none focus:ring-1 focus:ring-blue-500"
+                >
+                  <option value="Draft">Draft</option>
+                  <option value="Published">Published</option>
+                </select>
+              </div>
+            </div>
+
+            {/* Short Description */}
+            <div>
+              <label className="block text-xs font-semibold text-gray-700 mb-1">
+                Short Description
               </label>
-              <div className="flex bg-gray-100 p-1 rounded-lg">
-                {["Low", "Medium", "High"].map((level) => (
-                  <button
-                    key={level}
-                    type="button"
-                    className={`flex-1 py-2 text-xs font-medium rounded-md transition-all ${
-                      currentDifficulty === level
-                        ? "bg-white shadow-sm"
-                        : "text-gray-500"
-                    }`}
-                  >
-                    {level}
-                  </button>
+              <input
+                {...register("shortDescription")}
+                type="text"
+                className="w-full border border-gray-300 p-2.5 rounded-md text-sm outline-none focus:ring-1 focus:ring-blue-500"
+                placeholder="Junior MSK physiotherapist practicing history taking and clinical..."
+              />
+            </div>
+
+            {/* Animation Triggers - Shoulder */}
+            <div>
+              <h3 className="text-sm font-bold text-gray-800 mb-2">
+                Animation triggers - Shoulder
+              </h3>
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-y-3">
+                {SHOULDER_MOVEMENTS.map((movement) => (
+                  <div key={`shoulder-${movement.id}`} className="space-y-1">
+                    <label className="text-xs font-semibold text-gray-600 block">
+                      {movement.label}
+                    </label>
+                    <div className="flex flex-wrap gap-4 items-center">
+                      {movement.options.map((opt) => (
+                        <label
+                          key={opt}
+                          className="flex items-center text-xs text-gray-700 cursor-pointer"
+                        >
+                          <input
+                            type="radio"
+                            {...register(`movements.shoulder.${movement.id}`)}
+                            value={opt}
+                            className="mr-1.5 w-3.5 h-3.5 text-blue-600 border-gray-300 focus:ring-blue-500 cursor-pointer"
+                          />
+                          {`${movement.label}_${opt}`}
+                        </label>
+                      ))}
+                    </div>
+                  </div>
                 ))}
               </div>
             </div>
-          </div>
 
-          <div>
-            <label className="block text-xs font-bold text-gray-900 mb-2">
-              Questions (Read Only)
-            </label>
-            <textarea
-              {...register("aiQuestions")}
-              rows={4}
-              className={readOnlyClass}
-              readOnly
-            />
-          </div>
-
-          <div>
-            <label className="block text-xs font-bold text-gray-900 mb-2">
-              Description (Read Only)
-            </label>
-            <textarea
-              {...register("description")}
-              rows={2}
-              className={readOnlyClass}
-              readOnly
-            />
-          </div>
-        </form>
-
-        <div className="absolute bottom-8 left-8 right-8">
-          <div className="relative p-[2px] rounded-xl bg-gradient-to-r from-[#FF9D80] via-[#FF66C4] to-[#9F7AEA] shadow-lg">
-            <div className="bg-white rounded-[10px] flex items-center pr-2">
-              <div className="pl-3 text-gray-400">
-                {isAiLoading ? (
-                  <Loader className="w-4 h-4 animate-spin text-purple-600" />
-                ) : (
-                  <Sparkles className="w-4 h-4" />
-                )}
+            {/* Animation Triggers - Neck */}
+            <div className="pt-2">
+              <h3 className="text-sm font-bold text-gray-800 mb-2">
+                Animation triggers - Neck
+              </h3>
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-y-3">
+                {NECK_MOVEMENTS.map((movement) => (
+                  <div key={`neck-${movement.id}`} className="space-y-1">
+                    <label className="text-xs font-semibold text-gray-600 block">
+                      {movement.label}
+                    </label>
+                    <div className="flex flex-wrap gap-4 items-center">
+                      {movement.options.map((opt) => (
+                        <label
+                          key={opt}
+                          className="flex items-center text-xs text-gray-700 cursor-pointer"
+                        >
+                          <input
+                            type="radio"
+                            {...register(`movements.neck.${movement.id}`)}
+                            value={opt}
+                            className="mr-1.5 w-3.5 h-3.5 text-blue-600 border-gray-300 focus:ring-blue-500 cursor-pointer"
+                          />
+                          {`${movement.label}_${opt}`}
+                        </label>
+                      ))}
+                    </div>
+                  </div>
+                ))}
               </div>
-              <input
-                type="text"
-                value={aiInput}
-                onChange={(e) => setAiInput(e.target.value)}
-                onKeyDown={(e) => e.key === "Enter" && handleAskAI(e)}
-                disabled={isAiLoading}
-                placeholder={
-                  isAiLoading
-                    ? "AI is processing..."
-                    : "Ask AI to generate the form content..."
-                }
-                className="w-full px-3 py-3 text-sm outline-none bg-transparent placeholder:text-gray-400"
-              />
-              <button
-                onClick={handleAskAI}
-                disabled={isAiLoading || !aiInput}
-                className={`w-8 h-8 flex items-center justify-center rounded-full text-white transition-colors ${
-                  isAiLoading ? "bg-gray-400" : "bg-black hover:bg-gray-800"
-                }`}
-              >
-                <ArrowUp className="w-4 h-4" />
-              </button>
             </div>
-          </div>
+
+            {/* HDML text area */}
+            <div>
+              <label className="block text-xs font-semibold text-gray-700 mb-1">
+                HDML
+              </label>
+              <textarea
+                {...register("hdml")}
+                rows={4}
+                className="w-full border border-gray-300 p-2.5 rounded-md text-sm outline-none focus:ring-1 focus:ring-blue-500"
+              ></textarea>
+            </div>
+
+            {/* Scenario Prompt (React Quill) */}
+            <div>
+              <label className="block text-xs font-semibold text-gray-700 mb-1">
+                Scenario Prompt
+              </label>
+              <div className="bg-white border-gray-300 rounded-md overflow-hidden">
+                <Controller
+                  name="scenarioPrompt"
+                  control={control}
+                  render={({ field }) => (
+                    <ReactQuill
+                      theme="snow"
+                      value={field.value}
+                      onChange={field.onChange}
+                      modules={quillModules}
+                      className="h-48 mb-10"
+                    />
+                  )}
+                />
+              </div>
+            </div>
+
+            {/* Questions for Feedback (React Quill) */}
+            <div className="pt-2">
+              <label className="block text-xs font-semibold text-gray-700 mb-1">
+                Questions for & Feedback
+              </label>
+              <div className="bg-white border-gray-300 rounded-md overflow-hidden">
+                <Controller
+                  name="questionsForFeedback"
+                  control={control}
+                  render={({ field }) => (
+                    <ReactQuill
+                      theme="snow"
+                      value={field.value}
+                      onChange={field.onChange}
+                      modules={quillModules}
+                      className="h-48 mb-10"
+                    />
+                  )}
+                />
+              </div>
+            </div>
+          </form>
+        </div>
+
+        {/* Bottom Action Footer */}
+        <div className="p-4 border-t border-gray-100 flex justify-end gap-3 bg-white rounded-b-lg">
+          <button
+            type="button"
+            className="px-6 py-2 rounded-md text-sm font-semibold text-white bg-red-600 hover:bg-red-700 shadow-sm transition-colors"
+          >
+            Delete
+          </button>
+          <button
+            onClick={handleSubmit(onSubmit)}
+            disabled={isSaving || isAiLoading}
+            className="px-6 py-2 rounded-md text-sm font-semibold text-white bg-orange-400 hover:bg-orange-500 shadow-sm transition-colors disabled:opacity-50 flex items-center gap-2"
+          >
+            {isSaving && <Loader className="w-4 h-4 animate-spin" />}
+            {isDbEdit ? "Save Changes" : "Publish Scenario"}
+          </button>
         </div>
       </div>
     </div>
   );
 }
+
 export default ScenarioFormPage;
