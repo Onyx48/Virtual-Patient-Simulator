@@ -7,6 +7,7 @@ import axios from "axios";
 import {
   addScenario,
   updateScenario,
+  deleteScenario,
 } from "../../redux/slices/scenarioSlice.js";
 import { Sparkles, ArrowUp, Loader, X, AlertCircle } from "lucide-react";
 
@@ -197,7 +198,6 @@ function ScenarioFormPage() {
       const rawData = response.data;
       const returnedJson = rawData.response ? rawData.response : rawData;
 
-      // 1. Map Text & Dropdown Fields
       if (returnedJson.scenario_name) {
         setValue("scenarioName", returnedJson.scenario_name);
         setValue("shortDescription", returnedJson.scenario_name);
@@ -247,9 +247,25 @@ function ScenarioFormPage() {
     } catch (err) {
       setErrorPopup({
         open: true,
-        message: err.message || "Failed to save scenario.",
+        message: err?.message || err || "Failed to save scenario.",
       });
     } finally {
+      setIsSaving(false);
+    }
+  };
+
+  const handleDelete = async () => {
+    if (!window.confirm("Are you sure you want to delete this scenario?"))
+      return;
+    setIsSaving(true);
+    try {
+      await dispatch(deleteScenario(id)).unwrap();
+      navigate("/scenarios");
+    } catch (err) {
+      setErrorPopup({
+        open: true,
+        message: err?.message || err || "Failed to delete scenario.",
+      });
       setIsSaving(false);
     }
   };
@@ -275,7 +291,9 @@ function ScenarioFormPage() {
         </div>
 
         <div className="flex justify-between items-center p-6 pb-2 border-b-0">
-          <h2 className="text-xl font-bold text-gray-800">Add Scenario</h2>
+          <h2 className="text-xl font-bold text-gray-800">
+            {isDbEdit ? "Edit Scenario" : "Add Scenario"}
+          </h2>
         </div>
 
         <div className="p-6 pt-0 overflow-y-auto max-h-[85vh]">
@@ -315,6 +333,7 @@ function ScenarioFormPage() {
                 <input
                   type="text"
                   disabled
+                  value={id || ""}
                   className="w-full border border-gray-300 p-2.5 rounded-md bg-gray-50 text-sm text-gray-500"
                   placeholder="Auto-generated"
                 />
@@ -332,33 +351,19 @@ function ScenarioFormPage() {
               </div>
             </div>
 
-            {/* Difficulty Level & Status */}
-            <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-              <div>
-                <label className="block text-xs font-semibold text-gray-700 mb-1">
-                  Difficulty Level
-                </label>
-                <select
-                  {...register("difficulty")}
-                  className="w-full border border-gray-300 p-2.5 rounded-md text-sm bg-white outline-none focus:ring-1 focus:ring-blue-500"
-                >
-                  <option value="Low">Low</option>
-                  <option value="Medium">Medium</option>
-                  <option value="High">High</option>
-                </select>
-              </div>
-              <div>
-                <label className="block text-xs font-semibold text-gray-700 mb-1">
-                  Status
-                </label>
-                <select
-                  {...register("status")}
-                  className="w-full border border-gray-300 p-2.5 rounded-md text-sm bg-white outline-none focus:ring-1 focus:ring-blue-500"
-                >
-                  <option value="Draft">Draft</option>
-                  <option value="Published">Published</option>
-                </select>
-              </div>
+            {/* Difficulty Level - NOW STRETCHED TO FULL WIDTH */}
+            <div>
+              <label className="block text-xs font-semibold text-gray-700 mb-1">
+                Difficulty Level
+              </label>
+              <select
+                {...register("difficulty")}
+                className="w-full border border-gray-300 p-2.5 rounded-md text-sm bg-white outline-none focus:ring-1 focus:ring-blue-500"
+              >
+                <option value="Easy">Easy</option>
+                <option value="Medium">Medium</option>
+                <option value="Hard">Hard</option>
+              </select>
             </div>
 
             <div>
@@ -447,11 +452,12 @@ function ScenarioFormPage() {
               ></textarea>
             </div>
 
+            {/* Scenario Prompt Text Editor */}
             <div>
               <label className="block text-xs font-semibold text-gray-700 mb-1">
                 Scenario Prompt
               </label>
-              <div className="bg-white border-gray-300 rounded-md overflow-hidden">
+              <div className="bg-white [&_.ql-container]:h-[350px] [&_.ql-editor]:min-h-full">
                 <Controller
                   name="scenarioPrompt"
                   control={control}
@@ -461,18 +467,18 @@ function ScenarioFormPage() {
                       value={field.value}
                       onChange={field.onChange}
                       modules={quillModules}
-                      className="h-48 mb-10"
                     />
                   )}
                 />
               </div>
             </div>
 
-            <div className="pt-2">
+            {/* Questions for & Feedback Text Editor */}
+            <div className="pt-6">
               <label className="block text-xs font-semibold text-gray-700 mb-1">
                 Questions for & Feedback
               </label>
-              <div className="bg-white border-gray-300 rounded-md overflow-hidden">
+              <div className="bg-white [&_.ql-container]:h-[300px] [&_.ql-editor]:min-h-full">
                 <Controller
                   name="questionsForFeedback"
                   control={control}
@@ -482,7 +488,6 @@ function ScenarioFormPage() {
                       value={field.value}
                       onChange={field.onChange}
                       modules={quillModules}
-                      className="h-48 mb-10"
                     />
                   )}
                 />
@@ -491,21 +496,50 @@ function ScenarioFormPage() {
           </form>
         </div>
 
-        <div className="p-4 border-t border-gray-100 flex justify-end gap-3 bg-white rounded-b-lg">
-          <button
-            type="button"
-            className="px-6 py-2 rounded-md text-sm font-semibold text-white bg-red-600 hover:bg-red-700 shadow-sm transition-colors"
-          >
-            Delete
-          </button>
-          <button
-            onClick={handleSubmit(onSubmit)}
-            disabled={isSaving || isAiLoading}
-            className="px-6 py-2 rounded-md text-sm font-semibold text-white bg-orange-400 hover:bg-orange-500 shadow-sm transition-colors disabled:opacity-50 flex items-center gap-2"
-          >
-            {isSaving && <Loader className="w-4 h-4 animate-spin" />}
-            {isDbEdit ? "Save Changes" : "Publish Scenario"}
-          </button>
+        {/* Footer Buttons Section */}
+        <div className="p-4 border-t border-gray-100 flex items-center justify-between bg-white rounded-b-lg">
+          <div>
+            {/* DELETE BUTTON: Only show if editing an existing scenario */}
+            {isDbEdit && (
+              <button
+                type="button"
+                onClick={handleDelete}
+                disabled={isSaving || isAiLoading}
+                className="px-6 py-2 rounded-md text-sm font-semibold text-white bg-red-600 hover:bg-red-700 shadow-sm transition-colors"
+              >
+                Delete
+              </button>
+            )}
+          </div>
+
+          <div className="flex gap-3">
+            {/* SAVE AS DRAFT BUTTON */}
+            <button
+              type="button"
+              onClick={() => {
+                setValue("status", "Draft");
+                handleSubmit(onSubmit)();
+              }}
+              disabled={isSaving || isAiLoading}
+              className="px-6 py-2 rounded-md text-sm font-semibold text-gray-700 bg-gray-200 hover:bg-gray-300 shadow-sm transition-colors disabled:opacity-50"
+            >
+              Save as Draft
+            </button>
+
+            {/* PUBLISH SCENARIO BUTTON */}
+            <button
+              type="button"
+              onClick={() => {
+                setValue("status", "Published");
+                handleSubmit(onSubmit)();
+              }}
+              disabled={isSaving || isAiLoading}
+              className="px-6 py-2 rounded-md text-sm font-semibold text-white bg-orange-400 hover:bg-orange-500 shadow-sm transition-colors disabled:opacity-50 flex items-center gap-2"
+            >
+              {isSaving && <Loader className="w-4 h-4 animate-spin" />}
+              {isDbEdit ? "Publish Changes" : "Publish Scenario"}
+            </button>
+          </div>
         </div>
       </div>
     </div>
