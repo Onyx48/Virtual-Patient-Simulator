@@ -188,7 +188,7 @@ function ScenarioFormPage() {
     ? scenarios.find((s) => s._id === id || s.id === id)
     : null;
 
-  const { register, handleSubmit, setValue, control } = useForm({
+  const { register, handleSubmit, setValue, control, watch } = useForm({
     defaultValues: {
       scenarioName: "",
       difficulty: "Medium",
@@ -198,7 +198,7 @@ function ScenarioFormPage() {
         shoulder: {},
         neck: {},
       },
-      hdml: "",
+      html: "",
       scenarioPrompt: "",
       questionsForFeedback: "",
     },
@@ -243,7 +243,9 @@ function ScenarioFormPage() {
         );
       }
 
-      if (selectedScenario.hdml) setValue("hdml", selectedScenario.hdml);
+      // Support both new "html" key and legacy "hdml" key from existing data
+      if (selectedScenario.html || selectedScenario.hdml)
+        setValue("html", selectedScenario.html || selectedScenario.hdml);
     }
   }, [isDbEdit, selectedScenario, setValue]);
 
@@ -351,7 +353,7 @@ function ScenarioFormPage() {
 
   return (
     <>
-      {/* ✅ Modals are now outside the scrollable overlay so fixed positioning
+      {/* Modals are outside the scrollable overlay so fixed positioning
           covers the true viewport and backdrop-blur fills the full screen */}
       <ConfirmationModal
         isOpen={showConfirmModal}
@@ -528,13 +530,27 @@ function ScenarioFormPage() {
 
               <div>
                 <label className="block text-xs font-semibold text-gray-700 mb-1">
-                  HDML
+                  HTML
                 </label>
                 <textarea
-                  {...register("hdml")}
+                  {...register("html")}
                   rows={4}
                   className="w-full border border-gray-300 p-2.5 rounded-md text-sm outline-none focus:ring-1 focus:ring-blue-500"
                 ></textarea>
+
+                {watch("html") && (
+                  <div className="mt-2 border border-gray-200 rounded-md overflow-hidden">
+                    <p className="text-xs font-semibold text-gray-500 px-3 py-1 bg-gray-50 border-b border-gray-200">
+                      Preview
+                    </p>
+                    <iframe
+                      srcDoc={watch("html")}
+                      sandbox="allow-scripts"
+                      title="HTML Preview"
+                      className="w-full h-48 bg-white"
+                    />
+                  </div>
+                )}
               </div>
 
               <div>

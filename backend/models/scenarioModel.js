@@ -39,6 +39,7 @@ const scenarioSchema = new mongoose.Schema(
       shoulder: [{ type: String }],
       neck: [{ type: String }],
     },
+    html: { type: String },
   },
   {
     timestamps: true,

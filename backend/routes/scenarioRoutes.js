@@ -121,6 +121,7 @@ router.post(
       difficulty,
       animationTriggers,
       apiKey,
+      html,
     } = req.body;
 
     console.log("POST /scenarios - Received body:", req.body);
@@ -180,6 +181,7 @@ router.post(
         difficulty: difficulty || "Medium",
         animationTriggers: animationTriggers || { shoulder: [], neck: [] },
         apiKey: apiKey || "",
+        html: html || "",
       };
 
       if (customId) {
@@ -236,6 +238,7 @@ router.put(
       difficulty,
       animationTriggers,
       apiKey,
+      html,
     } = req.body;
 
     let assignedUserIds = [];
@@ -293,6 +296,7 @@ router.put(
       if (animationTriggers !== undefined)
         scenario.animationTriggers = animationTriggers;
       if (apiKey !== undefined) scenario.apiKey = apiKey;
+      if (html !== undefined) scenario.html = html;
 
       await scenario.save();
       console.log("Updated scenario assignedTo:", scenario.assignedTo);
