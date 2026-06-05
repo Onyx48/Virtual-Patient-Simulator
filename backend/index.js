@@ -17,6 +17,7 @@ connectDB();
 app.use(
   cors({
     origin: [
+      "https://vps.metawingsxr.com",
       "https://vpsdashboard.metawingsxr.com",
       "http://localhost:5173", // Keep local for testing
       // ADD YOUR PRODUCTION FRONTEND
