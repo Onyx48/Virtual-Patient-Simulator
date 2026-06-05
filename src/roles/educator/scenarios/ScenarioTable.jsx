@@ -54,7 +54,7 @@ function ScenarioTable({ data, onEditClick, canEdit = true }) {
                   <Loader2 className="w-4 h-4 text-orange-400 animate-[spin_3s_linear_infinite]" />
                 </div>
                 <span className="text-xs font-bold text-gray-700">
-                  {scenario.avgScore || "4 Avg Score"}
+                  {scenario.avgScore || "0 Avg Score"}
                 </span>
               </div>
             </div>
