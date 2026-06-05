@@ -17,8 +17,10 @@ connectDB();
 app.use(
   cors({
     origin: [
+      "https://vpsdashboard.metawingsxr.com",
       "http://localhost:5173", // Keep local for testing
-      "https://vpsdashboard.metawingsxr.com", // ADD YOUR PRODUCTION FRONTEND
+      // ADD YOUR PRODUCTION FRONTEND
+      ,
     ],
     credentials: true,
   }),
@@ -44,7 +46,7 @@ app.get("/debug/env", (req, res) => {
   res.json({
     AWS_REGION: process.env.AWS_REGION,
     EMAIL_FROM: process.env.EMAIL_FROM,
-    AWS_ACCESS_KEY_ID: process.env.AWS_ACCESS_KEY_ID ? "present" : "missing"
+    AWS_ACCESS_KEY_ID: process.env.AWS_ACCESS_KEY_ID ? "present" : "missing",
   });
 });
 
