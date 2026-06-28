@@ -83,6 +83,10 @@ function AssignScenariosModal({ onClose, onAssignSuccess }) {
   };
 
   const handleAssign = () => {
+    const nameMap = {};
+    students.forEach(s => { nameMap[s._id] = s.name; });
+    scenarios.forEach(s => (s.assignedTo || []).forEach(a => { nameMap[a._id] = a.name; }));
+
     const changes = [];
     scenarios.forEach((scenario) => {
       const currentAssigned = (scenario.assignedTo || []).map(u => u._id);
@@ -94,16 +98,10 @@ function AssignScenariosModal({ onClose, onAssignSuccess }) {
           console.log("Assigned to IDs for scenario", scenario._id, ":", assignedToIds);
           const studentUpdates = [];
           added.forEach((userId) => {
-            const student = students.find(s => s._id === userId);
-            if (student) {
-              studentUpdates.push({ studentId: student._id, addScenarios: [scenario._id], removeScenarios: [] });
-            }
+            studentUpdates.push({ studentId: userId, addScenarios: [scenario._id], removeScenarios: [] });
           });
           removed.forEach((userId) => {
-            const student = students.find(s => s._id === userId);
-            if (student) {
-              studentUpdates.push({ studentId: student._id, addScenarios: [], removeScenarios: [scenario._id] });
-            }
+            studentUpdates.push({ studentId: userId, addScenarios: [], removeScenarios: [scenario._id] });
           });
         changes.push({
           scenarioId: scenario._id,
@@ -111,10 +109,10 @@ function AssignScenariosModal({ onClose, onAssignSuccess }) {
           assignedToIds,
           studentUpdates,
           addedStudents: added.map(
-            (userId) => students.find((s) => s._id === userId)?.name || userId
+            (userId) => nameMap[userId] || userId
           ),
           removedStudents: removed.map(
-            (userId) => students.find((s) => s._id === userId)?.name || userId
+            (userId) => nameMap[userId] || userId
           ),
         });
       }

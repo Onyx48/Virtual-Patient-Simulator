@@ -1,10 +1,12 @@
 // src/components/ScenariosPage.jsx
-import React, { useState } from 'react';
-import ScenarioManagementControls from '../roles/educator/scenarios/ScenarioManagementControls.jsx'; // Temporarily import, later make shared
+import React, { useState, useEffect } from 'react';
+import ScenarioManagementControls from '../roles/educator/scenarios/ScenarioManagementControls.jsx';
 import ScenarioTable from '../roles/educator/scenarios/ScenarioTable.jsx';
 import ScenarioModal from './ScenarioModal.jsx';
+import PaginationBar from './ui/PaginationBar';
 import { useEntityFilters } from '../lib/hooks/useEntityFilters.js';
 import { useSorting } from '../lib/hooks/useSorting.js';
+import { usePagination } from '../lib/hooks/usePagination';
 
 function ScenariosPage({ scenarios, onAdd, onEdit, canEdit = true, canAdd = true }) {
   const [searchTerm, setSearchTerm] = useState('');
@@ -22,6 +24,26 @@ function ScenariosPage({ scenarios, onAdd, onEdit, canEdit = true, canAdd = true
 
   // Sort scenarios
   const { sortedData, handleSort } = useSorting(filteredScenarios);
+
+  const {
+    paginatedData,
+    currentPage,
+    totalPages,
+    totalItems,
+    pageNumbers,
+    handlePageChange,
+    nextPage,
+    prevPage,
+    isFirstPage,
+    isLastPage,
+    rangeStart,
+    rangeEnd,
+    resetPage,
+  } = usePagination(sortedData, 8);
+
+  useEffect(() => {
+    resetPage();
+  }, [searchTerm, filterCriteria]);
 
   const handleAddClick = () => {
     if (canAdd) {
@@ -60,10 +82,23 @@ function ScenariosPage({ scenarios, onAdd, onEdit, canEdit = true, canAdd = true
         initialFilters={filterCriteria}
       />
       <ScenarioTable
-        data={sortedData}
+        data={paginatedData}
         onEditClick={handleEditClick}
         onSort={handleSort}
         canEdit={canEdit}
+      />
+      <PaginationBar
+        currentPage={currentPage}
+        totalPages={totalPages}
+        totalItems={totalItems}
+        pageNumbers={pageNumbers}
+        onPageChange={handlePageChange}
+        onPrevPage={prevPage}
+        onNextPage={nextPage}
+        isFirstPage={isFirstPage}
+        isLastPage={isLastPage}
+        rangeStart={rangeStart}
+        rangeEnd={rangeEnd}
       />
       {isModalOpen && (
         <ScenarioModal

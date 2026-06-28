@@ -4,18 +4,21 @@ import axios from "axios";
 import { getAuthHeaders } from "../lib/utils.js";
 import ScenarioManagementControlsStudent from "../roles/student/scenarios/ScenarioManagementControlsStudent.jsx";
 import ScenrioGridStudent from "../roles/student/scenarios/ScenrioGridStudent.jsx";
+import PaginationBar from "./ui/PaginationBar";
+import { usePagination } from "../lib/hooks/usePagination";
+import { useLoading, Spinner } from "../lib/hooks/useLoading";
 import toast from "react-hot-toast";
 
 function StudentScenariosPage() {
   const { user } = useAuth();
   const [scenarios, setScenarios] = useState([]);
-  const [loading, setLoading] = useState(true);
+  const { isLoading, withLoading } = useLoading(true);
   const [searchTerm, setSearchTerm] = useState("");
   const [sortConfig, setSortConfig] = useState("All");
 
   useEffect(() => {
     const fetchScenarios = async () => {
-      try {
+      await withLoading(async () => {
         const response = await axios.get("/api/scenarios", getAuthHeaders());
         const mappedScenarios = response.data.map((scenario) => ({
           id: scenario._id,
@@ -26,11 +29,7 @@ function StudentScenariosPage() {
           status: scenario.status,
         }));
         setScenarios(mappedScenarios);
-      } catch (error) {
-        console.error("Error fetching scenarios:", error);
-      } finally {
-        setLoading(false);
-      }
+      });
     };
     if (user) fetchScenarios();
   }, [user]);
@@ -77,7 +76,27 @@ function StudentScenariosPage() {
     return filtered;
   }, [scenarios, searchTerm, sortConfig]);
 
-  if (loading) return <div className="p-8">Loading scenarios...</div>;
+  const {
+    paginatedData,
+    currentPage,
+    totalPages,
+    totalItems,
+    pageNumbers,
+    handlePageChange,
+    nextPage,
+    prevPage,
+    isFirstPage,
+    isLastPage,
+    rangeStart,
+    rangeEnd,
+    resetPage,
+  } = usePagination(processedScenarios, 8);
+
+  useEffect(() => {
+    resetPage();
+  }, [searchTerm, sortConfig]);
+
+  if (isLoading) return <div className="p-8 flex justify-center"><Spinner size={40} /></div>;
 
   return (
     <div className="p-8 bg-gray-50 min-h-screen font-sans">
@@ -92,8 +111,21 @@ function StudentScenariosPage() {
         onSortChange={setSortConfig}
       />
       <ScenrioGridStudent
-        data={processedScenarios}
+        data={paginatedData}
         onStartNow={handleStartNow}
+      />
+      <PaginationBar
+        currentPage={currentPage}
+        totalPages={totalPages}
+        totalItems={totalItems}
+        pageNumbers={pageNumbers}
+        onPageChange={handlePageChange}
+        onPrevPage={prevPage}
+        onNextPage={nextPage}
+        isFirstPage={isFirstPage}
+        isLastPage={isLastPage}
+        rangeStart={rangeStart}
+        rangeEnd={rangeEnd}
       />
     </div>
   );

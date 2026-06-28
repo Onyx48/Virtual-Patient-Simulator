@@ -9,14 +9,17 @@ import SchoolManagementControls from "./SchoolManagementControls.jsx";
 import SchoolTable from "./SchoolTable.jsx";
 import SchoolAdminModal from "../../../components/SchoolAdminModal.jsx";
 import ConfirmationModal from "../../../components/ui/ConfirmationModal.jsx";
+import PaginationBar from "../../../components/ui/PaginationBar";
 import { toast } from "react-hot-toast";
+import { usePagination } from "../../../lib/hooks/usePagination";
+import { useLoading, Spinner } from "../../../lib/hooks/useLoading";
 
 function SchoolsPage() {
   const { user } = useAuth();
   const navigate = useNavigate();
 
   const [schools, setSchools] = useState([]);
-  const [isLoading, setIsLoading] = useState(true);
+  const { isLoading, withLoading } = useLoading(true);
   const [error, setError] = useState(null);
   const [searchTerm, setSearchTerm] = useState("");
   const [isSchoolAdminModalOpen, setIsSchoolAdminModalOpen] = useState(false);
@@ -28,25 +31,24 @@ function SchoolsPage() {
   const [isDeletingId, setIsDeletingId] = useState(null);
 
   const fetchSchools = useCallback(async () => {
-    setIsLoading(true);
-    try {
-      const response = await axios.get("/api/schools", {
-        params: { searchTerm },
-        ...getAuthHeaders(),
-      });
+    await withLoading(async () => {
+      try {
+        const response = await axios.get("/api/schools", {
+          params: { searchTerm },
+          ...getAuthHeaders(),
+        });
 
-      const fetchedSchools = response.data.map((school) => ({
-        ...school,
-        startDate: school.startDate ? new Date(school.startDate) : null,
-        expireDate: school.expireDate ? new Date(school.expireDate) : null,
-      }));
-      setSchools(fetchedSchools);
-    } catch (err) {
-      console.error("Error fetching schools:", err);
-      setError(err.response?.data?.message || "Failed to load schools.");
-    } finally {
-      setIsLoading(false);
-    }
+        const fetchedSchools = response.data.map((school) => ({
+          ...school,
+          startDate: school.startDate ? new Date(school.startDate) : null,
+          expireDate: school.expireDate ? new Date(school.expireDate) : null,
+        }));
+        setSchools(fetchedSchools);
+      } catch (err) {
+        console.error("Error fetching schools:", err);
+        setError(err.response?.data?.message || "Failed to load schools.");
+      }
+    });
   }, [searchTerm]);
 
   const fetchAvailableSchools = useCallback(async () => {
@@ -69,6 +71,26 @@ function SchoolsPage() {
   useEffect(() => {
     fetchSchools();
   }, [fetchSchools]);
+
+  const {
+    paginatedData,
+    currentPage,
+    totalPages,
+    totalItems,
+    pageNumbers,
+    handlePageChange,
+    nextPage,
+    prevPage,
+    isFirstPage,
+    isLastPage,
+    rangeStart,
+    rangeEnd,
+    resetPage,
+  } = usePagination(schools, 8);
+
+  useEffect(() => {
+    resetPage();
+  }, [searchTerm]);
 
   const handleAddNewClick = () => {
     navigate("/schools/add");
@@ -110,7 +132,7 @@ function SchoolsPage() {
     }
   };
 
-  if (isLoading) return <div className="p-8">Loading schools...</div>;
+  if (isLoading) return <div className="p-8 flex justify-center"><Spinner size={40} /></div>;
 
   return (
     <div className="p-6 max-w-7xl mx-auto">
@@ -137,12 +159,25 @@ function SchoolsPage() {
       />
 
       <SchoolTable
-        data={schools}
+        data={paginatedData}
         onEditClick={handleEditClick}
         onDeleteClick={handleDeleteClick}
         onSort={() => {}}
         canEdit={user?.role === "superadmin"}
         isDeletingId={isDeletingId}
+      />
+      <PaginationBar
+        currentPage={currentPage}
+        totalPages={totalPages}
+        totalItems={totalItems}
+        pageNumbers={pageNumbers}
+        onPageChange={handlePageChange}
+        onPrevPage={prevPage}
+        onNextPage={nextPage}
+        isFirstPage={isFirstPage}
+        isLastPage={isLastPage}
+        rangeStart={rangeStart}
+        rangeEnd={rangeEnd}
       />
 
       {isSchoolAdminModalOpen && (

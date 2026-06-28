@@ -211,18 +211,10 @@ router.post(
       });
       await user.save();
       if (creatorRole) {
-        console.log("[AUTH] Calling sendWelcomeEmail for:", lowerEmail);
-        sendWelcomeEmail({ toEmail: lowerEmail, name, password }).catch((err) =>
-          console.error("[AUTH] Welcome email failed:", err),
-        );
+        console.log("[AUTH] Welcome email skipped (temporarily disabled)");
       }
 
-      console.log("[AUTH] Calling sendWelcomeEmail for user:", lowerEmail);
-      sendWelcomeEmail({
-        toEmail: lowerEmail,
-        name,
-        password,
-      }).catch((err) => console.error("[AUTH] Welcome email failed:", err));
+      console.log("[AUTH] Welcome email skipped (temporarily disabled)");
 
       res.status(201).json({
         _id: user._id,
@@ -303,9 +295,7 @@ router.post(
 
       const otp = generateOTP();
       await storeOTPAndAttempts(lowerEmail, otp);
-      sendOTPEmail(lowerEmail, otp).catch((err) =>
-        console.error("OTP email failed:", err),
-      );
+      console.log("[AUTH] OTP email skipped (temporarily disabled). OTP:", otp);
 
       res.status(200).json({ message: "OTP sent." });
     } catch (error) {

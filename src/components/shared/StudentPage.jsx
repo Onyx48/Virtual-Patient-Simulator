@@ -7,8 +7,6 @@ import {
   PlusIcon,
   PencilSquareIcon,
   TrashIcon,
-  ChevronLeftIcon,
-  ChevronRightIcon,
   ArrowUpTrayIcon,
 } from "@heroicons/react/24/outline";
 
@@ -16,8 +14,11 @@ import StudentModal from "../StudentModal";
 import AssignScenariosModal from "./AssignScenariosModal";
 import TranscriptViewerModal from "../ui/TranscriptViewerModal";
 import ConfirmationModal from "../ui/ConfirmationModal";
+import PaginationBar from "../ui/PaginationBar";
 import { toast } from "react-hot-toast";
 import { useAuth } from "../../AuthContext";
+import { usePagination } from "../../lib/hooks/usePagination";
+import { useLoading, Spinner, FullPageSpinner } from "../../lib/hooks/useLoading";
 
 const getAuthHeaders = () => {
   const token = localStorage.getItem("token");
@@ -27,8 +28,8 @@ const getAuthHeaders = () => {
 function StudentPage({ role }) {
   const { user } = useAuth();
   const [students, setStudents] = useState([]);
-  const [loading, setLoading] = useState(true);
   const [searchTerm, setSearchTerm] = useState("");
+  const { isLoading, withLoading } = useLoading(true);
 
   const [isUploading, setIsUploading] = useState(false);
   const fileInputRef = useRef(null);
@@ -43,12 +44,8 @@ function StudentPage({ role }) {
   const [confirmMessage, setConfirmMessage] = useState("");
   const [onConfirmAction, setOnConfirmAction] = useState(() => {});
 
-  const [currentPage, setCurrentPage] = useState(1);
-  const itemsPerPage = 8;
-
   const fetchStudents = async () => {
-    try {
-      setLoading(true);
+    await withLoading(async () => {
       const response = await axios.get(
         "/api/users?role=student",
         getAuthHeaders(),
@@ -66,12 +63,7 @@ function StudentPage({ role }) {
         originalData: student,
       }));
       setStudents(mappedData);
-    } catch (error) {
-      console.error("Error loading students:", error);
-      toast.error("Could not load students.");
-    } finally {
-      setLoading(false);
-    }
+    });
   };
 
   useEffect(() => {
@@ -249,10 +241,25 @@ function StudentPage({ role }) {
     );
   }, [students, searchTerm]);
 
-  const paginatedData = useMemo(() => {
-    const start = (currentPage - 1) * itemsPerPage;
-    return filteredData.slice(start, start + itemsPerPage);
-  }, [filteredData, currentPage]);
+  const {
+    paginatedData,
+    currentPage,
+    totalPages,
+    totalItems,
+    pageNumbers,
+    handlePageChange,
+    nextPage,
+    prevPage,
+    isFirstPage,
+    isLastPage,
+    rangeStart,
+    rangeEnd,
+    resetPage,
+  } = usePagination(filteredData, 8);
+
+  useEffect(() => {
+    resetPage();
+  }, [searchTerm]);
 
   return (
     <div className="p-8 bg-white min-h-screen font-sans">
@@ -350,13 +357,10 @@ function StudentPage({ role }) {
             </tr>
           </thead>
           <tbody className="bg-white divide-y divide-gray-100">
-            {loading ? (
+            {isLoading ? (
               <tr>
-                <td
-                  colSpan="8"
-                  className="px-6 py-12 text-center text-gray-500"
-                >
-                  Loading students...
+                <td colSpan="8" className="px-6 py-12 text-center">
+                  <Spinner size={32} />
                 </td>
               </tr>
             ) : paginatedData.length === 0 ? (
@@ -438,61 +442,19 @@ function StudentPage({ role }) {
             )}
           </tbody>
         </table>
-      </div>
-
-      <div className="flex items-center justify-between mt-6">
-        <p className="text-sm text-gray-500">
-          Showing{" "}
-          <span className="font-medium">
-            {(currentPage - 1) * itemsPerPage + 1}
-          </span>{" "}
-          to{" "}
-          <span className="font-medium">
-            {Math.min(currentPage * itemsPerPage, filteredData.length)}
-          </span>{" "}
-          of <span className="font-medium">{filteredData.length}</span> total
-        </p>
-        <div className="flex gap-2">
-          <button
-            onClick={() => setCurrentPage((prev) => Math.max(prev - 1, 1))}
-            disabled={currentPage === 1}
-            className="p-2 rounded-lg hover:bg-gray-100 disabled:opacity-30 disabled:hover:bg-transparent"
-          >
-            <ChevronLeftIcon className="w-5 h-5 text-gray-600" />
-          </button>
-          {[...Array(Math.ceil(filteredData.length / itemsPerPage))].map(
-            (_, idx) => (
-              <button
-                key={idx}
-                onClick={() => setCurrentPage(idx + 1)}
-                className={`w-8 h-8 rounded-lg text-sm font-medium transition-colors ${
-                  currentPage === idx + 1
-                    ? "bg-orange-500 text-white shadow-sm"
-                    : "text-gray-600 hover:bg-gray-100"
-                }`}
-              >
-                {idx + 1}
-              </button>
-            ),
-          )}
-          <button
-            onClick={() =>
-              setCurrentPage((prev) =>
-                Math.min(
-                  prev + 1,
-                  Math.ceil(filteredData.length / itemsPerPage),
-                ),
-              )
-            }
-            disabled={
-              currentPage >= Math.ceil(filteredData.length / itemsPerPage)
-            }
-            className="p-2 rounded-lg hover:bg-gray-100 disabled:opacity-30 disabled:hover:bg-transparent"
-          >
-            <ChevronRightIcon className="w-5 h-5 text-gray-600" />
-          </button>
-        </div>
-      </div>
+        <PaginationBar
+        currentPage={currentPage}
+        totalPages={totalPages}
+        totalItems={totalItems}
+        pageNumbers={pageNumbers}
+        onPageChange={handlePageChange}
+        onPrevPage={prevPage}
+        onNextPage={nextPage}
+        isFirstPage={isFirstPage}
+        isLastPage={isLastPage}
+        rangeStart={rangeStart}
+        rangeEnd={rangeEnd}
+      />
 
       {isStudentModalOpen && role !== "school_admin" && (
         <div className="fixed inset-0 z-50 bg-black/40 backdrop-blur-sm flex justify-center items-center">

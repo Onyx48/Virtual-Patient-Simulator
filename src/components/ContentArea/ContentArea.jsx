@@ -1,6 +1,7 @@
 import React, { lazy, Suspense } from "react";
 import { Routes, Route, Navigate } from "react-router-dom";
 import { useAuth } from "../../AuthContext";
+import { FullPageSpinner } from "../../lib/hooks/useLoading";
 
 const StudentDashboard = lazy(() => import("../../roles/student/Dashboard"));
 const EducatorDashboard = lazy(() => import("../../roles/educator/Dashboard"));
@@ -11,24 +12,24 @@ const SchoolAdminDashboard = lazy(
   () => import("../../roles/school_admin/Dashboard"),
 );
 
-import SchoolsPage from "../../roles/superadmin/schools/Schools";
-import SchoolFormPage from "../../roles/superadmin/schools/SchoolFormPage";
+const SchoolsPage = lazy(() => import("../../roles/superadmin/schools/Schools"));
+const SchoolFormPage = lazy(() => import("../../roles/superadmin/schools/SchoolFormPage"));
 
-import ScenariosPage from "../../roles/educator/scenarios/index.jsx";
-import SchoolAdminScenariosPage from "../../roles/school_admin/scenarios/index.jsx";
-import StudentScenariosPage from "../StudentScenariosPage.jsx";
-import StudentScenarioDetails from "../../roles/student/scenarios/StudentScenarioDetails.jsx";
-import ScenarioFormPage from "../shared/ScenarioFormPage";
+const ScenariosPage = lazy(() => import("../../roles/educator/scenarios/index.jsx"));
+const SchoolAdminScenariosPage = lazy(() => import("../../roles/school_admin/scenarios/index.jsx"));
+const StudentScenariosPage = lazy(() => import("../StudentScenariosPage.jsx"));
+const StudentScenarioDetails = lazy(() => import("../../roles/student/scenarios/StudentScenarioDetails.jsx"));
+const ScenarioFormPage = lazy(() => import("../shared/ScenarioFormPage"));
 
-import EducatorStudentsPage from "../../roles/educator/students/Student.jsx";
-import SchoolAdminStudentsPage from "../../roles/school_admin/students/Student.jsx";
-import StudentsPage from "../StudentsPage.jsx";
+const EducatorStudentsPage = lazy(() => import("../../roles/educator/students/Student.jsx"));
+const SchoolAdminStudentsPage = lazy(() => import("../../roles/school_admin/students/Student.jsx"));
+const StudentsPage = lazy(() => import("../StudentsPage.jsx"));
 
-import SchoolAdminEducatorsPage from "../../roles/school_admin/educators/Educator.jsx";
+const SchoolAdminEducatorsPage = lazy(() => import("../../roles/school_admin/educators/Educator.jsx"));
 
-import AccountSettingsPage from "../settings/SettingsPage";
-import HelpCenterPage from "../HelpCenter/HelpCenterPage";
-import ReportPage from "../Report/ReportPage";
+const AccountSettingsPage = lazy(() => import("../settings/SettingsPage"));
+const HelpCenterPage = lazy(() => import("../HelpCenter/HelpCenterPage"));
+const ReportPage = lazy(() => import("../Report/ReportPage"));
 
 const RoleBasedRoute = ({ children, allowedRoles }) => {
   const { user, loading } = useAuth();
@@ -47,25 +48,25 @@ function ContentArea() {
     switch (user?.role) {
       case "student":
         return (
-          <Suspense fallback={<div>Loading...</div>}>
+          <Suspense fallback={<FullPageSpinner />}>
             <StudentDashboard />
           </Suspense>
         );
       case "educator":
         return (
-          <Suspense fallback={<div>Loading...</div>}>
+          <Suspense fallback={<FullPageSpinner />}>
             <EducatorDashboard />
           </Suspense>
         );
       case "superadmin":
         return (
-          <Suspense fallback={<div>Loading...</div>}>
+          <Suspense fallback={<FullPageSpinner />}>
             <SuperAdminDashboard />
           </Suspense>
         );
       case "school_admin":
         return (
-          <Suspense fallback={<div>Loading...</div>}>
+          <Suspense fallback={<FullPageSpinner />}>
             <SchoolAdminDashboard />
           </Suspense>
         );

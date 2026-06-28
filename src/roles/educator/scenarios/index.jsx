@@ -5,7 +5,11 @@ import { useAuth } from "../../../AuthContext";
 
 import ScenarioManagementControls from "./ScenarioManagementControls.jsx";
 import ScenarioTable from "./ScenarioTable.jsx";
+import PaginationBar from "../../../components/ui/PaginationBar";
 // import AssignScenariosModal from "../../components/shared/AssignScenariosModal";
+
+import { usePagination } from "../../../lib/hooks/usePagination";
+import { Spinner } from "../../../lib/hooks/useLoading";
 
 import {
   fetchScenarios,
@@ -82,6 +86,26 @@ function ScenariosPage() {
     return sortableItems;
   }, [filteredScenarios, sortConfig]);
 
+  const {
+    paginatedData,
+    currentPage,
+    totalPages,
+    totalItems,
+    pageNumbers,
+    handlePageChange,
+    nextPage,
+    prevPage,
+    isFirstPage,
+    isLastPage,
+    rangeStart,
+    rangeEnd,
+    resetPage,
+  } = usePagination(filteredAndSortedScenarios, 8);
+
+  useEffect(() => {
+    resetPage();
+  }, [searchTerm, filterCriteria]);
+
   const handleSearchChange = (term) => {
     setSearchTerm(term);
   };
@@ -128,7 +152,7 @@ function ScenariosPage() {
 
   if (loading)
     return (
-      <div className="p-8 text-center text-gray-500">Loading scenarios...</div>
+      <div className="p-8 text-center"><Spinner size={32} /></div>
     );
   if (error)
     return (
@@ -151,10 +175,24 @@ function ScenariosPage() {
       />
 
       <ScenarioTable
-        data={filteredAndSortedScenarios}
+        data={paginatedData}
         onEditClick={canEditScenarios ? handleEditClick : null}
         sortConfig={sortConfig}
         onSort={handleSort}
+      />
+
+      <PaginationBar
+        currentPage={currentPage}
+        totalPages={totalPages}
+        totalItems={totalItems}
+        pageNumbers={pageNumbers}
+        onPageChange={handlePageChange}
+        onPrevPage={prevPage}
+        onNextPage={nextPage}
+        isFirstPage={isFirstPage}
+        isLastPage={isLastPage}
+        rangeStart={rangeStart}
+        rangeEnd={rangeEnd}
       />
 
       {isAssignModalOpen && (

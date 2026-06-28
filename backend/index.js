@@ -9,6 +9,7 @@ import schoolRoutes from "./routes/schoolRoutes.js";
 import scenarioRoutes from "./routes/scenarioRoutes.js";
 import sessionRoutes from "./routes/sessionRoutes.js";
 import dashboardRoutes from "./routes/dashboardRoutes.js";
+import importRoutes from "./routes/importRoutes.js";
 
 const app = express();
 
@@ -38,6 +39,7 @@ app.use("/api/schools", schoolRoutes);
 app.use("/api/scenarios", scenarioRoutes);
 app.use("/api/sessions", sessionRoutes);
 app.use("/api/dashboard", dashboardRoutes);
+app.use("/api/import", importRoutes);
 
 app.get("/", (req, res) => {
   res.json({ message: "Backend server (Single User Model) is running!" });

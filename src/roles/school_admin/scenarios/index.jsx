@@ -3,6 +3,10 @@ import { useSelector, useDispatch } from "react-redux";
 
 import ScenarioManagementControls from "../../educator/scenarios/ScenarioManagementControls.jsx";
 import ScenarioTable from "../../educator/scenarios/ScenarioTable.jsx";
+import PaginationBar from "../../../components/ui/PaginationBar";
+
+import { usePagination } from "../../../lib/hooks/usePagination";
+import { Spinner } from "../../../lib/hooks/useLoading";
 
 import { fetchScenarios } from "../../../redux/slices/scenarioSlice.js";
 
@@ -76,6 +80,26 @@ function SchoolAdminScenariosPage() {
     return sortableItems;
   }, [filteredScenarios, sortConfig]);
 
+  const {
+    paginatedData,
+    currentPage,
+    totalPages,
+    totalItems,
+    pageNumbers,
+    handlePageChange,
+    nextPage,
+    prevPage,
+    isFirstPage,
+    isLastPage,
+    rangeStart,
+    rangeEnd,
+    resetPage,
+  } = usePagination(filteredAndSortedScenarios, 8);
+
+  useEffect(() => {
+    resetPage();
+  }, [searchTerm, filterCriteria]);
+
   const handleSort = (key) => {
     let direction = "asc";
     if (
@@ -94,9 +118,7 @@ function SchoolAdminScenariosPage() {
 
   if (loading)
     return (
-      <div className="p-8 text-center text-gray-500">
-        Loading school scenarios...
-      </div>
+      <div className="p-8 text-center"><Spinner size={32} /></div>
     );
   if (error)
     return (
@@ -119,11 +141,24 @@ function SchoolAdminScenariosPage() {
       />
 
       <ScenarioTable
-        data={filteredAndSortedScenarios}
+        data={paginatedData}
         canEdit={false}
         variant="table"
         onSort={handleSort}
         sortConfig={sortConfig}
+      />
+      <PaginationBar
+        currentPage={currentPage}
+        totalPages={totalPages}
+        totalItems={totalItems}
+        pageNumbers={pageNumbers}
+        onPageChange={handlePageChange}
+        onPrevPage={prevPage}
+        onNextPage={nextPage}
+        isFirstPage={isFirstPage}
+        isLastPage={isLastPage}
+        rangeStart={rangeStart}
+        rangeEnd={rangeEnd}
       />
     </div>
   );

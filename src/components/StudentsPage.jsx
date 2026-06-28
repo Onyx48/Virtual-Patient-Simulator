@@ -1,12 +1,14 @@
 // src/components/StudentsPage.jsx
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import StudentManagementControls from '../roles/educator/students/StudentManagementControls.jsx';
 import StudentTable from '../roles/educator/students/StudentTable.jsx';
 import StudentModal from './StudentModal.jsx';
 import AssignScenarios from '../components/shared/AssignScenarios.jsx';
 import TranscriptViewerModal from './ui/TranscriptViewerModal.jsx';
+import PaginationBar from './ui/PaginationBar';
 import { useEntityFilters } from '../lib/hooks/useEntityFilters.js';
 import { useSorting } from '../lib/hooks/useSorting.js';
+import { usePagination } from '../lib/hooks/usePagination';
 
 function StudentsPage({ students, onAdd, onEdit, onDelete, canEdit = true, canAdd = true, canAssign = true }) {
   const [searchTerm, setSearchTerm] = useState('');
@@ -26,6 +28,26 @@ function StudentsPage({ students, onAdd, onEdit, onDelete, canEdit = true, canAd
 
   // Sort students
   const { sortedData, handleSort } = useSorting(filteredStudents);
+
+  const {
+    paginatedData,
+    currentPage,
+    totalPages,
+    totalItems,
+    pageNumbers,
+    handlePageChange,
+    nextPage,
+    prevPage,
+    isFirstPage,
+    isLastPage,
+    rangeStart,
+    rangeEnd,
+    resetPage,
+  } = usePagination(sortedData, 8);
+
+  useEffect(() => {
+    resetPage();
+  }, [searchTerm, filterCriteria]);
 
   const handleAddClick = () => {
     if (canAdd) {
@@ -79,13 +101,26 @@ function StudentsPage({ students, onAdd, onEdit, onDelete, canEdit = true, canAd
         initialFilters={filterCriteria}
       />
       <StudentTable
-        data={sortedData}
+        data={paginatedData}
         onEditClick={handleEditClick}
         onDeleteClick={onDelete}
         onViewTranscriptClick={handleViewTranscriptClick}
         onViewProfileClick={() => {}}
         onSort={handleSort}
         canEdit={canEdit}
+      />
+      <PaginationBar
+        currentPage={currentPage}
+        totalPages={totalPages}
+        totalItems={totalItems}
+        pageNumbers={pageNumbers}
+        onPageChange={handlePageChange}
+        onPrevPage={prevPage}
+        onNextPage={nextPage}
+        isFirstPage={isFirstPage}
+        isLastPage={isLastPage}
+        rangeStart={rangeStart}
+        rangeEnd={rangeEnd}
       />
       {isModalOpen && (
         <StudentModal

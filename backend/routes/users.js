@@ -123,9 +123,7 @@ router.post("/", protect, checkAccess("manageUsers"), async (req, res) => {
     const newUser = new User(userData);
     await newUser.save();
 
-    sendWelcomeEmail({ toEmail: email, name, password }).catch((err) =>
-      console.error("[USER] Welcome email failed:", err),
-    );
+    console.log("[USER] Welcome email skipped (temporarily disabled) for:", email);
 
     if (normalizedRole === "school_admin") {
       await School.findByIdAndUpdate(finalSchoolId, {
@@ -225,9 +223,7 @@ router.post("/bulk", protect, checkAccess("manageUsers"), async (req, res) => {
       const newUser = new User(newUserData);
       await newUser.save();
 
-      sendWelcomeEmail({ toEmail: lowerEmail, name, password }).catch((err) =>
-        console.error(`[BULK] Welcome email failed for ${lowerEmail}:`, err),
-      );
+      console.log("[BULK] Welcome email skipped (temporarily disabled) for:", lowerEmail);
       results.successCount++;
     } catch (error) {
       results.failureCount++;
