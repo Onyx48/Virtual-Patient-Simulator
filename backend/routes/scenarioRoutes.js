@@ -1,8 +1,9 @@
 // WHOLE_PROJECT/routes/scenarioRoutes.js
 import express from "express";
 import { body, validationResult } from "express-validator";
-import mongoose from "mongoose"; // Required for ID validation
+import mongoose from "mongoose";
 import Scenario from "../models/scenarioModel.js";
+import Session from "../models/sessionModel.js";
 import User from "../models/userModel.js";
 import { protect } from "../middleware/authMiddleware.js";
 import { checkAccess } from "../middleware/roleAccessMiddleware.js";
@@ -40,21 +41,36 @@ router.get("/", protect, checkAccess("viewScenarios"), async (req, res) => {
       }
     }
 
-    console.log("Scope:", req.scope);
-    console.log("Query:", query);
-
     const scenarios = await Scenario.find(query)
       .populate("educator", "name email")
       .populate("assignedTo", "name")
       .sort({ createdAt: -1 });
 
-    console.log("Found scenarios count:", scenarios.length);
-    console.log(
-      "Fetched scenarios with assignedTo:",
-      scenarios.map((s) => ({ id: s._id, assignedTo: s.assignedTo })),
-    );
+    // Attach session stats (avgScore, totalSessions) to each scenario
+    const scenarioIdStrings = scenarios.map((s) => s._id.toString());
+    const sessionStats = await Session.aggregate([
+      { $match: { scenario_id: { $in: scenarioIdStrings } } },
+      {
+        $group: {
+          _id: "$scenario_id",
+          avgScore: { $avg: "$score" },
+          totalSessions: { $sum: 1 },
+        },
+      },
+    ]);
+    const statsMap = {};
+    sessionStats.forEach((s) => { statsMap[s._id] = s; });
 
-    res.json(scenarios);
+    const scenariosWithStats = scenarios.map((s) => {
+      const stat = statsMap[s._id.toString()];
+      return {
+        ...s.toObject(),
+        avgScore: stat ? parseFloat((stat.avgScore * 100).toFixed(1)) : null,
+        totalSessions: stat?.totalSessions ?? 0,
+      };
+    });
+
+    res.json(scenariosWithStats);
   } catch (err) {
     console.error("Get Scenarios Error:", err);
     res.status(500).json({ message: "Server error fetching scenarios." });
@@ -124,8 +140,6 @@ router.post(
       html,
     } = req.body;
 
-    console.log("POST /scenarios - Received body:", req.body);
-    console.log("User schoolId:", req.user.schoolId);
 
     let assignedUserIds = [];
     if (assignedTo && Array.isArray(assignedTo) && assignedTo.length > 0) {
@@ -299,13 +313,24 @@ router.put(
       if (html !== undefined) scenario.html = html;
 
       await scenario.save();
-      console.log("Updated scenario assignedTo:", scenario.assignedTo);
       await scenario.populate("educator", "name email");
       await scenario.populate("assignedTo", "name");
 
+      // Attach session stats so Redux store keeps avgScore/totalSessions after update
+      const sessionStat = await Session.aggregate([
+        { $match: { scenario_id: scenario._id.toString() } },
+        { $group: { _id: "$scenario_id", avgScore: { $avg: "$score" }, totalSessions: { $sum: 1 } } },
+      ]);
+      const stat = sessionStat[0];
+      const scenarioObj = {
+        ...scenario.toObject(),
+        avgScore: stat ? parseFloat((stat.avgScore * 100).toFixed(1)) : null,
+        totalSessions: stat?.totalSessions ?? 0,
+      };
+
       res.status(200).json({
         message: "Scenario updated successfully.",
-        scenario: scenario,
+        scenario: scenarioObj,
       });
     } catch (err) {
       console.error("Update Scenario Error:", err);

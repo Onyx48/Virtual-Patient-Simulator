@@ -4,8 +4,32 @@ import mongoose from "mongoose";
 import User from "../models/userModel.js";
 import { protect } from "../middleware/authMiddleware.js";
 import { checkAccess } from "../middleware/roleAccessMiddleware.js";
+import redisClient from "../utils/redisClient.js";
 
 const router = express.Router();
+const STUDENTS_CACHE_TTL = 120;
+
+const isRedisReady = () => redisClient && redisClient.status === "ready";
+
+const studentsCacheKey = (scope) => {
+  if (scope.educatorId) return `students:educator:${scope.educatorId}`;
+  if (scope.schoolId) return `students:school:${scope.schoolId}`;
+  return "students:all";
+};
+
+const invalidateStudentsCache = async (scope) => {
+  if (!isRedisReady()) return;
+  try {
+    const keys = [
+      scope?.educatorId ? `students:educator:${scope.educatorId}` : null,
+      scope?.schoolId ? `students:school:${scope.schoolId}` : null,
+      "students:all",
+    ].filter(Boolean);
+    await Promise.all(keys.map((k) => redisClient.del(k)));
+  } catch (err) {
+    console.error("Redis students cache invalidation error:", err.message);
+  }
+};
 
 router.post("/", protect, checkAccess("manageStudents"), async (req, res) => {
   const { name, email, password } = req.body;
@@ -49,12 +73,7 @@ router.post("/", protect, checkAccess("manageStudents"), async (req, res) => {
       supervisor: new mongoose.Types.ObjectId(req.user._id),
     });
     await user.save();
-    console.log(
-      "Student user created - ID:",
-      user._id,
-      "Supervisor:",
-      user.supervisor,
-    );
+    await invalidateStudentsCache(req.scope);
 
     res.status(201).json(user);
   } catch (err) {
@@ -65,6 +84,13 @@ router.post("/", protect, checkAccess("manageStudents"), async (req, res) => {
 
 router.get("/", protect, checkAccess("viewStudents"), async (req, res) => {
   try {
+    const cacheKey = studentsCacheKey(req.scope);
+
+    if (isRedisReady()) {
+      const cached = await redisClient.get(cacheKey);
+      if (cached) return res.json(JSON.parse(cached));
+    }
+
     let students = [];
     const Scenario = (await import("../models/scenarioModel.js")).default;
     const Session = (await import("../models/sessionModel.js")).default;
@@ -133,12 +159,12 @@ router.get("/", protect, checkAccess("viewStudents"), async (req, res) => {
       };
     });
 
-    console.log(
-      "GET /api/students - Scope:",
-      req.scope,
-      "Students found:",
-      studentsWithStats.length,
-    );
+    if (isRedisReady()) {
+      redisClient
+        .set(cacheKey, JSON.stringify(studentsWithStats), "EX", STUDENTS_CACHE_TTL)
+        .catch(() => {});
+    }
+
     res.json(studentsWithStats);
   } catch (err) {
     console.error("Error in GET:", err);
@@ -202,6 +228,7 @@ router.put("/:id", protect, checkAccess("manageStudents"), async (req, res) => {
       { new: true },
     ).populate("schoolId", "schoolName");
 
+    await invalidateStudentsCache(req.scope);
     res.json(updatedStudent);
   } catch (err) {
     res.status(500).json({ message: err.message });
@@ -231,6 +258,7 @@ router.delete(
       }
 
       await User.findByIdAndDelete(req.params.id);
+      await invalidateStudentsCache(req.scope);
 
       res.json({
         message: "Student account removed",

@@ -103,7 +103,9 @@ function SchoolsPage() {
   // Handle Delete
   const handleDeleteClick = (schoolId) => {
     setConfirmTitle("Delete School");
-    setConfirmMessage("Are you sure you want to delete this school? This action cannot be undone.");
+    setConfirmMessage(
+      "Are you sure you want to delete this school? This action cannot be undone.",
+    );
     setOnConfirmAction(() => async () => {
       setIsDeletingId(schoolId);
       try {
@@ -132,7 +134,12 @@ function SchoolsPage() {
     }
   };
 
-  if (isLoading) return <div className="p-8 flex justify-center"><Spinner size={40} /></div>;
+  if (isLoading)
+    return (
+      <div className="p-8 flex justify-center">
+        <Spinner size={40} />
+      </div>
+    );
 
   return (
     <div className="p-6 max-w-7xl mx-auto">

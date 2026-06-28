@@ -3,7 +3,6 @@ import { useNavigate } from "react-router-dom";
 import { useAuth } from "@/AuthContext.jsx";
 import axios from "axios";
 import { getAuthHeaders } from "../../lib/utils.js";
-import { flushSync } from "react-dom";
 
 import {
   BarChart,
@@ -34,6 +33,7 @@ function EducatorDashboard() {
   const [teachingEffectiveness, setTeachingEffectiveness] = useState(null);
   const [popularityData, setPopularityData] = useState([]);
   const [educatorStats, setEducatorStats] = useState(null);
+  const [loading, setLoading] = useState(true);
 
   useEffect(() => {
     const fetchAllData = async () => {
@@ -64,33 +64,40 @@ function EducatorDashboard() {
           totalSessions: student.totalSessions || 0,
         }));
 
-        flushSync(() => {
-          setStudents(mappedStudents);
-          setScenarios(scenariosRes.data);
-          setActivityData(activityRes.data);
-          setTeachingEffectiveness(effectivenessRes.data);
-          setPopularityData(popularityRes.data);
-          setEducatorStats(statsRes.data);
-        });
+        setStudents(mappedStudents);
+        setScenarios(scenariosRes.data);
+        setActivityData(activityRes.data);
+        setTeachingEffectiveness(effectivenessRes.data);
+        setPopularityData(popularityRes.data);
+        setEducatorStats(statsRes.data);
       } catch (error) {
         console.error("Error fetching dashboard data:", error);
+      } finally {
+        setLoading(false);
       }
     };
 
     fetchAllData();
   }, []);
 
-  const DashboardHome = () => {
-    const totalStudents = students.length;
-    const totalScenarios = scenarios.length;
-    const activeScenariosCount =
-      scenarios.filter((s) => s.status === "Published").length || 0;
+  const totalStudents = students.length;
+  const totalScenarios = scenarios.length;
+  const activeScenariosCount =
+    scenarios.filter((s) => s.status === "Published").length || 0;
 
-    const recentStudents = students.slice(0, 5);
-    const recentScenarios = [...scenarios].reverse().slice(0, 3);
+  const recentStudents = students.slice(0, 5);
+  const recentScenarios = [...scenarios].reverse().slice(0, 3);
 
+  if (loading) {
     return (
-      <div className="space-y-6 animate-in fade-in duration-500">
+      <div className="p-8 w-full bg-gray-50 min-h-full flex items-center justify-center">
+        <div className="w-8 h-8 border-4 border-orange-400 border-t-transparent rounded-full animate-spin" />
+      </div>
+    );
+  }
+
+  const DashboardContent = (
+      <div className="space-y-6">
         <div className="flex flex-col md:flex-row justify-between items-start md:items-end gap-4">
           <div>
             <h1 className="text-2xl font-bold text-gray-900">
@@ -310,7 +317,7 @@ function EducatorDashboard() {
                 </div>
               </div>
             </div>
-            <div className="flex-1 w-full min-h-0">
+            <div className="w-full" style={{ height: 260 }}>
               <ResponsiveContainer
                 width="100%"
                 height="100%"
@@ -544,12 +551,11 @@ function EducatorDashboard() {
           </div>
         </div>
       </div>
-    );
-  };
+  );
 
   return (
     <div className="p-8 w-full bg-gray-50 min-h-full">
-      <DashboardHome />
+      {DashboardContent}
     </div>
   );
 }

@@ -1,5 +1,5 @@
 import React from "react";
-import { Target, Edit, Loader2 } from "lucide-react";
+import { Target, Edit, TrendingUp } from "lucide-react";
 
 function ScenarioTable({ data, onEditClick, canEdit = true }) {
   const getStatusStyle = (status) => {
@@ -33,7 +33,6 @@ function ScenarioTable({ data, onEditClick, canEdit = true }) {
   return (
     <div className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-4 gap-6">
       {data.map((scenario, index) => {
-        console.log("Scenario assignedTo:", scenario.assignedTo);
         return (
           <div
             key={scenario.id || scenario._id}
@@ -49,12 +48,12 @@ function ScenarioTable({ data, onEditClick, canEdit = true }) {
                 <Target className={`w-5 h-5 ${getIconColor(index)}`} />
               </div>
 
-              <div className="flex items-center gap-2">
-                <div className="relative w-5 h-5 flex items-center justify-center">
-                  <Loader2 className="w-4 h-4 text-orange-400 animate-[spin_3s_linear_infinite]" />
-                </div>
+              <div className="flex items-center gap-1.5">
+                <TrendingUp className="w-4 h-4 text-orange-400" />
                 <span className="text-xs font-bold text-gray-700">
-                  {scenario.avgScore || "0 Avg Score"}
+                  {scenario.avgScore != null
+                    ? `${scenario.avgScore}% avg`
+                    : "No sessions"}
                 </span>
               </div>
             </div>
@@ -74,7 +73,11 @@ function ScenarioTable({ data, onEditClick, canEdit = true }) {
                 </span>
                 <span className="text-gray-300">•</span>
                 <span className="text-gray-500">
-                  {scenario.assignedTo?.length || 0} STUDENT ACCESS
+                  {scenario.assignedTo?.length || 0} students
+                </span>
+                <span className="text-gray-300">•</span>
+                <span className="text-gray-500">
+                  {scenario.totalSessions || 0} sessions
                 </span>
               </div>
             </div>

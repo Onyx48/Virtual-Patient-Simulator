@@ -5,10 +5,33 @@ import { protect } from "../middleware/authMiddleware.js";
 import { checkAccess } from "../middleware/roleAccessMiddleware.js";
 import { sendWelcomeEmail } from "../utils/emailService.js";
 import crypto from "crypto";
+import redisClient from "../utils/redisClient.js";
 
 const router = express.Router();
+const USERS_CACHE_TTL = 120; // seconds
 
 console.log("User Model Status:", User ? "Loaded" : "FAILED IMPORT");
+
+const usersListCacheKey = (scopeSchoolId, role) => {
+  const schoolPart = scopeSchoolId ? scopeSchoolId.toString() : "all";
+  const rolePart = role || "all";
+  return `users:${schoolPart}:${rolePart}`;
+};
+
+const isRedisReady = () => redisClient && redisClient.status === "ready";
+
+const invalidateUsersCache = async (schoolId) => {
+  if (!isRedisReady()) return;
+  try {
+    const roles = ["student", "educator", "school_admin", "all"];
+    const schoolPart = schoolId ? schoolId.toString() : "all";
+    await Promise.all(
+      roles.map((r) => redisClient.del(`users:${schoolPart}:${r}`))
+    );
+  } catch (err) {
+    console.error("Redis cache invalidation error:", err.message);
+  }
+};
 
 // GET ALL USERS (with filters)
 router.get("/", protect, checkAccess("manageUsers"), async (req, res) => {
@@ -20,9 +43,24 @@ router.get("/", protect, checkAccess("manageUsers"), async (req, res) => {
     if (req.scope?.schoolId) {
       query.schoolId = req.scope.schoolId;
     }
+
+    const cacheKey = usersListCacheKey(req.scope?.schoolId, role);
+
+    if (isRedisReady()) {
+      const cached = await redisClient.get(cacheKey);
+      if (cached) {
+        return res.status(200).json(JSON.parse(cached));
+      }
+    }
+
     const users = await User.find(query)
       .select("-password")
       .populate("schoolId", "schoolName");
+
+    if (isRedisReady()) {
+      redisClient.set(cacheKey, JSON.stringify(users), "EX", USERS_CACHE_TTL).catch(() => {});
+    }
+
     res.status(200).json(users);
   } catch (err) {
     res.status(500).json({ message: err.message });
@@ -124,6 +162,8 @@ router.post("/", protect, checkAccess("manageUsers"), async (req, res) => {
     await newUser.save();
 
     console.log("[USER] Welcome email skipped (temporarily disabled) for:", email);
+
+    await invalidateUsersCache(finalSchoolId);
 
     if (normalizedRole === "school_admin") {
       await School.findByIdAndUpdate(finalSchoolId, {
@@ -234,6 +274,8 @@ router.post("/bulk", protect, checkAccess("manageUsers"), async (req, res) => {
     }
   }
 
+  await invalidateUsersCache(creator.schoolId);
+
   return res
     .status(207)
     .json({
@@ -300,6 +342,7 @@ router.put("/:id", protect, checkAccess("manageUsers"), async (req, res) => {
     }
 
     const updatedUser = await user.save();
+    await invalidateUsersCache(updatedUser.schoolId);
     res.status(200).json({ success: true, user: updatedUser });
   } catch (err) {
     res.status(500).json({ message: err.message });
@@ -330,6 +373,7 @@ router.delete("/:id", protect, checkAccess("manageUsers"), async (req, res) => {
       });
     }
     await User.findByIdAndDelete(id);
+    await invalidateUsersCache(user.schoolId);
     res
       .status(200)
       .json({ success: true, message: "User deleted successfully" });

@@ -46,10 +46,7 @@ function StudentPage({ role }) {
 
   const fetchStudents = async () => {
     await withLoading(async () => {
-      const response = await axios.get(
-        "/api/users?role=student",
-        getAuthHeaders(),
-      );
+      const response = await axios.get("/api/students", getAuthHeaders());
       const mappedData = response.data.map((student) => ({
         id: student._id,
         visualId: `VS${student._id.slice(-6).toUpperCase()}`,
@@ -57,9 +54,15 @@ function StudentPage({ role }) {
         name: student.name || "Unknown",
         email: student.email || "No Email",
         schoolName: student.schoolId?.schoolName || "Unassigned",
-        progress: "N/A",
-        assignedScenariosCount: 0,
-        isAssigned: false,
+        progress: student.avgScore != null
+          ? `${Math.round(student.avgScore * 100)}%`
+          : "N/A",
+        assignedScenariosCount: student.assignedScenariosCount || 0,
+        isAssigned: (student.assignedScenariosCount || 0) > 0,
+        bestScore: student.bestScore != null
+          ? `${Math.round(student.bestScore * 100)}%`
+          : null,
+        totalSessions: student.totalSessions || 0,
         originalData: student,
       }));
       setStudents(mappedData);
@@ -390,13 +393,22 @@ function StudentPage({ role }) {
                   <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-600 max-w-xs truncate">
                     {student.schoolName}
                   </td>
-                  <td className="px-6 py-4 whitespace-nowrap text-sm font-medium text-gray-900">
-                    {student.progress}
+                  <td className="px-6 py-4 whitespace-nowrap text-sm">
+                    {student.progress !== "N/A" ? (
+                      <div className="flex flex-col gap-0.5">
+                        <span className="font-semibold text-gray-900">{student.progress} avg</span>
+                        {student.bestScore && (
+                          <span className="text-xs text-gray-400">{student.bestScore} best · {student.totalSessions} sessions</span>
+                        )}
+                      </div>
+                    ) : (
+                      <span className="text-gray-400">No sessions yet</span>
+                    )}
                   </td>
                   <td className="px-6 py-4 whitespace-nowrap text-sm">
                     {student.isAssigned ? (
                       <span className="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium bg-green-100 text-green-800">
-                        Assigned ({student.assignedScenariosCount})
+                        {student.assignedScenariosCount} scenario{student.assignedScenariosCount !== 1 ? "s" : ""}
                       </span>
                     ) : (
                       <span className="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium bg-gray-100 text-gray-800">
@@ -455,6 +467,7 @@ function StudentPage({ role }) {
         rangeStart={rangeStart}
         rangeEnd={rangeEnd}
       />
+      </div>
 
       {isStudentModalOpen && role !== "school_admin" && (
         <div className="fixed inset-0 z-50 bg-black/40 backdrop-blur-sm flex justify-center items-center">

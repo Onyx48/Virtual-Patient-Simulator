@@ -83,17 +83,9 @@ router.get(
     try {
       const studentId = req.user._id.toString();
 
-      console.log("DEBUG student-stats - studentId:", studentId);
-      console.log("DEBUG student-stats - user:", req.user.name);
-
       const assignedScenarios = await Scenario.find({
         assignedTo: studentId,
       }).select("_id scenarioName");
-
-      console.log(
-        "DEBUG student-stats - assignedScenarios count:",
-        assignedScenarios.length,
-      );
 
       const totalAssigned = assignedScenarios.length;
 
@@ -108,7 +100,6 @@ router.get(
       }
 
       const sessions = await Session.find({ student_id: studentId });
-      console.log("DEBUG student-stats - sessions found:", sessions.length);
 
       const scenarioBestScores = {};
       const completedScenarioIds = new Set();

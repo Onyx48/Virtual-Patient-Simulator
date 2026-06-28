@@ -67,7 +67,9 @@ function StudentDashboard() {
         const assignedScenarios = allScenarios.filter(
           (scenario) =>
             scenario.assignedTo &&
-            scenario.assignedTo.some((a) => a._id === user._id),
+            scenario.assignedTo.some(
+              (a) => (a._id ?? a).toString() === user._id.toString(),
+            ),
         );
 
         const mapped = assignedScenarios.map((scenario) => {

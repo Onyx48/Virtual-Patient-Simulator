@@ -4,6 +4,7 @@ import { useDispatch } from "react-redux";
 import { XMarkIcon, PlusIcon, MinusIcon } from "@heroicons/react/24/outline";
 import { toast } from 'react-hot-toast';
 import { assignScenarios } from "../../redux/slices/scenarioSlice";
+import { Spinner } from "../../lib/hooks/useLoading";
 
 function AssignScenariosModal({ onClose, onAssignSuccess }) {
   const dispatch = useDispatch();
@@ -82,10 +83,24 @@ function AssignScenariosModal({ onClose, onAssignSuccess }) {
     });
   };
 
+  const handleSelectAll = (scenarioId) => {
+    const allIds = students.map((s) => s._id);
+    const current = selections[scenarioId] || [];
+    const allSelected = allIds.every((id) => current.includes(id));
+    setSelections((prev) => ({
+      ...prev,
+      [scenarioId]: allSelected ? [] : allIds,
+    }));
+  };
+
   const handleAssign = () => {
     const nameMap = {};
-    students.forEach(s => { nameMap[s._id] = s.name; });
-    scenarios.forEach(s => (s.assignedTo || []).forEach(a => { nameMap[a._id] = a.name; }));
+    students.forEach(s => {
+      nameMap[s._id] = s.name || s.email;
+    });
+    scenarios.forEach(s => (s.assignedTo || []).forEach(a => {
+      nameMap[a._id] = a.name || a.email;
+    }));
 
     const changes = [];
     scenarios.forEach((scenario) => {
@@ -95,7 +110,6 @@ function AssignScenariosModal({ onClose, onAssignSuccess }) {
         const removed = currentAssigned.filter((userId) => !newAssigned.includes(userId));
         if (added.length > 0 || removed.length > 0) {
           const assignedToIds = newAssigned;
-          console.log("Assigned to IDs for scenario", scenario._id, ":", assignedToIds);
           const studentUpdates = [];
           added.forEach((userId) => {
             studentUpdates.push({ studentId: userId, addScenarios: [scenario._id], removeScenarios: [] });
@@ -141,7 +155,7 @@ function AssignScenariosModal({ onClose, onAssignSuccess }) {
   if (loading)
     return (
       <div className="fixed inset-0 z-50 bg-black/40 backdrop-blur-sm flex justify-center items-center">
-        <div className="bg-white p-4 rounded">Loading data...</div>
+        <Spinner size={48} colorClass="border-t-orange-500" label="Loading scenarios..." />
       </div>
     );
   if (error)
@@ -252,6 +266,21 @@ function AssignScenariosModal({ onClose, onAssignSuccess }) {
                         No students available to assign.
                       </div>
                     ) : (
+                      <>
+                      <div className="flex items-center justify-between mb-3">
+                        <span className="text-xs text-gray-500">
+                          {(selections[scenario._id] || []).length} / {students.length} selected
+                        </span>
+                        <button
+                          type="button"
+                          onClick={() => handleSelectAll(scenario._id)}
+                          className="text-xs font-semibold text-orange-600 hover:text-orange-800 transition-colors"
+                        >
+                          {students.every((s) => (selections[scenario._id] || []).includes(s._id))
+                            ? "Deselect All"
+                            : "Select All"}
+                        </button>
+                      </div>
                       <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-3">
                         {students.map((student) => (
                         <label
@@ -268,12 +297,13 @@ function AssignScenariosModal({ onClose, onAssignSuccess }) {
                              }
                             className="w-4 h-4 text-orange-600 border-gray-300 rounded focus:ring-orange-500"
                           />
-                          <span className="text-sm text-gray-700">
-                            {student.name || "Unnamed Student"}
+                          <span className="text-sm font-medium text-gray-800 truncate">
+                            {student.name || student.email}
                           </span>
                         </label>
                         ))}
                       </div>
+                      </>
                     )}
                   </div>
                 )}
