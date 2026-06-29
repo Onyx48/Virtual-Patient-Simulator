@@ -420,6 +420,7 @@ function EducatorsPage() {
         rangeStart={rangeStart}
         rangeEnd={rangeEnd}
       />
+      </div>
 
       {isModalOpen && (
         <div className="fixed inset-0 z-50 bg-black/40 backdrop-blur-sm flex justify-center items-center p-4">

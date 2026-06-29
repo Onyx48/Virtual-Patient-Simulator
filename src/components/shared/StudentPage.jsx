@@ -19,6 +19,7 @@ import { toast } from "react-hot-toast";
 import { useAuth } from "../../AuthContext";
 import { usePagination } from "../../lib/hooks/usePagination";
 import { useLoading, Spinner, FullPageSpinner } from "../../lib/hooks/useLoading";
+import { useSorting } from "../../lib/hooks/useSorting";
 
 const getAuthHeaders = () => {
   const token = localStorage.getItem("token");
@@ -33,6 +34,22 @@ function StudentPage({ role }) {
 
   const [isUploading, setIsUploading] = useState(false);
   const fileInputRef = useRef(null);
+
+  const [isFilterOpen, setIsFilterOpen] = useState(false);
+  const [filterAssigned, setFilterAssigned] = useState("");
+  const [filterProgress, setFilterProgress] = useState("");
+  const filterRef = useRef(null);
+
+  useEffect(() => {
+    if (!isFilterOpen) return;
+    const handleClickOutside = (e) => {
+      if (filterRef.current && !filterRef.current.contains(e.target)) {
+        setIsFilterOpen(false);
+      }
+    };
+    document.addEventListener("mousedown", handleClickOutside);
+    return () => document.removeEventListener("mousedown", handleClickOutside);
+  }, [isFilterOpen]);
 
   const [isStudentModalOpen, setIsStudentModalOpen] = useState(false);
   const [isAssignModalOpen, setIsAssignModalOpen] = useState(false);
@@ -237,12 +254,35 @@ function StudentPage({ role }) {
   };
 
   const filteredData = useMemo(() => {
-    return students.filter(
-      (student) =>
+    return students.filter((student) => {
+      const matchesSearch =
         student.name.toLowerCase().includes(searchTerm.toLowerCase()) ||
-        student.email.toLowerCase().includes(searchTerm.toLowerCase()),
-    );
-  }, [students, searchTerm]);
+        student.email.toLowerCase().includes(searchTerm.toLowerCase());
+
+      const matchesAssigned =
+        filterAssigned === ""
+          ? true
+          : filterAssigned === "assigned"
+          ? student.isAssigned
+          : !student.isAssigned;
+
+      const matchesProgress =
+        filterProgress === ""
+          ? true
+          : filterProgress === "active"
+          ? student.totalSessions > 0
+          : student.totalSessions === 0;
+
+      return matchesSearch && matchesAssigned && matchesProgress;
+    });
+  }, [students, searchTerm, filterAssigned, filterProgress]);
+
+  const { sortedData, sortConfig, handleSort } = useSorting(filteredData);
+
+  const getSortIcon = (key) => {
+    if (!sortConfig || sortConfig.key !== key) return " ↕";
+    return sortConfig.direction === "asc" ? " ↑" : " ↓";
+  };
 
   const {
     paginatedData,
@@ -258,11 +298,11 @@ function StudentPage({ role }) {
     rangeStart,
     rangeEnd,
     resetPage,
-  } = usePagination(filteredData, 8);
+  } = usePagination(sortedData, 8);
 
   useEffect(() => {
     resetPage();
-  }, [searchTerm]);
+  }, [searchTerm, sortConfig, filterAssigned, filterProgress]);
 
   return (
     <div className="p-8 bg-white min-h-screen font-sans">
@@ -286,10 +326,61 @@ function StudentPage({ role }) {
               onChange={(e) => setSearchTerm(e.target.value)}
             />
           </div>
-          <button className="flex items-center gap-2 px-4 py-2.5 border border-gray-200 rounded-lg text-sm font-medium text-gray-600 hover:bg-gray-50 transition-colors">
-            <FunnelIcon className="h-5 w-5" />
-            Filters
-          </button>
+          <div className="relative" ref={filterRef}>
+            <button
+              onClick={() => setIsFilterOpen((v) => !v)}
+              className={`flex items-center gap-2 px-4 py-2.5 border rounded-lg text-sm font-medium transition-colors ${
+                filterAssigned || filterProgress
+                  ? "border-orange-400 bg-orange-50 text-orange-700"
+                  : "border-gray-200 text-gray-600 hover:bg-gray-50"
+              }`}
+            >
+              <FunnelIcon className="h-5 w-5" />
+              Filters
+              {(filterAssigned || filterProgress) && (
+                <span className="ml-1 px-1.5 py-0.5 text-xs bg-orange-400 text-white rounded-full">
+                  {[filterAssigned, filterProgress].filter(Boolean).length}
+                </span>
+              )}
+            </button>
+
+            {isFilterOpen && (
+              <div className="absolute left-0 top-full mt-2 w-56 bg-white border border-gray-200 rounded-xl shadow-lg z-20 p-3 space-y-3">
+                <div>
+                  <p className="text-xs font-semibold text-gray-500 uppercase mb-1.5">Scenarios</p>
+                  <select
+                    value={filterAssigned}
+                    onChange={(e) => setFilterAssigned(e.target.value)}
+                    className="w-full text-sm border border-gray-200 rounded-lg px-3 py-2 bg-white focus:outline-none focus:ring-2 focus:ring-orange-400"
+                  >
+                    <option value="">All students</option>
+                    <option value="assigned">Has assigned scenarios</option>
+                    <option value="unassigned">Not assigned</option>
+                  </select>
+                </div>
+                <div>
+                  <p className="text-xs font-semibold text-gray-500 uppercase mb-1.5">Progress</p>
+                  <select
+                    value={filterProgress}
+                    onChange={(e) => setFilterProgress(e.target.value)}
+                    className="w-full text-sm border border-gray-200 rounded-lg px-3 py-2 bg-white focus:outline-none focus:ring-2 focus:ring-orange-400"
+                  >
+                    <option value="">All progress</option>
+                    <option value="active">Has sessions</option>
+                    <option value="inactive">No sessions yet</option>
+                  </select>
+                </div>
+                {(filterAssigned || filterProgress) && (
+                  <button
+                    onClick={() => { setFilterAssigned(""); setFilterProgress(""); }}
+                    className="w-full text-xs text-gray-500 hover:text-gray-800 underline"
+                  >
+                    Clear filters
+                  </button>
+                )}
+              </div>
+            )}
+          </div>
         </div>
 
         <div className="flex gap-3">
@@ -336,20 +427,35 @@ function StudentPage({ role }) {
               <th className="px-6 py-4 text-left text-xs font-semibold text-gray-500 uppercase tracking-wider">
                 ID
               </th>
-              <th className="px-6 py-4 text-left text-xs font-semibold text-gray-500 uppercase tracking-wider">
-                Student Name
+              <th
+                className="px-6 py-4 text-left text-xs font-semibold text-gray-500 uppercase tracking-wider cursor-pointer select-none hover:text-gray-700"
+                onClick={() => handleSort("name")}
+              >
+                Student Name{getSortIcon("name")}
               </th>
-              <th className="px-6 py-4 text-left text-xs font-semibold text-gray-500 uppercase tracking-wider">
-                Email Address
+              <th
+                className="px-6 py-4 text-left text-xs font-semibold text-gray-500 uppercase tracking-wider cursor-pointer select-none hover:text-gray-700"
+                onClick={() => handleSort("email")}
+              >
+                Email Address{getSortIcon("email")}
               </th>
-              <th className="px-6 py-4 text-left text-xs font-semibold text-gray-500 uppercase tracking-wider">
-                School Name
+              <th
+                className="px-6 py-4 text-left text-xs font-semibold text-gray-500 uppercase tracking-wider cursor-pointer select-none hover:text-gray-700"
+                onClick={() => handleSort("schoolName")}
+              >
+                School Name{getSortIcon("schoolName")}
               </th>
-              <th className="px-6 py-4 text-left text-xs font-semibold text-gray-500 uppercase tracking-wider">
-                Progress
+              <th
+                className="px-6 py-4 text-left text-xs font-semibold text-gray-500 uppercase tracking-wider cursor-pointer select-none hover:text-gray-700"
+                onClick={() => handleSort("totalSessions")}
+              >
+                Progress{getSortIcon("totalSessions")}
               </th>
-              <th className="px-6 py-4 text-left text-xs font-semibold text-gray-500 uppercase tracking-wider">
-                Assigned Scenarios
+              <th
+                className="px-6 py-4 text-left text-xs font-semibold text-gray-500 uppercase tracking-wider cursor-pointer select-none hover:text-gray-700"
+                onClick={() => handleSort("assignedScenariosCount")}
+              >
+                Assigned Scenarios{getSortIcon("assignedScenariosCount")}
               </th>
               <th className="px-6 py-4 text-left text-xs font-semibold text-gray-500 uppercase tracking-wider">
                 Transcript

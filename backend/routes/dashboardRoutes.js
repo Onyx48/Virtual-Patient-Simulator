@@ -294,17 +294,18 @@ router.get(
       }
 
       const sessions = await Session.find(sessionMatch);
-      const completedScenarios = new Set();
 
+      // Count unique (student_id, scenario_id) pairs that have at least one session
+      const completedPairs = new Set();
       sessions.forEach((session) => {
-        completedScenarios.add(session.scenario_id.toString());
+        completedPairs.add(`${session.student_id}::${session.scenario_id}`);
       });
 
-      totalCompleted = completedScenarios.size;
+      totalCompleted = completedPairs.size;
 
       const completionRate =
         totalAssigned > 0
-          ? Math.round((totalCompleted / totalAssigned) * 100)
+          ? Math.min(100, Math.round((totalCompleted / totalAssigned) * 100))
           : 0;
 
       const scores = sessions.map((s) => s.score);
@@ -437,9 +438,10 @@ router.get(
       const educatorId = req.user._id;
       const schoolId = req.user.schoolId;
 
+      // Find students via their school (supervisor may not be populated for all)
       const students = await User.find({
         role: "student",
-        supervisor: educatorId,
+        schoolId: schoolId,
       }).select("_id");
 
       const studentIds = students.map((s) => s._id);
@@ -462,13 +464,13 @@ router.get(
 
       const currentMonthStudents = await User.countDocuments({
         role: "student",
-        supervisor: educatorId,
+        schoolId: schoolId,
         createdAt: { $gte: startOfMonth },
       });
 
       const lastMonthStudents = await User.countDocuments({
         role: "student",
-        supervisor: educatorId,
+        schoolId: schoolId,
         createdAt: { $gte: startOfLastMonth, $lt: endOfLastMonth },
       });
 

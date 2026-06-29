@@ -83,7 +83,7 @@ function TranscriptViewerModal({ isOpen, onClose, student }) {
           </button>
         </div>
 
-        <div className="flex flex-1 overflow-hidden">
+        <div className="flex flex-1 min-h-0 overflow-hidden">
           <div className="w-2/5 border-r border-gray-100 overflow-y-auto">
             <div className="p-4">
               <h4 className="text-sm font-medium text-gray-500 mb-3">Sessions</h4>
