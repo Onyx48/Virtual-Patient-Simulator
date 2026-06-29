@@ -10,13 +10,7 @@
     "frontend": "vite",
     "build": "vite build",
     "lint": "eslint .",
-    "preview": "vite preview",
-    "migrate:validate": "cd backend && node scripts/validateJsonFiles.js",
-    "migrate:import": "cd backend && node scripts/migrateFromBubble.js",
-    "migrate:help": "echo 'Usage: npm run migrate:validate <path> OR npm run migrate:import <path>' && echo 'Example: npm run migrate:validate \"D:\\\\downlaods\\\\tep\\\\tep\"'",
-    "migrate:audit": "cd backend && node scripts/auditImport.js",
-    "validate:connections": "cd backend && node scripts/validateConnections.js",
-    "repair:connections": "cd backend && node scripts/repairConnections.js"
+    "preview": "vite preview"
   },
   "dependencies": {
     "@aws-sdk/client-ses": "^3.1045.0",
