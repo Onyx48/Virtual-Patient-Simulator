@@ -63,6 +63,11 @@ const userSchema = new mongoose.Schema(
       trim: true,
       required: false,
     },
+    groupId: {
+      type: mongoose.Schema.Types.ObjectId,
+      ref: "Group",
+      default: null,
+    },
   },
   {
     timestamps: true,

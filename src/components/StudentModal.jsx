@@ -8,10 +8,13 @@ function StudentModal({
   studentData,
   role,
   defaultSchoolName,
+  groups = [],
 }) {
-  console.log("StudentModal studentData:", studentData);
   const isEdit = !!studentData;
   const [isSubmitting, setIsSubmitting] = useState(false);
+  const [groupMode, setGroupMode] = useState(
+    studentData?.groupId ? "existing" : "none",
+  );
 
   const {
     register,
@@ -24,12 +27,16 @@ function StudentModal({
           emailAddress: studentData.email,
           schoolName: studentData.schoolName,
           grade: "",
+          groupId: studentData.groupId?._id || studentData.groupId || "",
+          newGroupName: "",
         }
       : {
           studentName: "",
           emailAddress: "",
           schoolName: role === "educator" ? defaultSchoolName : "",
           grade: "",
+          groupId: "",
+          newGroupName: "",
         },
   });
 
@@ -44,6 +51,12 @@ function StudentModal({
         !isEdit && role === "educator" ? defaultSchoolName : data.schoolName,
       grade: data.grade,
     };
+
+    if (groupMode === "existing" && data.groupId) {
+      submissionData.groupId = data.groupId;
+    } else if (groupMode === "new" && data.newGroupName?.trim()) {
+      submissionData.newGroupName = data.newGroupName.trim();
+    }
 
     await onSave(submissionData);
     setIsSubmitting(false);
@@ -112,6 +125,71 @@ function StudentModal({
             </div>
           )}
         </div>
+
+        {/* Group assignment — only for educators */}
+        {role === "educator" && (
+          <div className="space-y-3">
+            <label className="block text-sm font-semibold text-gray-700">
+              Group Assignment
+            </label>
+            <div className="flex gap-3">
+              {[
+                { value: "none", label: "No group" },
+                { value: "existing", label: "Existing group" },
+                { value: "new", label: "Create new group" },
+              ].map((opt) => (
+                <button
+                  key={opt.value}
+                  type="button"
+                  onClick={() => setGroupMode(opt.value)}
+                  className={`flex-1 py-2 rounded-lg text-sm font-medium border transition-colors ${
+                    groupMode === opt.value
+                      ? "bg-black text-white border-black"
+                      : "bg-white text-gray-600 border-gray-300 hover:bg-gray-50"
+                  }`}
+                >
+                  {opt.label}
+                </button>
+              ))}
+            </div>
+
+            {groupMode === "existing" && (
+              <div className="space-y-1.5">
+                {groups.length === 0 ? (
+                  <p className="text-xs text-gray-400">
+                    No groups yet. Create one using "Create new group".
+                  </p>
+                ) : (
+                  <select
+                    {...register("groupId")}
+                    className="w-full px-4 py-2.5 rounded-lg border border-gray-300 focus:ring-2 focus:ring-orange-500 focus:border-transparent outline-none transition-all text-sm bg-white"
+                  >
+                    <option value="">— Select a group —</option>
+                    {groups.map((g) => (
+                      <option key={g._id} value={g._id}>
+                        {g.name}
+                        {g.studentCount != null
+                          ? ` (${g.studentCount} student${g.studentCount !== 1 ? "s" : ""})`
+                          : ""}
+                      </option>
+                    ))}
+                  </select>
+                )}
+              </div>
+            )}
+
+            {groupMode === "new" && (
+              <div className="space-y-1.5">
+                <input
+                  type="text"
+                  {...register("newGroupName")}
+                  className="w-full px-4 py-2.5 rounded-lg border border-gray-300 focus:ring-2 focus:ring-orange-500 focus:border-transparent outline-none transition-all text-sm"
+                  placeholder="e.g. Morning Cohort A"
+                />
+              </div>
+            )}
+          </div>
+        )}
 
         <div className="pt-4 flex items-center justify-end gap-3">
           <button

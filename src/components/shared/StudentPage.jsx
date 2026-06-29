@@ -29,6 +29,7 @@ const getAuthHeaders = () => {
 function StudentPage({ role }) {
   const { user } = useAuth();
   const [students, setStudents] = useState([]);
+  const [groups, setGroups] = useState([]);
   const [searchTerm, setSearchTerm] = useState("");
   const { isLoading, withLoading } = useLoading(true);
 
@@ -71,6 +72,8 @@ function StudentPage({ role }) {
         name: student.name || "Unknown",
         email: student.email || "No Email",
         schoolName: student.schoolId?.schoolName || "Unassigned",
+        groupName: student.groupId?.name || null,
+        groupId: student.groupId || null,
         progress: student.avgScore != null
           ? `${Math.round(student.avgScore * 100)}%`
           : "N/A",
@@ -86,8 +89,18 @@ function StudentPage({ role }) {
     });
   };
 
+  const fetchGroups = async () => {
+    try {
+      const response = await axios.get("/api/groups", getAuthHeaders());
+      setGroups(response.data);
+    } catch {
+      // groups are optional; silently ignore
+    }
+  };
+
   useEffect(() => {
     fetchStudents();
+    if (role === "educator") fetchGroups();
   }, []);
 
   useEffect(() => {
@@ -231,19 +244,29 @@ function StudentPage({ role }) {
       if (formData.id) {
         await axios.put(
           `/api/users/${formData.user_id}`,
-          { name: formData.name, email: formData.email },
+          {
+            name: formData.name,
+            email: formData.email,
+            ...(formData.groupId && { groupId: formData.groupId }),
+          },
           getAuthHeaders(),
         );
         toast.success("Student updated successfully.");
       } else {
         await axios.post(
           "/api/users",
-          { name: formData.name, email: formData.email, role: "student" },
+          {
+            name: formData.name,
+            email: formData.email,
+            role: "student",
+            ...(formData.groupId && { groupId: formData.groupId }),
+            ...(formData.newGroupName && { newGroupName: formData.newGroupName }),
+          },
           getAuthHeaders(),
         );
         toast.success("Student created successfully.");
       }
-      await fetchStudents();
+      await Promise.all([fetchStudents(), role === "educator" ? fetchGroups() : Promise.resolve()]);
       setIsStudentModalOpen(false);
     } catch (error) {
       toast.error(
@@ -421,12 +444,10 @@ function StudentPage({ role }) {
       </div>
 
       <div className="border border-gray-100 rounded-xl overflow-hidden shadow-sm">
+        <div className="overflow-x-auto">
         <table className="min-w-full divide-y divide-gray-100">
           <thead className="bg-gray-50/50">
             <tr>
-              <th className="px-6 py-4 text-left text-xs font-semibold text-gray-500 uppercase tracking-wider">
-                ID
-              </th>
               <th
                 className="px-6 py-4 text-left text-xs font-semibold text-gray-500 uppercase tracking-wider cursor-pointer select-none hover:text-gray-700"
                 onClick={() => handleSort("name")}
@@ -445,6 +466,14 @@ function StudentPage({ role }) {
               >
                 School Name{getSortIcon("schoolName")}
               </th>
+              {role === "educator" && (
+                <th
+                  className="px-6 py-4 text-left text-xs font-semibold text-gray-500 uppercase tracking-wider cursor-pointer select-none hover:text-gray-700"
+                  onClick={() => handleSort("groupName")}
+                >
+                  Group{getSortIcon("groupName")}
+                </th>
+              )}
               <th
                 className="px-6 py-4 text-left text-xs font-semibold text-gray-500 uppercase tracking-wider cursor-pointer select-none hover:text-gray-700"
                 onClick={() => handleSort("totalSessions")}
@@ -455,7 +484,7 @@ function StudentPage({ role }) {
                 className="px-6 py-4 text-left text-xs font-semibold text-gray-500 uppercase tracking-wider cursor-pointer select-none hover:text-gray-700"
                 onClick={() => handleSort("assignedScenariosCount")}
               >
-                Assigned Scenarios{getSortIcon("assignedScenariosCount")}
+                Scenarios{getSortIcon("assignedScenariosCount")}
               </th>
               <th className="px-6 py-4 text-left text-xs font-semibold text-gray-500 uppercase tracking-wider">
                 Transcript
@@ -468,14 +497,14 @@ function StudentPage({ role }) {
           <tbody className="bg-white divide-y divide-gray-100">
             {isLoading ? (
               <tr>
-                <td colSpan="8" className="px-6 py-12 text-center">
+                <td colSpan={role === "educator" ? 8 : 7} className="px-6 py-12 text-center">
                   <Spinner size={32} />
                 </td>
               </tr>
             ) : paginatedData.length === 0 ? (
               <tr>
                 <td
-                  colSpan="8"
+                  colSpan={role === "educator" ? 8 : 7}
                   className="px-6 py-12 text-center text-gray-500"
                 >
                   No students found.
@@ -487,9 +516,6 @@ function StudentPage({ role }) {
                   key={student.id}
                   className="hover:bg-gray-50/50 transition-colors group"
                 >
-                  <td className="px-6 py-4 whitespace-nowrap text-sm font-medium text-gray-900">
-                    {student.visualId}
-                  </td>
                   <td className="px-6 py-4 whitespace-nowrap text-sm font-semibold text-gray-800">
                     {student.name}
                   </td>
@@ -499,6 +525,17 @@ function StudentPage({ role }) {
                   <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-600 max-w-xs truncate">
                     {student.schoolName}
                   </td>
+                  {role === "educator" && (
+                    <td className="px-6 py-4 whitespace-nowrap text-sm">
+                      {student.groupName ? (
+                        <span className="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium bg-orange-100 text-orange-800">
+                          {student.groupName}
+                        </span>
+                      ) : (
+                        <span className="text-gray-400 text-xs">—</span>
+                      )}
+                    </td>
+                  )}
                   <td className="px-6 py-4 whitespace-nowrap text-sm">
                     {student.progress !== "N/A" ? (
                       <div className="flex flex-col gap-0.5">
@@ -560,6 +597,7 @@ function StudentPage({ role }) {
             )}
           </tbody>
         </table>
+        </div>
         <PaginationBar
         currentPage={currentPage}
         totalPages={totalPages}
@@ -583,6 +621,7 @@ function StudentPage({ role }) {
             onClose={() => setIsStudentModalOpen(false)}
             role={role}
             defaultSchoolName={user?.schoolName || ""}
+            groups={groups}
           />
         </div>
       )}

@@ -10,6 +10,7 @@ import scenarioRoutes from "./routes/scenarioRoutes.js";
 import sessionRoutes from "./routes/sessionRoutes.js";
 import dashboardRoutes from "./routes/dashboardRoutes.js";
 import importRoutes from "./routes/importRoutes.js";
+import groupRoutes from "./routes/groupRoutes.js";
 
 const app = express();
 
@@ -40,6 +41,7 @@ app.use("/api/scenarios", scenarioRoutes);
 app.use("/api/sessions", sessionRoutes);
 app.use("/api/dashboard", dashboardRoutes);
 app.use("/api/import", importRoutes);
+app.use("/api/groups", groupRoutes);
 
 app.get("/", (req, res) => {
   res.json({ message: "Backend server (Single User Model) is running!" });

@@ -99,17 +99,20 @@ router.get("/", protect, checkAccess("viewStudents"), async (req, res) => {
       students = await User.find({
         role: "student",
         supervisor: req.scope.educatorId,
-      }).populate("schoolId", "schoolName");
+      })
+        .populate("schoolId", "schoolName")
+        .populate("groupId", "name");
     } else if (req.scope.schoolId) {
       students = await User.find({
         role: "student",
         schoolId: req.scope.schoolId,
-      }).populate("schoolId", "schoolName");
+      })
+        .populate("schoolId", "schoolName")
+        .populate("groupId", "name");
     } else {
-      students = await User.find({ role: "student" }).populate(
-        "schoolId",
-        "schoolName",
-      );
+      students = await User.find({ role: "student" })
+        .populate("schoolId", "schoolName")
+        .populate("groupId", "name");
     }
 
     if (students.length === 0) {
@@ -156,6 +159,7 @@ router.get("/", protect, checkAccess("viewStudents"), async (req, res) => {
         bestScore: sessionStat?.bestScore || null,
         avgScore: sessionStat?.avgScore || null,
         totalSessions: sessionStat?.totalSessions || 0,
+        groupId: student.groupId || null,
       };
     });
 

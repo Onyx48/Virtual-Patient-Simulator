@@ -72,7 +72,7 @@ router.post("/", protect, checkAccess("manageUsers"), async (req, res) => {
   console.log("[USERS] POST route hit. Body:", req.body);
   try {
     let { password } = req.body;
-    const { name, email, role, schoolId, department } = req.body;
+    const { name, email, role, schoolId, department, groupId, newGroupName } = req.body;
 
     if (!name || !email || !role) {
       return res
@@ -161,6 +161,25 @@ router.post("/", protect, checkAccess("manageUsers"), async (req, res) => {
     const newUser = new User(userData);
     await newUser.save();
 
+    // Handle group assignment for students
+    if (normalizedRole === "student") {
+      let resolvedGroupId = groupId || null;
+      if (newGroupName && newGroupName.trim()) {
+        const Group = (await import("../models/groupModel.js")).default;
+        const group = new Group({
+          name: newGroupName.trim(),
+          educatorId: req.user._id,
+          schoolId: finalSchoolId || null,
+        });
+        await group.save();
+        resolvedGroupId = group._id;
+      }
+      if (resolvedGroupId) {
+        newUser.groupId = resolvedGroupId;
+        await newUser.save();
+      }
+    }
+
     console.log("[USER] Welcome email skipped (temporarily disabled) for:", email);
 
     await invalidateUsersCache(finalSchoolId);
@@ -183,6 +202,7 @@ router.post("/", protect, checkAccess("manageUsers"), async (req, res) => {
       schoolId: newUser.schoolId,
       supervisor: newUser.supervisor,
       department: newUser.department,
+      groupId: newUser.groupId,
     };
     res.status(201).json({ success: true, user: userResponse });
   } catch (err) {
