@@ -9,11 +9,13 @@ import path from "path";
 import fs from "fs";
 import mongoose from "mongoose";
 import bcrypt from "bcryptjs";
+import crypto from "crypto";
 import { protect } from "../middleware/authMiddleware.js";
 import User from "../models/userModel.js";
 import School from "../models/schoolModel.js";
 import Student from "../models/studentModel.js";
 import Scenario from "../models/scenarioModel.js";
+import { sendWelcomeEmail } from "../utils/emailService.js";
 
 const router = express.Router();
 
@@ -53,7 +55,7 @@ const upload = multer({
 // HELPER FUNCTIONS
 // ============================================
 
-const TEMP_PASSWORD = "Temp@123456";
+const generatePassword = () => crypto.randomBytes(8).toString("hex");
 
 const hashPassword = async (password) => {
   const salt = await bcrypt.genSalt(10);
@@ -149,7 +151,8 @@ const importUsers = async (usersData, schoolMap) => {
         continue;
       }
 
-      const hashedPassword = await hashPassword(TEMP_PASSWORD);
+      const plainPassword = generatePassword();
+      const hashedPassword = await hashPassword(plainPassword);
 
       const userDoc = await User.create({
         name,
@@ -160,6 +163,12 @@ const importUsers = async (usersData, schoolMap) => {
         phoneNumber: userData.Phone || "",
         department: userData.Department || "Science",
       });
+
+      try {
+        await sendWelcomeEmail({ toEmail: email, name, password: plainPassword });
+      } catch (emailErr) {
+        console.error("[IMPORT] Failed to send welcome email for:", email, emailErr);
+      }
 
       userMap.set(email, {
         id: userDoc._id.toString(),
@@ -199,7 +208,8 @@ const importEducators = async (educatorsData, userMap) => {
           };
           userMap.set(email, user);
         } else {
-          const hashedPassword = await hashPassword(TEMP_PASSWORD);
+          const plainPassword = generatePassword();
+          const hashedPassword = await hashPassword(plainPassword);
           const userDoc = await User.create({
             name,
             email,
@@ -207,6 +217,12 @@ const importEducators = async (educatorsData, userMap) => {
             role: "educator",
             department: educatorData.Department || "Science",
           });
+
+          try {
+            await sendWelcomeEmail({ toEmail: email, name, password: plainPassword });
+          } catch (emailErr) {
+            console.error("[IMPORT] Failed to send welcome email for:", email, emailErr);
+          }
 
           user = {
             id: userDoc._id.toString(),
@@ -250,7 +266,8 @@ const importStudents = async (studentsData, userMap, educatorMap, schoolMap) => 
           };
           userMap.set(email, user);
         } else {
-          const hashedPassword = await hashPassword(TEMP_PASSWORD);
+          const plainPassword = generatePassword();
+          const hashedPassword = await hashPassword(plainPassword);
           const userDoc = await User.create({
             name,
             email,
@@ -258,6 +275,12 @@ const importStudents = async (studentsData, userMap, educatorMap, schoolMap) => 
             role: "student",
             phoneNumber: "",
           });
+
+          try {
+            await sendWelcomeEmail({ toEmail: email, name, password: plainPassword });
+          } catch (emailErr) {
+            console.error("[IMPORT] Failed to send welcome email for:", email, emailErr);
+          }
 
           user = {
             id: userDoc._id.toString(),

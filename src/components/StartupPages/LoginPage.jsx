@@ -2,7 +2,6 @@ import React, { useState } from "react";
 import { Link, useNavigate } from "react-router-dom";
 import loginImage from "./Login-bg.jpg";
 import { useAuth } from "../../AuthContext";
-import { toast } from "react-hot-toast";
 
 const validateEmail = (emailToValidate) => {
   if (!emailToValidate.trim()) return "Email is required.";
@@ -61,13 +60,14 @@ function LoginPage() {
         await login(email, password);
       } catch (err) {
         const message =
-          err.response?.data?.message ||
-          err.response?.data?.error ||
-          err.response?.data?.msg ||
-          err.message ||
-          "Invalid email or password";
+          err.response?.status === 401
+            ? "Wrong email or password."
+            : err.response?.data?.message ||
+              err.response?.data?.error ||
+              err.response?.data?.msg ||
+              err.message ||
+              "Wrong email or password.";
         setApiError(message);
-        toast.error(message);
       } finally {
         setIsLoading(false);
       }

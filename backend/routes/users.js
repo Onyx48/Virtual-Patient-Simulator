@@ -180,7 +180,11 @@ router.post("/", protect, checkAccess("manageUsers"), async (req, res) => {
       }
     }
 
-    console.log("[USER] Welcome email skipped (temporarily disabled) for:", email);
+    try {
+      await sendWelcomeEmail({ toEmail: email, name, password });
+    } catch (emailErr) {
+      console.error("[USER] Failed to send welcome email for:", email, emailErr);
+    }
 
     await invalidateUsersCache(finalSchoolId);
 
@@ -283,7 +287,11 @@ router.post("/bulk", protect, checkAccess("manageUsers"), async (req, res) => {
       const newUser = new User(newUserData);
       await newUser.save();
 
-      console.log("[BULK] Welcome email skipped (temporarily disabled) for:", lowerEmail);
+      try {
+        await sendWelcomeEmail({ toEmail: lowerEmail, name, password });
+      } catch (emailErr) {
+        console.error("[BULK] Failed to send welcome email for:", lowerEmail, emailErr);
+      }
       results.successCount++;
     } catch (error) {
       results.failureCount++;

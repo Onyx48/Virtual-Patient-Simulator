@@ -211,10 +211,12 @@ router.post(
       });
       await user.save();
       if (creatorRole) {
-        console.log("[AUTH] Welcome email skipped (temporarily disabled)");
+        try {
+          await sendWelcomeEmail({ toEmail: lowerEmail, name, password });
+        } catch (emailErr) {
+          console.error("[AUTH] Failed to send welcome email for:", lowerEmail, emailErr);
+        }
       }
-
-      console.log("[AUTH] Welcome email skipped (temporarily disabled)");
 
       res.status(201).json({
         _id: user._id,

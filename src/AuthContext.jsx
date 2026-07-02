@@ -14,7 +14,11 @@ const AuthContext = createContext(null);
 axios.interceptors.response.use(
   (response) => response,
   (error) => {
-    if (error.response && error.response.status === 401) {
+    const requestUrl = error.config?.url || "";
+    // A 401 from the login request itself is a wrong email/password, not an
+    // expired session — let the LoginPage handle it instead of redirecting.
+    const isLoginRequest = requestUrl.includes("/api/auth/login");
+    if (error.response && error.response.status === 401 && !isLoginRequest) {
       console.log("Token expired or invalid, logging out...");
       localStorage.removeItem("token");
       localStorage.removeItem("currentUser");
