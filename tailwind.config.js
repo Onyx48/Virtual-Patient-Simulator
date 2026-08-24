@@ -10,6 +10,22 @@ export default {
         sm: "calc(var(--radius) - 4px)",
       },
       colors: {
+        // Remapped `orange` palette: lightens the brand color site-wide.
+        // The app uses orange-500/600 heavily as the (dark) primary; shifting
+        // the scale to softer tones makes the whole UI a lighter orange
+        // without touching the 60+ individual usages.
+        orange: {
+          50: "#fff8f2",
+          100: "#ffedde",
+          200: "#ffd8bd",
+          300: "#ffc09a",
+          400: "#ffa875",
+          500: "#ff9a56", // primary (was #f97316)
+          600: "#ff8a3d", // hover (was #ea580c)
+          700: "#fb7024",
+          800: "#e65c14",
+          900: "#c2410c",
+        },
         background: "hsl(var(--background))",
         foreground: "hsl(var(--foreground))",
         card: {

@@ -1,14 +1,14 @@
 import React from "react";
 import { NavLink } from "react-router-dom";
 import { useAuth } from "../../AuthContext";
+import { useLanguage } from "../../i18n/LanguageContext";
+import sitLogo from "../../assets/SIT.png";
 import {
   Squares2X2Icon,
   BuildingLibraryIcon,
   BookOpenIcon,
   UsersIcon,
   Cog6ToothIcon,
-  QuestionMarkCircleIcon,
-  FlagIcon,
   VideoCameraIcon,
   ArrowLeftOnRectangleIcon,
 } from "@heroicons/react/24/outline";
@@ -20,37 +20,38 @@ const hasAccess = (userRole, allowedRoles) => {
 
 function Sidebar({ logo }) {
   const { user, logout } = useAuth();
+  const { t } = useLanguage();
   const userRole = user?.role;
   // 1. Get the user's ID from the authentication context.
   const userId = user?._id;
 
   const menuItems = [
     {
-      name: "Dashboard",
+      name: t("nav.dashboard"),
       path: "/",
       icon: <Squares2X2Icon className="w-5 h-5" />,
       allowedRoles: ["superadmin", "school_admin", "educator", "student"],
     },
     {
-      name: "Schools",
+      name: t("nav.schools"),
       path: "/schools",
       icon: <BuildingLibraryIcon className="w-5 h-5" />,
       allowedRoles: ["superadmin"],
     },
     {
-      name: "Scenarios",
+      name: t("nav.scenarios"),
       path: "/scenarios",
       icon: <BookOpenIcon className="w-5 h-5" />,
       allowedRoles: ["school_admin", "educator", "student"],
     },
     {
-      name: "Students",
+      name: t("nav.students"),
       path: "/students",
       icon: <UsersIcon className="w-5 h-5" />,
       allowedRoles: ["school_admin", "educator"],
     },
     {
-      name: "Educators",
+      name: t("nav.educators"),
       path: "/educators",
       icon: <UsersIcon className="w-5 h-5" />,
       allowedRoles: ["school_admin"],
@@ -59,47 +60,39 @@ function Sidebar({ logo }) {
 
   const supportItems = [
     {
-      name: "Help & Center",
-      path: "/help-center",
-      icon: <QuestionMarkCircleIcon className="w-5 h-5" />,
-      allowedRoles: ["superadmin", "school_admin", "educator", "student"],
-    },
-    {
-      name: "Create Room",
+      name: t("nav.createRoom"),
       path: "/create-room", // This is the base path
       icon: <VideoCameraIcon className="w-5 h-5" />,
       allowedRoles: ["superadmin", "school_admin", "educator", "student"],
     },
     {
-      name: "Settings",
+      name: t("nav.settings"),
       path: "/settings",
       icon: <Cog6ToothIcon className="w-5 h-5" />,
       allowedRoles: ["superadmin", "school_admin", "educator", "student"],
     },
-    {
-      name: "Report",
-      path: "/report",
-      icon: <FlagIcon className="w-5 h-5" />,
-      allowedRoles: ["superadmin", "school_admin", "educator"],
-    },
   ];
+
+  // "Create Room" needs special-case pathing, so match on path not label.
+  const CREATE_ROOM_PATH = "/create-room";
 
   return (
     <aside className="fixed top-0 left-0 h-screen w-64 bg-[#0F0F0F] text-gray-400 flex flex-col transition-all duration-300 z-50 font-sans">
-      <div className="h-16 flex items-center px-6 border-b border-gray-800">
+      <div className="h-16 flex items-center px-6 border-b border-gray-800 bg-white">
         {logo ? (
           logo
         ) : (
-          <div className="flex items-center gap-3">
-            <div className="h-8 w-8 bg-orange-600 rounded flex items-center justify-center"></div>
-            <span className="text-lg font-bold text-white">VirtualSim</span>
-          </div>
+          <img
+            src={sitLogo}
+            alt="Singapore Institute of Technology"
+            className="h-9 w-auto object-contain"
+          />
         )}
       </div>
 
       <div className="flex-1 overflow-y-auto py-6 px-3 space-y-1 custom-scrollbar">
         <p className="px-3 text-xs font-semibold text-gray-500 uppercase tracking-wider mb-2">
-          Main Menu
+          {t("nav.mainMenu")}
         </p>
 
         {menuItems.map((item) =>
@@ -124,7 +117,7 @@ function Sidebar({ logo }) {
         <div className="my-6 border-t border-gray-800 mx-3"></div>
 
         <p className="px-3 text-xs font-semibold text-gray-500 uppercase tracking-wider mb-2">
-          Help & Support
+          {t("nav.helpSupport")}
         </p>
 
         {supportItems.map((item) => {
@@ -135,7 +128,7 @@ function Sidebar({ logo }) {
 
           // 3. Dynamically create the path for "Create Room"
           let finalPath = item.path;
-          if (item.name === "Create Room" && userId) {
+          if (item.path === CREATE_ROOM_PATH && userId) {
             finalPath = `${item.path}/${userId}`;
           }
 
@@ -164,7 +157,7 @@ function Sidebar({ logo }) {
           className="flex items-center gap-3 w-full px-3 py-2.5 text-sm font-medium text-gray-400 hover:text-white hover:bg-gray-800 rounded-lg transition-colors duration-200 group"
         >
           <ArrowLeftOnRectangleIcon className="w-5 h-5 group-hover:text-red-400 transition-colors" />
-          Log Out
+          {t("nav.logout")}
         </button>
       </div>
     </aside>

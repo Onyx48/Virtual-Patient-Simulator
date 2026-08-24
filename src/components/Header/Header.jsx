@@ -1,6 +1,7 @@
 import React from "react";
 import { useLocation, useNavigate } from "react-router-dom";
 import { useAuth } from "../../AuthContext";
+import { useLanguage } from "../../i18n/LanguageContext";
 
 import {
   BellIcon,
@@ -8,17 +9,17 @@ import {
   UserCircleIcon,
 } from "@heroicons/react/24/outline";
 
-const formatRoleForDisplay = (role) => {
+const formatRoleForDisplay = (role, t) => {
   if (!role) return "";
   switch (role.toLowerCase()) {
     case "superadmin":
-      return "Super Admin";
+      return t("role.superadmin");
     case "educator":
-      return "Educator";
+      return t("role.educator");
     case "school_admin":
-      return "School Admin";
+      return t("role.school_admin");
     case "student":
-      return "Student";
+      return t("role.student");
     default:
       return role.charAt(0).toUpperCase() + role.slice(1).replace(/_/g, " ");
   }
@@ -26,21 +27,20 @@ const formatRoleForDisplay = (role) => {
 
 function Header() {
   const { user } = useAuth();
+  const { t, toggleLanguage } = useLanguage();
   const location = useLocation();
   const navigate = useNavigate();
 
-  let pageTitle = "Dashboard";
+  let pageTitle = t("page.dashboard");
   const currentPath = location.pathname;
 
-  if (currentPath === "/") pageTitle = "Dashboard";
-  else if (currentPath.startsWith("/schools")) pageTitle = "Schools Management";
+  if (currentPath === "/") pageTitle = t("page.dashboard");
+  else if (currentPath.startsWith("/schools")) pageTitle = t("page.schools");
   else if (currentPath.startsWith("/scenario"))
-    pageTitle = "Scenarios Management";
+    pageTitle = t("page.scenarios");
   else if (currentPath.startsWith("/students"))
-    pageTitle = "Students Management";
-  else if (currentPath.startsWith("/settings")) pageTitle = "Account Settings";
-  else if (currentPath.startsWith("/help-center")) pageTitle = "Help & Center";
-  else if (currentPath.startsWith("/report")) pageTitle = "Report";
+    pageTitle = t("page.students");
+  else if (currentPath.startsWith("/settings")) pageTitle = t("page.settings");
 
   const showSearchBar = currentPath === "/";
 
@@ -65,7 +65,7 @@ function Header() {
             </svg>
             <input
               type="text"
-              placeholder="Search..."
+              placeholder={t("header.search")}
               className="w-full pl-10 pr-4 py-2 text-sm rounded-md bg-gray-100 text-gray-700 border border-gray-300 placeholder-gray-400 focus:outline-none focus:ring-2 focus:ring-orange-500 focus:border-transparent"
             />
           </div>
@@ -75,6 +75,13 @@ function Header() {
       </div>
 
       <div className="flex items-center space-x-5">
+        <button
+          onClick={toggleLanguage}
+          className="px-3 py-1.5 text-sm font-medium rounded-md border border-orange-500 text-orange-600 hover:bg-orange-50 focus:outline-none focus:ring-2 focus:ring-orange-400 transition-colors"
+          aria-label="Toggle language"
+        >
+          {t("common.language")}
+        </button>
         <button className="text-gray-500 hover:text-gray-700 focus:outline-none">
           <BellIcon className="h-6 w-6" />
         </button>
@@ -99,7 +106,7 @@ function Header() {
               <div className="flex flex-col text-xs text-left leading-tight">
                 <span className="font-semibold text-gray-700">{user.name}</span>
                 <span className="text-xs text-orange-500 font-medium">
-                  {formatRoleForDisplay(user.role)}{" "}
+                  {formatRoleForDisplay(user.role, t)}{" "}
                 </span>
               </div>
             )}

@@ -28,8 +28,6 @@ const StudentsPage = lazy(() => import("../StudentsPage.jsx"));
 const SchoolAdminEducatorsPage = lazy(() => import("../../roles/school_admin/educators/Educator.jsx"));
 
 const AccountSettingsPage = lazy(() => import("../settings/SettingsPage"));
-const HelpCenterPage = lazy(() => import("../HelpCenter/HelpCenterPage"));
-const ReportPage = lazy(() => import("../Report/ReportPage"));
 
 const RoleBasedRoute = ({ children, allowedRoles }) => {
   const { user, loading } = useAuth();
@@ -187,33 +185,6 @@ function ContentArea() {
               ]}
             >
               <AccountSettingsPage />
-            </RoleBasedRoute>
-          }
-        />
-
-        <Route
-          path="/help-center"
-          element={
-            <RoleBasedRoute
-              allowedRoles={[
-                "superadmin",
-                "school_admin",
-                "educator",
-                "student",
-              ]}
-            >
-              <HelpCenterPage />
-            </RoleBasedRoute>
-          }
-        />
-
-        <Route
-          path="/report"
-          element={
-            <RoleBasedRoute
-              allowedRoles={["superadmin", "school_admin", "educator"]}
-            >
-              <ReportPage />
             </RoleBasedRoute>
           }
         />
