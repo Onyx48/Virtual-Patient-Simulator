@@ -10,9 +10,13 @@ import axios from "axios";
 
 const container = document.getElementById("root");
 const root = ReactDOM.createRoot(container);
-axios.defaults.baseURL = import.meta.env.PROD
-  ? "http://localhost:5001"
-  : "https://vpsbackend.metawingsxr.com/";
+// Baked in at build time. VITE_API_BASE_URL overrides, otherwise a production
+// build targets the deployed backend subdomain and `pnpm dev` targets local.
+axios.defaults.baseURL =
+  import.meta.env.VITE_API_BASE_URL ||
+  (import.meta.env.PROD
+    ? "https://vpsbackend.metawingsxr.com"
+    : "http://localhost:5001");
 
 root.render(
   <React.StrictMode>

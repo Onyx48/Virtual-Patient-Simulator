@@ -1,0 +1,38 @@
+# Anything the Vite build needs must NOT be listed here:
+# src/, public/, index.html, vite.config.js, tailwind.config.js,
+# postcss.config.js, jsconfig.json, components.json
+
+node_modules
+dist
+
+# Leftover directory from before the repo was flattened. Still holds a stale
+# node_modules, dist, and a copy of .env, none of which belong in the image.
+Whole_project
+
+# Secrets. `gcloud run deploy --source .` and `gcloud builds submit` upload this
+# directory, so without these lines the real .env would be baked into the image.
+.env
+.env.*
+
+# Local-only artifacts
+dump.rdb
+start.sh
+test-server.js
+
+# VCS, editors, logs
+.git
+.gitignore
+*.log
+npm-debug.log*
+pnpm-debug.log*
+.vscode
+.idea
+.DS_Store
+
+# Stale npm lockfile; this project installs with pnpm
+package-lock.json
+
+# Not needed inside the image
+Dockerfile
+.dockerignore
+README.md
