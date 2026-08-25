@@ -5,8 +5,9 @@ import { ja } from "./dictionary";
 // React renders every screen in English (the source language). This module
 // overlays Japanese onto the live DOM so the entire app switches languages
 // without wrapping each component's strings. It:
-//   - walks all text nodes and swaps any exact English phrase found in the
-//     dictionary for its Japanese equivalent,
+//   - replaces every English phrase/word found in the dictionary with its
+//     Japanese equivalent, even when it is mixed with dynamic content
+//     (e.g. "8 increased vs last month"),
 //   - remembers each node's original English so switching back restores it,
 //   - watches for dynamically-rendered content via a MutationObserver,
 //   - also translates input placeholders and title attributes.
@@ -23,23 +24,48 @@ let observer = null;
 
 const ATTRS = ["placeholder", "title"];
 
+function escapeRegExp(s) {
+  return s.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
+}
+
+// Compile dictionary into [regex, japanese] pairs, longest key first so that
+// multi-word phrases win over the individual words inside them. Lookarounds
+// keep matches from firing inside a larger alphanumeric word.
+const compiled = Object.keys(ja)
+  .filter((k) => k.trim().length > 0)
+  .sort((a, b) => b.length - a.length)
+  .map((key) => ({
+    re: new RegExp(
+      `(?<![A-Za-z0-9])${escapeRegExp(key)}(?![A-Za-z0-9])`,
+      "g",
+    ),
+    jp: ja[key],
+  }));
+
+// Translate an English string by replacing each known phrase/word. Longer
+// phrases are replaced first; inserted Japanese contains no [A-Za-z0-9] so it
+// is never re-matched by a later English pattern.
+function translateString(orig) {
+  let out = orig;
+  for (const { re, jp } of compiled) {
+    re.lastIndex = 0;
+    if (re.test(out)) {
+      re.lastIndex = 0;
+      out = out.replace(re, jp);
+    }
+  }
+  return out;
+}
+
 function translateTextNode(node) {
   const value = node.nodeValue;
   if (!value || !value.trim()) return;
 
   if (!originalText.has(node)) originalText.set(node, value);
   const orig = originalText.get(node);
-  const key = orig.trim();
 
-  if (currentLang === "ja") {
-    const tr = ja[key];
-    if (tr) {
-      const next = orig.replace(key, tr);
-      if (node.nodeValue !== next) node.nodeValue = next;
-    }
-  } else if (node.nodeValue !== orig) {
-    node.nodeValue = orig;
-  }
+  const next = currentLang === "ja" ? translateString(orig) : orig;
+  if (node.nodeValue !== next) node.nodeValue = next;
 }
 
 function translateAttrs(el) {
@@ -56,16 +82,9 @@ function translateAttrs(el) {
     }
     if (!(attr in cache)) cache[attr] = value;
     const orig = cache[attr];
-    const key = orig.trim();
 
-    if (currentLang === "ja") {
-      const tr = ja[key];
-      if (tr && value !== orig.replace(key, tr)) {
-        el.setAttribute(attr, orig.replace(key, tr));
-      }
-    } else if (value !== orig) {
-      el.setAttribute(attr, orig);
-    }
+    const next = currentLang === "ja" ? translateString(orig) : orig;
+    if (value !== next) el.setAttribute(attr, next);
   }
 }
 
@@ -75,7 +94,6 @@ function walk(root) {
     return;
   }
   if (root.nodeType !== 1) return;
-  // Skip script/style subtrees.
   if (root.tagName === "SCRIPT" || root.tagName === "STYLE") return;
 
   translateAttrs(root);
@@ -85,7 +103,6 @@ function walk(root) {
     translateTextNode(n);
     n = iter.nextNode();
   }
-  // Attributes on descendants
   root.querySelectorAll?.("input, textarea, [title]").forEach(translateAttrs);
 }
 

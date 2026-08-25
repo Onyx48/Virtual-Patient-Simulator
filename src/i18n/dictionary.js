@@ -192,9 +192,126 @@ export const ja = {
   "Action Failed": "操作に失敗しました",
   Welcome: "ようこそ",
   "Welcome back": "おかえりなさい",
+  "Welcome Back": "おかえりなさい",
   Profile: "プロフィール",
   Notifications: "通知",
   Language: "言語",
+
+  // Stat-card trend phrases (multi-word first so they win over single words)
+  "increased vs last month": "先月比で増加",
+  "decreased vs last month": "先月比で減少",
+  "vs last month": "先月比",
+  "vs last week": "先週比",
+  "from last month": "先月から",
+  "since last month": "先月以降",
+  "this month": "今月",
+  "last month": "先月",
+  "this week": "今週",
+  "last week": "先週",
+  increased: "増加",
+  decreased: "減少",
+  "Recent Scenario": "最近のシナリオ",
+  "Recent Scenarios": "最近のシナリオ",
+  "Recent Activity": "最近のアクティビティ",
+  "Recent Sessions": "最近のセッション",
+  "View All": "すべて表示",
+  "See All": "すべて表示",
+  "Quick Actions": "クイックアクション",
+  "Top Performers": "上位パフォーマー",
+  Leaderboard: "リーダーボード",
+  "Assigned Scenarios": "割り当て済みシナリオ",
+  "Available Scenarios": "利用可能なシナリオ",
+  "Completed Scenarios": "完了したシナリオ",
+  "My Scenarios": "マイシナリオ",
+  "Active Schools": "アクティブな学校",
+  "Avg Score": "平均スコア",
+  "Average Score": "平均スコア",
+  "No scores yet": "まだスコアがありません",
+  "No sessions": "セッションなし",
+  "No scenarios yet": "まだシナリオがありません",
+  "Across all completed": "完了したすべてにわたって",
+  "Complete scenarios to track your progress":
+    "進捗を追跡するにはシナリオを完了してください",
+  "track your progress": "進捗を追跡",
+  overview: "概要",
+
+  // Buttons — add / create / edit / delete variants
+  "Add New Educator": "新しい教育者を追加",
+  "Add New School": "新しい学校を追加",
+  "Add New Student": "新しい学生を追加",
+  "Add Scenario": "シナリオを追加",
+  "Create Scenario": "シナリオを作成",
+  "Create School Admin": "学校管理者を作成",
+  "Create Student": "学生を作成",
+  "Create new group": "新しいグループを作成",
+  "Edit Educator": "教育者を編集",
+  "Edit Scenario": "シナリオを編集",
+  "Edit School": "学校を編集",
+  "Edit Student Details": "学生の詳細を編集",
+  "Delete Educator": "教育者を削除",
+  "Delete School": "学校を削除",
+  "Delete Student": "学生を削除",
+  Editing: "編集中",
+  "Auto-generated": "自動生成",
+  "HTML Preview": "HTMLプレビュー",
+
+  // Filters / placeholders
+  "Filter by email...": "メールで絞り込み...",
+  "Filter by school...": "学校で絞り込み...",
+  "Enter email": "メールを入力",
+  "Enter scenario name": "シナリオ名を入力",
+  "Enter scenario description": "シナリオの説明を入力",
+  "No Email": "メールなし",
+
+  // Confirmations
+  "Are you sure you want to create this school admin account?":
+    "この学校管理者アカウントを作成してもよろしいですか？",
+  "Are you sure you want to delete this educator?":
+    "この教育者を削除してもよろしいですか？",
+  "Are you sure you want to delete this scenario?":
+    "このシナリオを削除してもよろしいですか？",
+  "Are you sure you want to delete this student?":
+    "この学生を削除してもよろしいですか？",
+  "No description provided for this scenario.":
+    "このシナリオには説明がありません。",
+  "No changes to assign.": "割り当てる変更がありません。",
+
+  // Success / error toasts
+  "Educator created successfully": "教育者が正常に作成されました",
+  "Educator deleted successfully": "教育者が正常に削除されました",
+  "Educator updated successfully": "教育者が正常に更新されました",
+  "Email updated successfully": "メールが正常に更新されました",
+  "Password updated successfully": "パスワードが正常に更新されました",
+  "Profile updated successfully": "プロフィールが正常に更新されました",
+  "Profile picture updated successfully": "プロフィール画像が正常に更新されました",
+  "Failed to create school admin.": "学校管理者の作成に失敗しました。",
+  "Failed to delete scenario.": "シナリオの削除に失敗しました。",
+  "Failed to delete school.": "学校の削除に失敗しました。",
+  "Failed to load school details.": "学校の詳細の読み込みに失敗しました。",
+  "Failed to load schools.": "学校の読み込みに失敗しました。",
+  "Failed to save scenario.": "シナリオの保存に失敗しました。",
+  "Failed to update assignments.": "割り当ての更新に失敗しました。",
+  "Failed to update email": "メールの更新に失敗しました",
+  "Failed to update password": "パスワードの更新に失敗しました",
+  "Failed to update profile": "プロフィールの更新に失敗しました",
+  "Invalid email format": "メール形式が無効です",
+  "Please enter a valid email address": "有効なメールアドレスを入力してください",
+  "Please enter a valid email address.":
+    "有効なメールアドレスを入力してください。",
+  "Please use a valid email address.":
+    "有効なメールアドレスを使用してください。",
+  "If an account exists, an OTP will be sent.":
+    "アカウントが存在する場合、OTPが送信されます。",
+  "Account is locked. Cannot resend OTP now.":
+    "アカウントがロックされています。今はOTPを再送信できません。",
+  "Loading scenarios...": "シナリオを読み込み中...",
+
+  // Scenario builder
+  "Add interactive decision points": "インタラクティブな決定ポイントを追加",
+  "Enhance scenario with multimedia": "マルチメディアでシナリオを強化",
+  "Provide input for AI to create scenario":
+    "AIがシナリオを作成するための入力を提供",
+  "My School Logo": "私の学校のロゴ",
 };
 
 export default ja;
