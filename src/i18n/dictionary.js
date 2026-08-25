@@ -312,6 +312,67 @@ export const ja = {
   "Provide input for AI to create scenario":
     "AIがシナリオを作成するための入力を提供",
   "My School Logo": "私の学校のロゴ",
+
+  // Durations
+  "1 Year": "1年",
+  "6 Months": "6か月",
+  "3 Months": "3か月",
+  "1 Month": "1か月",
+
+  // Search / filter placeholders (full strings so nothing leaks mid-phrase)
+  "Search for a scenario": "シナリオを検索",
+  "Search for scenarios": "シナリオを検索",
+  "Search for a school": "学校を検索",
+  "Search for an educator": "教育者を検索",
+  "Search educators...": "教育者を検索...",
+  "Search students...": "学生を検索...",
+  "Search student name or email": "学生名またはメールを検索",
+  Filters: "フィルター",
+
+  // Auth / password placeholders and messages
+  "Enter current password": "現在のパスワードを入力",
+  "Enter new password": "新しいパスワードを入力",
+  "Enter your password": "パスワードを入力",
+  "Confirm new password": "新しいパスワードを確認",
+  "New passwords do not match": "新しいパスワードが一致しません",
+  "OTP Verified! Please proceed to reset your password.":
+    "OTPが確認されました！パスワードのリセットに進んでください。",
+  "Signup Successful! Please log in.":
+    "登録に成功しました！ログインしてください。",
+
+  // AI / scenario builder
+  "Ask anything from AI": "AIに何でも質問",
+  "Scenario Selection UI goes here.": "ここにシナリオ選択UIが入ります。",
+  "Scenario ID is missing.": "シナリオIDがありません。",
+  "Scenarios assigned successfully": "シナリオが正常に割り当てられました",
+
+  // Confirmation / pagination
+  "Confirm Deletion": "削除の確認",
+  Pagination: "ページネーション",
+  "Go to next page": "次のページへ",
+  "Go to previous page": "前のページへ",
+  "— Select a group —": "— グループを選択 —",
+  "School Name": "学校名",
+
+  // Uploads
+  "File size must be less than 2MB": "ファイルサイズは2MB未満である必要があります",
+  "Only JPG, PNG, and GIF files are allowed":
+    "JPG、PNG、GIFファイルのみ許可されています",
+  "Failed to parse CSV:": "CSVの解析に失敗しました：",
+  "Profile picture removed successfully": "プロフィール画像が正常に削除されました",
+
+  // CRUD toasts (school / student)
+  "School Admin created successfully.": "学校管理者が正常に作成されました。",
+  "School deleted successfully.": "学校が正常に削除されました。",
+  "Student created successfully.": "学生が正常に作成されました。",
+  "Student updated successfully.": "学生が正常に更新されました。",
+  "Student deleted successfully": "学生が正常に削除されました",
+  "Start date must be before end date.":
+    "開始日は終了日より前である必要があります。",
+
+  // Misc
+  User: "ユーザー",
+  "Singapore Institute of Technology": "シンガポール工科大学",
 };
 
 export default ja;

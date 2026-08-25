@@ -28,24 +28,44 @@ function escapeRegExp(s) {
   return s.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
 }
 
-// Compile dictionary into [regex, japanese] pairs, longest key first so that
-// multi-word phrases win over the individual words inside them. Lookarounds
-// keep matches from firing inside a larger alphanumeric word.
-const compiled = Object.keys(ja)
-  .filter((k) => k.trim().length > 0)
+const dictKeys = Object.keys(ja).filter((k) => k.trim().length > 0);
+
+// Exact whole-node lookup (case-insensitive) — labels, buttons, headings.
+// Safe: only fires when the entire cell equals a known phrase.
+const exactMap = new Map(dictKeys.map((k) => [k.trim().toLowerCase(), ja[k]]));
+
+// All keys as boundary-anchored regexes, longest first, for substring passes.
+const compiled = dictKeys
   .sort((a, b) => b.length - a.length)
   .map((key) => ({
     re: new RegExp(
-      `(?<![A-Za-z0-9])${escapeRegExp(key)}(?![A-Za-z0-9])`,
-      "g",
+      `(?<![A-Za-z0-9])${escapeRegExp(key.trim())}(?![A-Za-z0-9])`,
+      "gi",
     ),
     jp: ja[key],
   }));
 
-// Translate an English string by replacing each known phrase/word. Longer
-// phrases are replaced first; inserted Japanese contains no [A-Za-z0-9] so it
-// is never re-matched by a later English pattern.
+const HAS_LETTER = /[A-Za-z]/;
+
+// Elements marked with [data-no-i18n] (and their subtree) are never touched —
+// e.g. the language switcher itself.
+function isExcluded(node) {
+  const el = node.nodeType === 1 ? node : node.parentElement;
+  return !!el && !!el.closest && !!el.closest("[data-no-i18n]");
+}
+
+// Translate an English string, guaranteeing no half-translated output:
+//   1. exact whole-node match wins immediately (handles all labels/buttons);
+//   2. otherwise replace every known phrase/word as a substring, but KEEP the
+//      result only if no English letters remain — so counts like
+//      "8 increased vs last month" fully translate, while a real sentence with
+//      any unknown word (e.g. "View all your data") is left entirely English.
+//      Either fully Japanese or fully English — never mixed.
 function translateString(orig) {
+  const trimmed = orig.trim();
+  const exact = exactMap.get(trimmed.toLowerCase());
+  if (exact !== undefined) return orig.replace(trimmed, exact);
+
   let out = orig;
   for (const { re, jp } of compiled) {
     re.lastIndex = 0;
@@ -54,12 +74,14 @@ function translateString(orig) {
       out = out.replace(re, jp);
     }
   }
-  return out;
+  // Reject partial translations: if any English word survived, leave English.
+  return HAS_LETTER.test(out) ? orig : out;
 }
 
 function translateTextNode(node) {
   const value = node.nodeValue;
   if (!value || !value.trim()) return;
+  if (isExcluded(node)) return;
 
   if (!originalText.has(node)) originalText.set(node, value);
   const orig = originalText.get(node);
@@ -70,6 +92,7 @@ function translateTextNode(node) {
 
 function translateAttrs(el) {
   if (el.nodeType !== 1) return;
+  if (isExcluded(el)) return;
   let cache = originalAttr.get(el);
   for (const attr of ATTRS) {
     if (!el.hasAttribute(attr)) continue;

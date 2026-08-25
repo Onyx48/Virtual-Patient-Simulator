@@ -27,7 +27,7 @@ const formatRoleForDisplay = (role, t) => {
 
 function Header() {
   const { user } = useAuth();
-  const { t, toggleLanguage } = useLanguage();
+  const { t, toggleLanguage, language } = useLanguage();
   const location = useLocation();
   const navigate = useNavigate();
 
@@ -75,13 +75,38 @@ function Header() {
       </div>
 
       <div className="flex items-center space-x-5">
-        <button
-          onClick={toggleLanguage}
-          className="px-3 py-1.5 text-sm font-medium rounded-md border border-orange-500 text-orange-600 hover:bg-orange-50 focus:outline-none focus:ring-2 focus:ring-orange-400 transition-colors"
-          aria-label="Toggle language"
+        {/* Language switcher — a segmented EN | 日本語 control. The active
+            language is highlighted, so its meaning is clear in either mode.
+            data-no-i18n keeps the DOM translator from touching it. */}
+        <div
+          data-no-i18n
+          className="flex items-center rounded-md border border-orange-500 overflow-hidden text-sm font-semibold select-none"
         >
-          {t("common.language")}
-        </button>
+          <button
+            type="button"
+            onClick={() => language !== "en" && toggleLanguage()}
+            className={`px-2.5 py-1 transition-colors ${
+              language === "en"
+                ? "bg-orange-500 text-white"
+                : "text-orange-600 hover:bg-orange-50"
+            }`}
+            aria-pressed={language === "en"}
+          >
+            EN
+          </button>
+          <button
+            type="button"
+            onClick={() => language !== "ja" && toggleLanguage()}
+            className={`px-2.5 py-1 transition-colors ${
+              language === "ja"
+                ? "bg-orange-500 text-white"
+                : "text-orange-600 hover:bg-orange-50"
+            }`}
+            aria-pressed={language === "ja"}
+          >
+            日本語
+          </button>
+        </div>
         <button className="text-gray-500 hover:text-gray-700 focus:outline-none">
           <BellIcon className="h-6 w-6" />
         </button>
