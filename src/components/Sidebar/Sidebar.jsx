@@ -78,7 +78,7 @@ function Sidebar({ logo }) {
 
   return (
     <aside className="fixed top-0 left-0 h-screen w-64 bg-[#0F0F0F] text-gray-400 flex flex-col transition-all duration-300 z-50 font-sans">
-      <div className="h-16 flex items-center px-6 border-b border-gray-800 bg-white">
+      <div className="h-16 flex items-center px-6 border-b border-gray-800 bg-black">
         {logo ? (
           logo
         ) : (

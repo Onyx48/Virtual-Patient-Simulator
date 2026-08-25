@@ -1,4 +1,11 @@
-import React, { createContext, useContext, useState, useCallback } from "react";
+import React, {
+  createContext,
+  useContext,
+  useState,
+  useCallback,
+  useEffect,
+} from "react";
+import { applyLanguage } from "./domTranslator";
 
 // Translation dictionary. Keys are stable identifiers; each maps to the
 // English and Japanese strings. Extend this as more of the UI is localized.
@@ -82,6 +89,21 @@ export function LanguageProvider({ children }) {
       return "en";
     }
   });
+
+  // Run the whole-platform DOM translator whenever the language changes.
+  // A double rAF lets React finish committing the current render (and any
+  // route/lazy content) before we overlay Japanese onto the live DOM.
+  useEffect(() => {
+    let raf1;
+    let raf2;
+    raf1 = requestAnimationFrame(() => {
+      raf2 = requestAnimationFrame(() => applyLanguage(language));
+    });
+    return () => {
+      cancelAnimationFrame(raf1);
+      cancelAnimationFrame(raf2);
+    };
+  }, [language]);
 
   const toggleLanguage = useCallback(() => {
     setLanguage((prev) => {
