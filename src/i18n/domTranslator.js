@@ -22,7 +22,11 @@ const originalAttr = new WeakMap(); // element -> { placeholder?, title? }
 let currentLang = "en";
 let observer = null;
 
-const ATTRS = ["placeholder", "title"];
+// Attributes whose values are read by a human (visibly or via a screen
+// reader). alt/aria-label matter for accessibility parity: without them a
+// Japanese screen-reader user hears English labels on an otherwise
+// translated page.
+const ATTRS = ["placeholder", "title", "alt", "aria-label"];
 
 function escapeRegExp(s) {
   return s.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
@@ -126,7 +130,9 @@ function walk(root) {
     translateTextNode(n);
     n = iter.nextNode();
   }
-  root.querySelectorAll?.("input, textarea, [title]").forEach(translateAttrs);
+  root
+    .querySelectorAll?.("input, textarea, [title], [alt], [aria-label]")
+    .forEach(translateAttrs);
 }
 
 function withObserverPaused(fn) {

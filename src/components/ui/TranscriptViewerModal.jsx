@@ -1,6 +1,7 @@
 import React, { useState, useEffect, useMemo } from "react";
 import axios from "axios";
 import { XMarkIcon, ClockIcon, PlusIcon, MinusIcon } from "@heroicons/react/24/outline";
+import { useLanguage } from "../../i18n/LanguageContext";
 
 const getAuthHeaders = () => {
   const token = localStorage.getItem("token");
@@ -8,6 +9,7 @@ const getAuthHeaders = () => {
 };
 
 function TranscriptViewerModal({ isOpen, onClose, student }) {
+  const { language } = useLanguage();
   const [sessions, setSessions] = useState([]);
   const [selectedSession, setSelectedSession] = useState(null);
   const [loading, setLoading] = useState(true);
@@ -34,10 +36,17 @@ function TranscriptViewerModal({ isOpen, onClose, student }) {
     }
   };
 
+  // Follow the app language, not the browser locale — otherwise a Japanese
+  // page shows US-format timestamps.
   const formatDate = (dateStr) => {
     if (!dateStr) return "";
     const date = new Date(dateStr);
-    return date.toLocaleDateString() + " " + date.toLocaleTimeString([], { hour: "2-digit", minute: "2-digit" });
+    const locale = language === "ja" ? "ja-JP" : "en-US";
+    return (
+      date.toLocaleDateString(locale) +
+      " " +
+      date.toLocaleTimeString(locale, { hour: "2-digit", minute: "2-digit" })
+    );
   };
 
   const toggleScenario = (scenarioId) => {
