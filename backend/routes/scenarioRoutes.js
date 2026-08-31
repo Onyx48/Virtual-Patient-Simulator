@@ -110,6 +110,36 @@ router.get("/:id", protect, checkAccess("viewScenarios"), async (req, res) => {
   }
 });
 
+// Public: no protect/checkAccess so the external simulator can fetch without a token.
+router.get("/:id/json", async (req, res) => {
+  try {
+    if (!mongoose.Types.ObjectId.isValid(req.params.id)) {
+      return res
+        .status(404)
+        .json({ message: "Scenario not found (Invalid ID)." });
+    }
+
+    const scenario = await Scenario.findById(req.params.id)
+      .populate("educator", "name email")
+      .lean();
+
+    if (!scenario)
+      return res.status(404).json({ message: "Scenario not found." });
+
+    res.json({
+      response: {
+        cursor: 0,
+        count: 1,
+        remaining: 0,
+        results: [scenario],
+      },
+    });
+  } catch (err) {
+    console.error("Get Scenario JSON Error:", err);
+    res.status(500).json({ message: "Server error fetching scenario." });
+  }
+});
+
 router.post(
   "/",
   protect,
