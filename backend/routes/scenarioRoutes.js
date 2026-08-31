@@ -7,6 +7,7 @@ import Session from "../models/sessionModel.js";
 import User from "../models/userModel.js";
 import { protect } from "../middleware/authMiddleware.js";
 import { checkAccess } from "../middleware/roleAccessMiddleware.js";
+import defaultScenarioJson from "../data/defaultScenarioJson.js";
 
 const router = express.Router();
 
@@ -77,6 +78,45 @@ router.get("/", protect, checkAccess("viewScenarios"), async (req, res) => {
   }
 });
 
+let liveScenario = null;
+
+router.post("/json", protect, async (req, res) => {
+  try {
+    const { scenarioId } = req.body;
+    if (!mongoose.Types.ObjectId.isValid(scenarioId)) {
+      return res
+        .status(404)
+        .json({ message: "Scenario not found (Invalid ID)." });
+    }
+
+    const scenario = await Scenario.findById(scenarioId)
+      .populate("educator", "name email")
+      .lean();
+
+    if (!scenario)
+      return res.status(404).json({ message: "Scenario not found." });
+
+    liveScenario = scenario;
+    res.json({ message: "Scenario JSON set." });
+  } catch (err) {
+    console.error("Set Scenario JSON Error:", err);
+    res.status(500).json({ message: "Server error setting scenario JSON." });
+  }
+});
+
+router.get("/json", (req, res) => {
+  if (!liveScenario) return res.json({ response: defaultScenarioJson });
+
+  res.json({
+    response: {
+      cursor: 0,
+      count: 1,
+      remaining: 0,
+      results: [liveScenario],
+    },
+  });
+});
+
 router.get("/:id", protect, checkAccess("viewScenarios"), async (req, res) => {
   try {
     if (!mongoose.Types.ObjectId.isValid(req.params.id)) {
@@ -106,36 +146,6 @@ router.get("/:id", protect, checkAccess("viewScenarios"), async (req, res) => {
     res.json(scenario);
   } catch (err) {
     console.error("Get Single Scenario Error:", err);
-    res.status(500).json({ message: "Server error fetching scenario." });
-  }
-});
-
-// Public: no protect/checkAccess so the external simulator can fetch without a token.
-router.get("/:id/json", async (req, res) => {
-  try {
-    if (!mongoose.Types.ObjectId.isValid(req.params.id)) {
-      return res
-        .status(404)
-        .json({ message: "Scenario not found (Invalid ID)." });
-    }
-
-    const scenario = await Scenario.findById(req.params.id)
-      .populate("educator", "name email")
-      .lean();
-
-    if (!scenario)
-      return res.status(404).json({ message: "Scenario not found." });
-
-    res.json({
-      response: {
-        cursor: 0,
-        count: 1,
-        remaining: 0,
-        results: [scenario],
-      },
-    });
-  } catch (err) {
-    console.error("Get Scenario JSON Error:", err);
     res.status(500).json({ message: "Server error fetching scenario." });
   }
 });
