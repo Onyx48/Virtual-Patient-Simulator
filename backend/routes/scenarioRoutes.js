@@ -12,6 +12,7 @@ import defaultScenarioJson from "../data/defaultScenarioJson.js";
 import { generateScenarioJson } from "../utils/geminiClient.js";
 import { buildWorkflow, createFlow, updateFlow } from "../utils/voxioClient.js";
 import { publicMessage } from "../utils/appEnv.js";
+import { setLiveScenario, getLiveScenario } from "../state/liveScenario.js";
 
 const router = express.Router();
 
@@ -208,8 +209,6 @@ router.post(
   },
 );
 
-let liveScenario = null;
-
 router.post("/json", protect, async (req, res) => {
   try {
     const { scenarioId } = req.body;
@@ -226,7 +225,7 @@ router.post("/json", protect, async (req, res) => {
     if (!scenario)
       return res.status(404).json({ message: "Scenario not found." });
 
-    liveScenario = scenario;
+    setLiveScenario(scenario);
     res.json({ message: "Scenario JSON set." });
   } catch (err) {
     console.error("Set Scenario JSON Error:", err);
@@ -235,6 +234,7 @@ router.post("/json", protect, async (req, res) => {
 });
 
 router.get("/json", (req, res) => {
+  const liveScenario = getLiveScenario();
   if (!liveScenario) return res.json({ response: defaultScenarioJson });
 
   res.json({

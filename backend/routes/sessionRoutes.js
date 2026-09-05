@@ -4,6 +4,7 @@ import { EncryptJWT, jwtDecrypt } from "jose";
 import { createSecretKey } from "crypto";
 import { fetchSessionState } from "../utils/voxioClient.js";
 import { publicMessage } from "../utils/appEnv.js";
+import { setLiveScenario } from "../state/liveScenario.js";
 import Scenario from "../models/scenarioModel.js";
 import Session from "../models/sessionModel.js";
 import User from "../models/userModel.js";
@@ -63,8 +64,12 @@ router.post(
           .json({ message: "Valid scenario_id is required." });
       }
 
-      const scenario =
-        await Scenario.findById(scenario_id).select("apiKey assignedTo");
+      // Fetched whole (not .select'd) because the same document is published to
+      // GET /api/scenarios/json below, and the simulator needs the prompt and
+      // movements, not just the key.
+      const scenario = await Scenario.findById(scenario_id)
+        .populate("educator", "name email")
+        .lean();
       if (!scenario) {
         return res.status(404).json({ message: "Scenario not found." });
       }
@@ -92,6 +97,12 @@ router.post(
           .status(400)
           .json({ message: "Assigned educator is missing for student." });
       }
+
+      // Hand this scenario to the external simulator, which reads it from
+      // GET /api/scenarios/json. Last-write-wins by design: whoever pressed
+      // Start most recently is the scenario the simulator will load. Done after
+      // every check above so a rejected start cannot displace a live run.
+      setLiveScenario(scenario);
 
       const companyId = "@STRAITS";
       const sessionId = new mongoose.Types.ObjectId().toString();

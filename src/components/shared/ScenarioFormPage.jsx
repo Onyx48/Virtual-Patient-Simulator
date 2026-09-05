@@ -581,6 +581,12 @@ function ScenarioFormPage() {
                         value={field.value}
                         onChange={field.onChange}
                         modules={quillModules}
+                        // Quill 2's getSemanticHTML() rewrites every space as
+                        // &nbsp; and every apostrophe as &#39;. This prompt is
+                        // fed to an LLM as a system prompt, so that entity soup
+                        // ends up in the model's context. innerHTML keeps the
+                        // formatting but leaves the text alone.
+                        useSemanticHTML={false}
                       />
                     )}
                   />
@@ -601,6 +607,7 @@ function ScenarioFormPage() {
                         value={field.value}
                         onChange={field.onChange}
                         modules={quillModules}
+                        useSemanticHTML={false}
                       />
                     )}
                   />
