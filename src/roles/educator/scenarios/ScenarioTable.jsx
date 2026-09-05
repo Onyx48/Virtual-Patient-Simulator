@@ -1,5 +1,7 @@
-import React from "react";
-import { Target, Edit, TrendingUp } from "lucide-react";
+import React, { useState } from "react";
+import axios from "axios";
+import toast from "react-hot-toast";
+import { Target, Edit, TrendingUp, Loader2 } from "lucide-react";
 
 // The hosted simulator the Test button opens. Baked in at build time; set
 // VITE_SIMULATOR_URL in .env to point at a different deployment.
@@ -8,6 +10,44 @@ const SIMULATOR_URL =
   "https://share.streampixel.io/6a9bdb0a635d17b54874e623";
 
 function ScenarioTable({ data, onEditClick, canEdit = true }) {
+  // Which card's Test button is mid-publish, so only that one shows a spinner.
+  const [publishingId, setPublishingId] = useState(null);
+
+  /*
+   * The simulator has no way to be told *which* scenario to run — it reads
+   * whatever GET /api/scenarios/json currently returns. So Test has to publish
+   * this scenario to that endpoint and only then open the simulator, or the
+   * simulator loads the previous tester's scenario.
+   *
+   * The blank tab is opened synchronously, before the await, because a
+   * window.open() that happens after an async gap has lost the user's click
+   * gesture and gets blocked as a popup.
+   */
+  const handleTest = async (scenario) => {
+    const scenarioId = scenario._id || scenario.id;
+    if (!scenarioId || publishingId) return;
+
+    const tab = window.open("", "_blank");
+    if (!tab) {
+      toast.error("Allow popups for this site to test a scenario.");
+      return;
+    }
+
+    setPublishingId(scenarioId);
+    try {
+      await axios.post("/api/scenarios/json", { scenarioId });
+      tab.location = SIMULATOR_URL;
+    } catch (error) {
+      tab.close();
+      toast.error(
+        error.response?.data?.message ||
+          "Could not hand this scenario to the simulator.",
+      );
+    } finally {
+      setPublishingId(null);
+    }
+  };
+
   const getStatusStyle = (status) => {
     switch (status?.toLowerCase()) {
       case "published":
@@ -97,18 +137,23 @@ function ScenarioTable({ data, onEditClick, canEdit = true }) {
                   <Edit className="w-3 h-3" /> Edit
                 </button>
               )}
-              <a
-                href={SIMULATOR_URL}
-                target="_blank"
-                rel="noopener noreferrer"
-                className={`flex-1 flex items-center justify-center gap-2 py-2.5 rounded-lg text-sm font-semibold transition-colors ${
+              <button
+                onClick={() => handleTest(scenario)}
+                disabled={publishingId === (scenario._id || scenario.id)}
+                className={`flex-1 flex items-center justify-center gap-2 py-2.5 rounded-lg text-sm font-semibold transition-colors disabled:opacity-60 ${
                   canEdit
                     ? "bg-black text-white hover:bg-gray-800"
                     : "bg-black text-white hover:bg-gray-800 w-full"
                 }`}
               >
-                Test
-              </a>
+                {publishingId === (scenario._id || scenario.id) ? (
+                  <>
+                    <Loader2 className="w-3 h-3 animate-spin" /> Opening
+                  </>
+                ) : (
+                  "Test"
+                )}
+              </button>
             </div>
           </div>
         );
