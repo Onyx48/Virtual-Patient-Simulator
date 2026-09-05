@@ -11,6 +11,11 @@ function StudentModal({
   groups = [],
 }) {
   const isEdit = !!studentData;
+  // Educators and school admins are scoped to one school and the API derives the
+  // school from their own account, so the field is not theirs to choose.
+  const schoolIsFixed = role === "educator" || role === "school_admin";
+  // Groups are a per-school grouping of students; both scoped roles manage them.
+  const canAssignGroup = role === "educator" || role === "school_admin";
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [groupMode, setGroupMode] = useState(
     studentData?.groupId ? "existing" : "none",
@@ -33,7 +38,7 @@ function StudentModal({
       : {
           studentName: "",
           emailAddress: "",
-          schoolName: role === "educator" ? defaultSchoolName : "",
+          schoolName: schoolIsFixed ? defaultSchoolName : "",
           grade: "",
           groupId: "",
           newGroupName: "",
@@ -48,14 +53,19 @@ function StudentModal({
       name: data.studentName,
       email: data.emailAddress,
       schoolName:
-        !isEdit && role === "educator" ? defaultSchoolName : data.schoolName,
+        !isEdit && schoolIsFixed ? defaultSchoolName : data.schoolName,
       grade: data.grade,
     };
 
-    if (groupMode === "existing" && data.groupId) {
-      submissionData.groupId = data.groupId;
-    } else if (groupMode === "new" && data.newGroupName?.trim()) {
-      submissionData.newGroupName = data.newGroupName.trim();
+    if (canAssignGroup) {
+      if (groupMode === "new" && data.newGroupName?.trim()) {
+        submissionData.newGroupName = data.newGroupName.trim();
+      } else {
+        // Send null rather than omitting it, so picking "No group" on an existing
+        // student actually removes them from their group.
+        submissionData.groupId =
+          groupMode === "existing" ? data.groupId || null : null;
+      }
     }
 
     await onSave(submissionData);
@@ -110,7 +120,7 @@ function StudentModal({
         </div>
 
         <div className="grid grid-cols-2 gap-5">
-          {!(role === "educator" && !isEdit) && (
+          {!(schoolIsFixed && !isEdit) && (
             <div className="space-y-1.5 col-span-2">
               <label className="block text-sm font-semibold text-gray-700">
                 School Name
@@ -118,7 +128,7 @@ function StudentModal({
               <input
                 type="text"
                 {...register("schoolName")}
-                readOnly={role === "educator"}
+                readOnly={schoolIsFixed}
                 className="w-full px-4 py-2.5 rounded-lg border border-gray-300 focus:ring-2 focus:ring-orange-500 focus:border-transparent outline-none transition-all text-sm"
                 placeholder="School Name"
               />
@@ -126,8 +136,8 @@ function StudentModal({
           )}
         </div>
 
-        {/* Group assignment — only for educators */}
-        {role === "educator" && (
+        {/* Group assignment — for the roles scoped to a single school */}
+        {canAssignGroup && (
           <div className="space-y-3">
             <label className="block text-sm font-semibold text-gray-700">
               Group Assignment

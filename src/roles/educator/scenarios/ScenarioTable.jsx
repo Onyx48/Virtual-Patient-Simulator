@@ -1,6 +1,12 @@
 import React from "react";
 import { Target, Edit, TrendingUp } from "lucide-react";
 
+// The hosted simulator the Test button opens. Baked in at build time; set
+// VITE_SIMULATOR_URL in .env to point at a different deployment.
+const SIMULATOR_URL =
+  import.meta.env.VITE_SIMULATOR_URL ||
+  "https://share.streampixel.io/6a9bdb0a635d17b54874e623";
+
 function ScenarioTable({ data, onEditClick, canEdit = true }) {
   const getStatusStyle = (status) => {
     switch (status?.toLowerCase()) {
@@ -91,10 +97,10 @@ function ScenarioTable({ data, onEditClick, canEdit = true }) {
                   <Edit className="w-3 h-3" /> Edit
                 </button>
               )}
-              <button
-                onClick={() =>
-                  console.log("Test clicked for", scenario.scenarioName)
-                }
+              <a
+                href={SIMULATOR_URL}
+                target="_blank"
+                rel="noopener noreferrer"
                 className={`flex-1 flex items-center justify-center gap-2 py-2.5 rounded-lg text-sm font-semibold transition-colors ${
                   canEdit
                     ? "bg-black text-white hover:bg-gray-800"
@@ -102,7 +108,7 @@ function ScenarioTable({ data, onEditClick, canEdit = true }) {
                 }`}
               >
                 Test
-              </button>
+              </a>
             </div>
           </div>
         );

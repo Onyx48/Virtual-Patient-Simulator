@@ -17,7 +17,6 @@ import {
   Cell,
 } from "recharts";
 import {
-  Plus,
   MoreHorizontal,
   ArrowUpRight,
   ArrowDownRight,
@@ -106,14 +105,6 @@ function EducatorDashboard() {
             <p className="text-gray-500 mt-1 text-sm">
               Here is what's happening with your scenarios today.
             </p>
-          </div>
-          <div className="flex gap-3">
-            <button
-              onClick={() => navigate("/scenarios/add")}
-              className="flex items-center gap-2 bg-[#1a1a1a] text-white px-5 py-2.5 rounded-lg hover:bg-black transition shadow-lg text-sm font-medium"
-            >
-              <Plus size={18} /> New Scenario
-            </button>
           </div>
         </div>
 

@@ -28,6 +28,18 @@ const getAuthHeaders = () => {
 
 function StudentPage({ role }) {
   const { user } = useAuth();
+
+  // A school_admin does not assign scenarios (that stays with educators), so
+  // neither the Scenarios column nor its filter is shown to them.
+  // Groups are per-school, and GET /api/groups already scopes a school_admin to
+  // their own school, so they get the same grouping tools an educator has.
+  const showGroupColumn = role === "educator" || role === "school_admin";
+  const showScenariosColumn = role !== "school_admin";
+  const canManageStudents = role !== "school_admin";
+  // ID, Name, Email, School, Progress, Transcript, Action are always present.
+  const columnCount =
+    7 + (showGroupColumn ? 1 : 0) + (showScenariosColumn ? 1 : 0);
+
   const [students, setStudents] = useState([]);
   const [groups, setGroups] = useState([]);
   const [searchTerm, setSearchTerm] = useState("");
@@ -100,7 +112,7 @@ function StudentPage({ role }) {
 
   useEffect(() => {
     fetchStudents();
-    if (role === "educator") fetchGroups();
+    if (showGroupColumn) fetchGroups();
   }, []);
 
   useEffect(() => {
@@ -247,7 +259,11 @@ function StudentPage({ role }) {
           {
             name: formData.name,
             email: formData.email,
-            ...(formData.groupId && { groupId: formData.groupId }),
+            // Pass null through, so clearing the group is not mistaken for
+            // "field not supplied".
+            ...(formData.groupId !== undefined && {
+              groupId: formData.groupId,
+            }),
           },
           getAuthHeaders(),
         );
@@ -266,7 +282,7 @@ function StudentPage({ role }) {
         );
         toast.success("Student created successfully.");
       }
-      await Promise.all([fetchStudents(), role === "educator" ? fetchGroups() : Promise.resolve()]);
+      await Promise.all([fetchStudents(), showGroupColumn ? fetchGroups() : Promise.resolve()]);
       setIsStudentModalOpen(false);
     } catch (error) {
       toast.error(
@@ -369,18 +385,20 @@ function StudentPage({ role }) {
 
             {isFilterOpen && (
               <div className="absolute left-0 top-full mt-2 w-56 bg-white border border-gray-200 rounded-xl shadow-lg z-20 p-3 space-y-3">
-                <div>
-                  <p className="text-xs font-semibold text-gray-500 uppercase mb-1.5">Scenarios</p>
-                  <select
-                    value={filterAssigned}
-                    onChange={(e) => setFilterAssigned(e.target.value)}
-                    className="w-full text-sm border border-gray-200 rounded-lg px-3 py-2 bg-white focus:outline-none focus:ring-2 focus:ring-orange-400"
-                  >
-                    <option value="">All students</option>
-                    <option value="assigned">Has assigned scenarios</option>
-                    <option value="unassigned">Not assigned</option>
-                  </select>
-                </div>
+                {showScenariosColumn && (
+                  <div>
+                    <p className="text-xs font-semibold text-gray-500 uppercase mb-1.5">Scenarios</p>
+                    <select
+                      value={filterAssigned}
+                      onChange={(e) => setFilterAssigned(e.target.value)}
+                      className="w-full text-sm border border-gray-200 rounded-lg px-3 py-2 bg-white focus:outline-none focus:ring-2 focus:ring-orange-400"
+                    >
+                      <option value="">All students</option>
+                      <option value="assigned">Has assigned scenarios</option>
+                      <option value="unassigned">Not assigned</option>
+                    </select>
+                  </div>
+                )}
                 <div>
                   <p className="text-xs font-semibold text-gray-500 uppercase mb-1.5">Progress</p>
                   <select
@@ -407,39 +425,37 @@ function StudentPage({ role }) {
         </div>
 
         <div className="flex gap-3">
-          {role !== "school_admin" && (
-            <>
-              <button
-                onClick={() => setIsAssignModalOpen(true)}
-                className="px-5 py-2.5 bg-gray-100 hover:bg-gray-200 text-gray-800 text-sm font-semibold rounded-lg transition-colors"
-              >
-                Assign Scenarios
-              </button>
-              <input
-                type="file"
-                ref={fileInputRef}
-                onChange={handleFileChange}
-                accept=".csv"
-                style={{ display: "none" }}
-                disabled={isUploading}
-              />
-              <button
-                onClick={handleBulkUploadClick}
-                disabled={isUploading}
-                className="flex items-center gap-2 px-5 py-2.5 bg-white border border-gray-200 text-gray-700 hover:bg-gray-50 text-sm font-bold rounded-lg transition-colors shadow-sm disabled:opacity-50"
-              >
-                <ArrowUpTrayIcon className="h-5 w-5" />
-                {isUploading ? "Uploading..." : "Upload Bulk Students"}
-              </button>
-              <button
-                onClick={handleAddNew}
-                className="flex items-center gap-2 px-5 py-2.5 bg-black hover:bg-gray-800 text-white text-sm font-bold rounded-lg transition-colors shadow-sm"
-              >
-                <PlusIcon className="h-5 w-5" />
-                New Student
-              </button>
-            </>
+          {showScenariosColumn && (
+            <button
+              onClick={() => setIsAssignModalOpen(true)}
+              className="px-5 py-2.5 bg-gray-100 hover:bg-gray-200 text-gray-800 text-sm font-semibold rounded-lg transition-colors"
+            >
+              Assign Scenarios
+            </button>
           )}
+          <input
+            type="file"
+            ref={fileInputRef}
+            onChange={handleFileChange}
+            accept=".csv"
+            style={{ display: "none" }}
+            disabled={isUploading}
+          />
+          <button
+            onClick={handleBulkUploadClick}
+            disabled={isUploading}
+            className="flex items-center gap-2 px-5 py-2.5 bg-white border border-gray-200 text-gray-700 hover:bg-gray-50 text-sm font-bold rounded-lg transition-colors shadow-sm disabled:opacity-50"
+          >
+            <ArrowUpTrayIcon className="h-5 w-5" />
+            {isUploading ? "Uploading..." : "Upload Bulk Students"}
+          </button>
+          <button
+            onClick={handleAddNew}
+            className="flex items-center gap-2 px-5 py-2.5 bg-black hover:bg-gray-800 text-white text-sm font-bold rounded-lg transition-colors shadow-sm"
+          >
+            <PlusIcon className="h-5 w-5" />
+            New Student
+          </button>
         </div>
       </div>
 
@@ -448,6 +464,12 @@ function StudentPage({ role }) {
         <table className="min-w-full divide-y divide-gray-100">
           <thead className="bg-gray-50/50">
             <tr>
+              <th
+                className="px-6 py-4 text-left text-xs font-semibold text-gray-500 uppercase tracking-wider cursor-pointer select-none hover:text-gray-700"
+                onClick={() => handleSort("visualId")}
+              >
+                ID{getSortIcon("visualId")}
+              </th>
               <th
                 className="px-6 py-4 text-left text-xs font-semibold text-gray-500 uppercase tracking-wider cursor-pointer select-none hover:text-gray-700"
                 onClick={() => handleSort("name")}
@@ -466,7 +488,7 @@ function StudentPage({ role }) {
               >
                 School Name{getSortIcon("schoolName")}
               </th>
-              {role === "educator" && (
+              {showGroupColumn && (
                 <th
                   className="px-6 py-4 text-left text-xs font-semibold text-gray-500 uppercase tracking-wider cursor-pointer select-none hover:text-gray-700"
                   onClick={() => handleSort("groupName")}
@@ -480,12 +502,14 @@ function StudentPage({ role }) {
               >
                 Progress{getSortIcon("totalSessions")}
               </th>
-              <th
-                className="px-6 py-4 text-left text-xs font-semibold text-gray-500 uppercase tracking-wider cursor-pointer select-none hover:text-gray-700"
-                onClick={() => handleSort("assignedScenariosCount")}
-              >
-                Scenarios{getSortIcon("assignedScenariosCount")}
-              </th>
+              {showScenariosColumn && (
+                <th
+                  className="px-6 py-4 text-left text-xs font-semibold text-gray-500 uppercase tracking-wider cursor-pointer select-none hover:text-gray-700"
+                  onClick={() => handleSort("assignedScenariosCount")}
+                >
+                  Scenarios{getSortIcon("assignedScenariosCount")}
+                </th>
+              )}
               <th className="px-6 py-4 text-left text-xs font-semibold text-gray-500 uppercase tracking-wider">
                 Transcript
               </th>
@@ -497,14 +521,14 @@ function StudentPage({ role }) {
           <tbody className="bg-white divide-y divide-gray-100">
             {isLoading ? (
               <tr>
-                <td colSpan={role === "educator" ? 8 : 7} className="px-6 py-12 text-center">
+                <td colSpan={columnCount} className="px-6 py-12 text-center">
                   <Spinner size={32} />
                 </td>
               </tr>
             ) : paginatedData.length === 0 ? (
               <tr>
                 <td
-                  colSpan={role === "educator" ? 8 : 7}
+                  colSpan={columnCount}
                   className="px-6 py-12 text-center text-gray-500"
                 >
                   No students found.
@@ -516,6 +540,12 @@ function StudentPage({ role }) {
                   key={student.id}
                   className="hover:bg-gray-50/50 transition-colors group"
                 >
+                  <td
+                    className="px-6 py-4 whitespace-nowrap text-xs font-mono text-gray-500"
+                    title={student.id}
+                  >
+                    {student.visualId}
+                  </td>
                   <td className="px-6 py-4 whitespace-nowrap text-sm font-semibold text-gray-800">
                     {student.name}
                   </td>
@@ -525,7 +555,7 @@ function StudentPage({ role }) {
                   <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-600 max-w-xs truncate">
                     {student.schoolName}
                   </td>
-                  {role === "educator" && (
+                  {showGroupColumn && (
                     <td className="px-6 py-4 whitespace-nowrap text-sm">
                       {student.groupName ? (
                         <span className="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium bg-orange-100 text-orange-800">
@@ -548,17 +578,19 @@ function StudentPage({ role }) {
                       <span className="text-gray-400">No sessions yet</span>
                     )}
                   </td>
-                  <td className="px-6 py-4 whitespace-nowrap text-sm">
-                    {student.isAssigned ? (
-                      <span className="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium bg-green-100 text-green-800">
-                        {student.assignedScenariosCount} scenario{student.assignedScenariosCount !== 1 ? "s" : ""}
-                      </span>
-                    ) : (
-                      <span className="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium bg-gray-100 text-gray-800">
-                        Not Assigned
-                      </span>
-                    )}
-                  </td>
+                  {showScenariosColumn && (
+                    <td className="px-6 py-4 whitespace-nowrap text-sm">
+                      {student.isAssigned ? (
+                        <span className="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium bg-green-100 text-green-800">
+                          {student.assignedScenariosCount} scenario{student.assignedScenariosCount !== 1 ? "s" : ""}
+                        </span>
+                      ) : (
+                        <span className="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium bg-gray-100 text-gray-800">
+                          Not Assigned
+                        </span>
+                      )}
+                    </td>
+                  )}
                   <td className="px-6 py-4 whitespace-nowrap text-sm">
                     <button
                       onClick={() =>
@@ -571,7 +603,7 @@ function StudentPage({ role }) {
                   </td>
                   <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500">
                     <div className="flex items-center gap-4">
-                      {role !== "school_admin" && (
+                      {canManageStudents && (
                         <>
                           <button
                             onClick={() => handleEdit(student)}
@@ -613,7 +645,7 @@ function StudentPage({ role }) {
       />
       </div>
 
-      {isStudentModalOpen && role !== "school_admin" && (
+      {isStudentModalOpen && (
         <div className="fixed inset-0 z-50 bg-black/40 backdrop-blur-sm flex justify-center items-center">
           <StudentModal
             studentData={editingStudent}
@@ -625,7 +657,7 @@ function StudentPage({ role }) {
           />
         </div>
       )}
-      {isAssignModalOpen && role !== "school_admin" && (
+      {isAssignModalOpen && showScenariosColumn && (
         <AssignScenariosModal
           onClose={() => setIsAssignModalOpen(false)}
           onAssignSuccess={() => {

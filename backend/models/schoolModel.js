@@ -59,6 +59,15 @@ const schoolSchema = new mongoose.Schema(
       name: { type: String, default: "" },
       email: { type: String, default: "" },
     },
+    // Whether this org's admin has been sent their login credentials. Separate
+    // from `status` above, which is about the subscription.
+    inviteStatus: {
+      type: String,
+      enum: ["pending", "invited"],
+      default: "pending",
+    },
+    inviteSentAt: { type: Date, default: null },
+    inviteSentTo: { type: String, default: "" },
   },
   {
     timestamps: true,

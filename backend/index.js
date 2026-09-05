@@ -11,18 +11,47 @@ import sessionRoutes from "./routes/sessionRoutes.js";
 import dashboardRoutes from "./routes/dashboardRoutes.js";
 import importRoutes from "./routes/importRoutes.js";
 import groupRoutes from "./routes/groupRoutes.js";
+import { APP_ENV, isDev, isProd, publicMessage } from "./utils/appEnv.js";
 
 const app = express();
 
 connectDB();
 
+// Deployed frontends. Extra origins can be added via CORS_ORIGINS (comma-separated).
+const PROD_ORIGINS = [
+  "https://vps.metawingsxr.com",
+  "https://vpsdashboard.metawingsxr.com",
+];
+const EXTRA_ORIGINS = (process.env.CORS_ORIGINS || "")
+  .split(",")
+  .map((o) => o.trim())
+  .filter(Boolean);
+
+// Any port on loopback or a private LAN address, so the dev server still works
+// when Vite picks a fallback port (5174 when 5173 is taken) or is opened via
+// 127.0.0.1 / the machine's LAN IP. Hardcoding only localhost:5173 meant those
+// responses arrived without an Access-Control-Allow-Origin header, so the
+// browser discarded them: the API logged a normal 200 while the client saw a
+// bare network error and login looked broken.
+const LOCAL_ORIGIN = /^https?:\/\/(localhost|127\.0\.0\.1|\[::1\]|10\.\d+\.\d+\.\d+|192\.168\.\d+\.\d+|172\.(1[6-9]|2\d|3[01])\.\d+\.\d+)(:\d+)?$/;
+
+const isAllowedOrigin = (origin) => {
+  if (PROD_ORIGINS.includes(origin) || EXTRA_ORIGINS.includes(origin)) return true;
+  return isDev && LOCAL_ORIGIN.test(origin);
+};
+
 app.use(
   cors({
-    origin: [
-      "https://vps.metawingsxr.com",
-      "https://vpsdashboard.metawingsxr.com",
-      "http://localhost:5173", // Keep local for testing
-    ],
+    origin: (origin, callback) => {
+      // No Origin header: same-origin, curl, or a native client. Not a browser
+      // cross-origin request, so there is nothing to gate.
+      if (!origin) return callback(null, true);
+      if (isAllowedOrigin(origin)) return callback(null, true);
+      // Log it. A silent omission of the CORS header is invisible server-side
+      // and shows up in the browser as an unexplained network failure.
+      console.warn(`[CORS] blocked origin: ${origin}`);
+      return callback(null, false);
+    },
     credentials: true,
   }),
 );
@@ -45,13 +74,27 @@ app.get("/", (req, res) => {
   res.json({ message: "Backend server (Single User Model) is running!" });
 });
 
-app.get("/debug/env", (req, res) => {
-  res.json({
-    AWS_REGION: process.env.AWS_REGION,
-    EMAIL_FROM: process.env.EMAIL_FROM,
-    AWS_ACCESS_KEY_ID: process.env.AWS_ACCESS_KEY_ID ? "present" : "missing",
+// Dev only: this is unauthenticated and reports configuration, which has no
+// business being reachable in production.
+if (isDev) {
+  app.get("/debug/env", (req, res) => {
+    res.json({
+      APP_ENV,
+      AWS_REGION: process.env.AWS_REGION || null,
+      EMAIL_FROM: process.env.EMAIL_FROM || null,
+      AWS_ACCESS_KEY_ID: process.env.AWS_ACCESS_KEY_ID ? "present" : "missing",
+      AWS_SECRET_ACCESS_KEY: process.env.AWS_SECRET_ACCESS_KEY
+        ? "present"
+        : "missing",
+      mailConfigured: Boolean(
+        process.env.AWS_REGION &&
+          process.env.EMAIL_FROM &&
+          process.env.AWS_ACCESS_KEY_ID &&
+          process.env.AWS_SECRET_ACCESS_KEY,
+      ),
+    });
   });
-});
+}
 
 app.use("*", (req, res) => {
   res.status(404).json({
@@ -64,11 +107,14 @@ app.use((err, req, res, next) => {
   console.error("Timestamp:", new Date().toISOString());
   console.error("Path:", req.path);
   console.error("Error Message:", err.message);
+  if (isDev) console.error(err.stack);
 
   const statusCode =
     err.statusCode || (res.statusCode === 200 ? 500 : res.statusCode) || 500;
+  // In production the internal reason stays in the log above; the client gets
+  // generic wording so stack traces and config details are not disclosed.
   res.status(statusCode).json({
-    message: err.message || "An unexpected server error occurred.",
+    message: publicMessage(err, "An unexpected server error occurred."),
   });
 });
 
@@ -76,6 +122,9 @@ const PORT = process.env.PORT || 5001;
 app.listen(PORT, () => {
   console.log("=================================");
   console.log(`🚀 Server running on port ${PORT}`);
+  console.log(
+    `🛠️  Mode: ${APP_ENV}${isProd ? " (client errors are generic)" : " (client errors include details)"}`,
+  );
   console.log(
     `🔗 MongoDB connection attempt initiated (Target DB: via .env)...`,
   );

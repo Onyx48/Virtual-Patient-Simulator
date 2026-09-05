@@ -8,7 +8,6 @@ import multer from "multer";
 import path from "path";
 import fs from "fs";
 import mongoose from "mongoose";
-import bcrypt from "bcryptjs";
 import crypto from "crypto";
 import { protect } from "../middleware/authMiddleware.js";
 import User from "../models/userModel.js";
@@ -56,11 +55,6 @@ const upload = multer({
 // ============================================
 
 const generatePassword = () => crypto.randomBytes(8).toString("hex");
-
-const hashPassword = async (password) => {
-  const salt = await bcrypt.genSalt(10);
-  return bcrypt.hash(password, salt);
-};
 
 const parseJsonFile = (filePath) => {
   try {
@@ -152,12 +146,11 @@ const importUsers = async (usersData, schoolMap) => {
       }
 
       const plainPassword = generatePassword();
-      const hashedPassword = await hashPassword(plainPassword);
 
       const userDoc = await User.create({
         name,
         email,
-        password: hashedPassword,
+        password: plainPassword, // hashed by userModel's pre-save hook
         role,
         schoolId: schoolId || undefined,
         phoneNumber: userData.Phone || "",
@@ -209,11 +202,10 @@ const importEducators = async (educatorsData, userMap) => {
           userMap.set(email, user);
         } else {
           const plainPassword = generatePassword();
-          const hashedPassword = await hashPassword(plainPassword);
           const userDoc = await User.create({
             name,
             email,
-            password: hashedPassword,
+            password: plainPassword, // hashed by userModel's pre-save hook
             role: "educator",
             department: educatorData.Department || "Science",
           });
@@ -267,11 +259,10 @@ const importStudents = async (studentsData, userMap, educatorMap, schoolMap) => 
           userMap.set(email, user);
         } else {
           const plainPassword = generatePassword();
-          const hashedPassword = await hashPassword(plainPassword);
           const userDoc = await User.create({
             name,
             email,
-            password: hashedPassword,
+            password: plainPassword, // hashed by userModel's pre-save hook
             role: "student",
             phoneNumber: "",
           });

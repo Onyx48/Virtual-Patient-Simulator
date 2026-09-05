@@ -2,6 +2,59 @@ import React from "react";
 import { ArrowsUpDownIcon } from "@heroicons/react/24/outline";
 import { format } from "date-fns";
 
+/**
+ * Clickable invite state. "Pending" means the org admin has never been sent
+ * credentials; "Invited" means they have. Clicking either one generates a fresh
+ * password and mails it — a re-send is a rotation, not a copy of the old one,
+ * because stored passwords are hashes.
+ */
+function InviteStatusBadge({ school, onClick, isSending, disabled }) {
+  const invited = school.inviteStatus === "invited";
+  const sentAt = school.inviteSentAt
+    ? format(new Date(school.inviteSentAt), "dd MMM, yyyy 'at' HH:mm")
+    : null;
+
+  const title = disabled
+    ? invited
+      ? `Invited${sentAt ? ` on ${sentAt}` : ""}`
+      : "No invite sent yet"
+    : invited
+      ? `Invited${sentAt ? ` on ${sentAt}` : ""} — click to send a new password`
+      : "Click to send login credentials";
+
+  if (isSending) {
+    return (
+      <span className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full text-xs font-medium bg-gray-100 text-gray-500">
+        <span className="h-3 w-3 rounded-full border-2 border-gray-400 border-t-transparent animate-spin" />
+        Sending…
+      </span>
+    );
+  }
+
+  const palette = invited
+    ? "bg-green-100 text-green-700 ring-green-200"
+    : "bg-amber-100 text-amber-700 ring-amber-200";
+  const interactive = disabled
+    ? "cursor-default"
+    : "cursor-pointer hover:brightness-95 focus:outline-none focus:ring-2 focus:ring-offset-1 focus:ring-orange-400";
+
+  return (
+    <button
+      type="button"
+      onClick={disabled ? undefined : () => onClick?.(school)}
+      disabled={disabled}
+      title={title}
+      aria-label={title}
+      className={`inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full text-xs font-medium ring-1 ${palette} ${interactive}`}
+    >
+      <span
+        className={`h-1.5 w-1.5 rounded-full ${invited ? "bg-green-500" : "bg-amber-500"}`}
+      />
+      {invited ? "Invited" : "Pending"}
+    </button>
+  );
+}
+
 function SchoolTable({
   data,
   onEditClick,
@@ -9,6 +62,8 @@ function SchoolTable({
   onSort,
   canEdit,
   isDeletingId,
+  onInviteClick,
+  isInvitingId,
 }) {
   const handleSort = (key) => {
     if (onSort) onSort(key);
@@ -74,6 +129,13 @@ function SchoolTable({
               </th>
               <th
                 scope="col"
+                className="px-6 py-3 text-left text-xs font-bold text-gray-500 uppercase tracking-wider cursor-pointer group select-none"
+                onClick={() => handleSort("inviteStatus")}
+              >
+                Status <SortIcon />
+              </th>
+              <th
+                scope="col"
                 className="px-6 py-3 text-left text-xs font-bold text-gray-500 uppercase tracking-wider"
               >
                 Action
@@ -94,7 +156,7 @@ function SchoolTable({
                     {school.email}
                   </td>
                   <td
-                    className="px-6 py-4 text-sm text-gray-500 max-w-xs truncate"
+                    className="px-6 py-4 text-sm text-gray-500 max-w-md truncate"
                     title={school.description}
                   >
                     {school.description}
@@ -126,6 +188,14 @@ function SchoolTable({
                       ? school.assignedAdmin.name
                       : "Unassigned"}
                   </td>
+                  <td className="px-6 py-4 whitespace-nowrap text-sm">
+                    <InviteStatusBadge
+                      school={school}
+                      onClick={onInviteClick}
+                      isSending={isInvitingId === school._id}
+                      disabled={!canEdit}
+                    />
+                  </td>
                   <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500">
                     <div className="flex gap-2">
                       {canEdit && (
@@ -154,7 +224,7 @@ function SchoolTable({
             ) : (
               <tr>
                 <td
-                  colSpan="8"
+                  colSpan="9"
                   className="px-6 py-10 text-center text-sm text-gray-500"
                 >
                   No schools found matching your search.

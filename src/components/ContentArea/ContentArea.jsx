@@ -141,7 +141,7 @@ function ContentArea() {
         <Route
           path="/scenarios/edit/:id"
           element={
-            <RoleBasedRoute allowedRoles={["educator"]}>
+            <RoleBasedRoute allowedRoles={["educator", "school_admin"]}>
               <ScenarioFormPage />
             </RoleBasedRoute>
           }

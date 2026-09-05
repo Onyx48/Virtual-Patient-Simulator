@@ -15,8 +15,9 @@ import ReactQuill from "react-quill-new";
 import "react-quill-new/dist/quill.snow.css";
 import ConfirmationModal from "../ui/ConfirmationModal";
 
-const AI_SERVICE_URL =
-  import.meta.env.VITE_AI_SERVICE_URL || "http://localhost:8888";
+// AI generation now runs inside this backend (backend/routes/scenarioRoutes.js),
+// so it goes through the shared axios instance and carries the auth header.
+// The old standalone :8888 FastAPI service is gone.
 
 const ErrorModal = ({ isOpen, message, onClose }) => {
   if (!isOpen) return null;
@@ -205,6 +206,8 @@ function ScenarioFormPage() {
   });
 
   const [aiInput, setAiInput] = useState("");
+  // Voxio flow key. Returned by the AI endpoints, saved onto the scenario.
+  const [apiKey, setApiKey] = useState("");
   const [isAiLoading, setIsAiLoading] = useState(false);
   const [isSaving, setIsSaving] = useState(false);
   const [errorPopup, setErrorPopup] = useState({ open: false, message: "" });
@@ -219,6 +222,7 @@ function ScenarioFormPage() {
 
   useEffect(() => {
     if (isDbEdit && selectedScenario) {
+      setApiKey(selectedScenario.apiKey || "");
       setValue("scenarioName", selectedScenario.scenarioName || "");
       setValue("difficulty", selectedScenario.difficulty || "Medium");
       setValue("status", selectedScenario.status || "Draft");
@@ -255,14 +259,18 @@ function ScenarioFormPage() {
     setIsAiLoading(true);
 
     try {
-      const url = `${AI_SERVICE_URL}/add-scenario`;
-      const payload = {
-        educator_id: user?._id || user?.id,
-        scenario_prompt: aiInput,
-      };
+      // Editing an existing scenario updates the simulator flow it already owns
+      // (identified by its apiKey); everything else creates a new flow.
+      const existingApiKey = isDbEdit
+        ? apiKey || selectedScenario?.apiKey
+        : null;
+      const url = existingApiKey
+        ? "/api/scenarios/ai/edit"
+        : "/api/scenarios/ai/generate";
 
-      const response = await axios.post(url, payload, {
-        headers: { "Content-Type": "application/json" },
+      const response = await axios.post(url, {
+        scenario_prompt: aiInput,
+        ...(existingApiKey && { api_key: existingApiKey }),
       });
 
       const rawData = response.data;
@@ -274,7 +282,10 @@ function ScenarioFormPage() {
       }
       if (returnedJson.difficulty_level)
         setValue("difficulty", returnedJson.difficulty_level);
-      if (returnedJson.status) setValue("status", returnedJson.status);
+
+      // The simulator key must survive the save, or the scenario can never be
+      // edited or run again. Not a form field — held in state and sent on submit.
+      if (returnedJson.api_key) setApiKey(returnedJson.api_key);
 
       if (returnedJson.scenario_prompt) {
         setValue("scenarioPrompt", returnedJson.scenario_prompt);
@@ -294,9 +305,9 @@ function ScenarioFormPage() {
         setValue("movements", processIncomingMovements(returnedJson.movements));
       }
     } catch (error) {
-      const msg = error.response
-        ? JSON.stringify(error.response.data)
-        : error.message;
+      const msg =
+        error.response?.data?.message ||
+        (error.response ? JSON.stringify(error.response.data) : error.message);
       setErrorPopup({ open: true, message: `AI Error: ${msg}` });
     } finally {
       setIsAiLoading(false);
@@ -312,6 +323,9 @@ function ScenarioFormPage() {
         description: data.shortDescription,
         animationTriggers: formattedTriggers,
         aiQuestions: data.questionsForFeedback,
+        // Only send it when we have one, so a manual edit of an AI scenario
+        // cannot blank out its existing key.
+        ...(apiKey && { apiKey }),
       };
 
       if (isDbEdit) {

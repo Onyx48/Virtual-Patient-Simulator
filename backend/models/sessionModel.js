@@ -6,6 +6,11 @@ const transcriptionSchema = new mongoose.Schema({
 }, { _id: false });
 
 const sessionSchema = new mongoose.Schema({
+  // The id minted by POST /api/sessions/start and carried in the JWE handoff.
+  // Unique so the simulator calling back twice for one run cannot create two
+  // session records; sparse because rows written before this field existed
+  // have none.
+  session_id: { type: String, index: { unique: true, sparse: true } },
   transcription: [transcriptionSchema],
   feedback: { type: String, default: "" },
   score: { type: Number, default: 0 },

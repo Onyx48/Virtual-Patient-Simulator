@@ -29,6 +29,7 @@ function SchoolsPage() {
   const [confirmMessage, setConfirmMessage] = useState("");
   const [onConfirmAction, setOnConfirmAction] = useState(() => {});
   const [isDeletingId, setIsDeletingId] = useState(null);
+  const [isInvitingId, setIsInvitingId] = useState(null);
 
   const fetchSchools = useCallback(async () => {
     await withLoading(async () => {
@@ -86,7 +87,7 @@ function SchoolsPage() {
     rangeStart,
     rangeEnd,
     resetPage,
-  } = usePagination(schools, 8);
+  } = usePagination(schools, 15);
 
   useEffect(() => {
     resetPage();
@@ -122,6 +123,42 @@ function SchoolsPage() {
     setIsConfirmModalOpen(true);
   };
 
+  // Sending credentials always issues a NEW password (the stored one is a hash
+  // and cannot be re-read), so confirm before invalidating the existing one.
+  const handleInviteClick = (school) => {
+    const invited = school.inviteStatus === "invited";
+    const target = school.assignedAdmin?.email || school.email;
+
+    setConfirmTitle(invited ? "Send a new password" : "Send invite");
+    setConfirmMessage(
+      invited
+        ? `Generate a new password for ${target} and email it? Their current password will stop working.`
+        : school.assignedAdmin?.id
+          ? `Email login credentials to ${target}?`
+          : `${school.schoolName} has no admin yet. A school admin account will be created for ${target} and the credentials emailed to them.`,
+    );
+    setOnConfirmAction(() => async () => {
+      setIsInvitingId(school._id);
+      try {
+        const { data } = await axios.post(
+          `/api/schools/${school._id}/invite`,
+          {},
+          getAuthHeaders(),
+        );
+        toast.success(data.message || "Credentials sent.");
+        fetchSchools();
+      } catch (err) {
+        console.error(err);
+        toast.error(
+          err.response?.data?.message || "Failed to send the credentials.",
+        );
+      } finally {
+        setIsInvitingId(null);
+      }
+    });
+    setIsConfirmModalOpen(true);
+  };
+
   const handleCreateSchoolAdmin = async (data) => {
     try {
       await axios.post("/api/users", data, getAuthHeaders());
@@ -142,7 +179,7 @@ function SchoolsPage() {
     );
 
   return (
-    <div className="p-6 max-w-7xl mx-auto">
+    <div className="p-6 w-full">
       <div className="flex justify-between items-center mb-6">
         <h1 className="text-2xl font-bold text-gray-900">School Management</h1>
         {user?.role === "superadmin" && (
@@ -172,6 +209,8 @@ function SchoolsPage() {
         onSort={() => {}}
         canEdit={user?.role === "superadmin"}
         isDeletingId={isDeletingId}
+        onInviteClick={handleInviteClick}
+        isInvitingId={isInvitingId}
       />
       <PaginationBar
         currentPage={currentPage}

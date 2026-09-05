@@ -1,6 +1,12 @@
 const rolePermissions = {
   manageScenarios: ["educator"],
 
+  // Editing/deleting an existing scenario. Kept separate from manageScenarios so
+  // a school_admin can moderate their school's scenarios without also gaining
+  // the ability to author new ones (creation would set them as the educator).
+  // The route handlers still restrict school_admin to their own school.
+  moderateScenarios: ["educator", "school_admin"],
+
   viewScenarios: ["student", "educator", "school_admin", "superadmin"],
 
   manageStudents: ["educator", "superadmin"],

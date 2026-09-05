@@ -7,6 +7,10 @@ import Student from "../models/studentModel.js";
 import Session from "../models/sessionModel.js";
 import { protect } from "../middleware/authMiddleware.js";
 import { checkAccess } from "../middleware/roleAccessMiddleware.js";
+import { sendSchoolInviteEmail } from "../utils/emailService.js";
+import { canonicalizeEmail, findUserByEmail } from "../utils/emailLookup.js";
+import { isProd, publicMessage } from "../utils/appEnv.js";
+import crypto from "crypto";
 
 const router = express.Router();
 
@@ -243,6 +247,134 @@ router.put(
         return res.status(400).json({ message: validationMessages });
       }
       res.status(500).json({ message: "Server error updating school." });
+    }
+  },
+);
+
+/**
+ * Send (or re-send) the org admin's login credentials.
+ *
+ * Stored passwords are bcrypt hashes and cannot be read back, so there is no
+ * existing password to re-send: every click generates a new one and replaces
+ * the old. When the school has no admin yet, one is created from the school's
+ * own email address.
+ *
+ * The mail goes out BEFORE anything is persisted, so a send failure (e.g. SES
+ * not configured) leaves no rotated password and no half-created account.
+ */
+router.post(
+  "/:id/invite",
+  protect,
+  checkAccess("manageSchools"),
+  async (req, res) => {
+    try {
+      const school = await School.findById(req.params.id);
+      if (!school) {
+        return res.status(404).json({ message: "School not found." });
+      }
+
+      const newPassword = crypto.randomBytes(8).toString("hex");
+      let adminUser = null;
+
+      if (school.assignedAdmin?.id) {
+        adminUser = await User.findById(school.assignedAdmin.id);
+        if (!adminUser) {
+          // The stored reference is dangling; fall through and re-create below.
+          school.assignedAdmin = { id: null, name: "", email: "" };
+        }
+      }
+
+      let recipient;
+      let adminName;
+      const isResend = Boolean(adminUser);
+
+      if (adminUser) {
+        recipient = adminUser.email;
+        adminName = adminUser.name;
+      } else {
+        // No admin yet: the school's own address becomes the login id.
+        recipient = canonicalizeEmail(school.email);
+        adminName = `${school.schoolName} Admin`;
+
+        const clash = await findUserByEmail(recipient);
+        if (clash) {
+          if (
+            clash.role !== "school_admin" ||
+            (clash.schoolId && String(clash.schoolId) !== String(school._id))
+          ) {
+            return res.status(409).json({
+              message:
+                `${recipient} already belongs to a ${clash.role} account. ` +
+                `Assign a school admin to this school first.`,
+            });
+          }
+          // An orphaned school_admin for this same school — adopt it.
+          adminUser = clash;
+          adminName = clash.name;
+        }
+      }
+
+      // 1. Mail first. Throws if SES is unconfigured or the send is rejected.
+      await sendSchoolInviteEmail({
+        toEmail: recipient,
+        adminName,
+        schoolName: school.schoolName,
+        password: newPassword,
+        isResend,
+      });
+
+      // 2. Only now change state.
+      if (adminUser) {
+        adminUser.password = newPassword; // hashed by the pre-save hook
+        await adminUser.save();
+      } else {
+        adminUser = await User.create({
+          name: adminName,
+          email: recipient,
+          password: newPassword, // hashed by the pre-save hook
+          role: "school_admin",
+          schoolId: school._id,
+        });
+      }
+
+      school.assignedAdmin = {
+        id: adminUser._id,
+        name: adminUser.name,
+        email: adminUser.email,
+      };
+      school.inviteStatus = "invited";
+      school.inviteSentAt = new Date();
+      school.inviteSentTo = recipient;
+      await school.save();
+
+      res.status(200).json({
+        message: isResend
+          ? `New password sent to ${recipient}.`
+          : `Invite sent to ${recipient}.`,
+        school,
+      });
+    } catch (err) {
+      if (err.code === "MAIL_NOT_CONFIGURED") {
+        // Always logged in full; only echoed to the client outside production.
+        console.error("Invite Error:", err.message);
+        return res.status(503).json({
+          message: publicMessage(
+            err,
+            "Email is not available right now. Please contact your administrator.",
+          ),
+        });
+      }
+      console.error("Invite Error:", err);
+      if (err.kind === "ObjectId") {
+        return res
+          .status(404)
+          .json({ message: "School not found (Invalid ID)." });
+      }
+      res.status(502).json({
+        message: isProd
+          ? "Could not send the email. Please try again later."
+          : `Could not send the email: ${err.message}`,
+      });
     }
   },
 );

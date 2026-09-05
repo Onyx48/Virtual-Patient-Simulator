@@ -1,5 +1,6 @@
 // WHOLE_PROJECT/routes/scenarioRoutes.js
 import express from "express";
+import { readFileSync } from "fs";
 import { body, validationResult } from "express-validator";
 import mongoose from "mongoose";
 import Scenario from "../models/scenarioModel.js";
@@ -8,6 +9,9 @@ import User from "../models/userModel.js";
 import { protect } from "../middleware/authMiddleware.js";
 import { checkAccess } from "../middleware/roleAccessMiddleware.js";
 import defaultScenarioJson from "../data/defaultScenarioJson.js";
+import { generateScenarioJson } from "../utils/geminiClient.js";
+import { buildWorkflow, createFlow, updateFlow } from "../utils/voxioClient.js";
+import { publicMessage } from "../utils/appEnv.js";
 
 const router = express.Router();
 
@@ -77,6 +81,132 @@ router.get("/", protect, checkAccess("viewScenarios"), async (req, res) => {
     res.status(500).json({ message: "Server error fetching scenarios." });
   }
 });
+
+/*
+ * ── AI scenario authoring ──────────────────────────────────────────────────────
+ *
+ * Ported from the standalone FastAPI service that used to run on :8888. Same
+ * pipeline: Gemini turns a one-line brief into the structured scenario, the
+ * result is injected into the Voxio workflow graph, and Voxio returns the
+ * api_key that identifies the runnable flow.
+ *
+ * Difference from the Python original: nothing is written to a second database.
+ * The generated fields come back to the form, and the existing POST/PUT
+ * /api/scenarios routes persist them — including apiKey — so a scenario exists
+ * in one place only.
+ */
+
+const readPrompt = (file) =>
+  readFileSync(new URL(`../ai/prompts/${file}`, import.meta.url), "utf8");
+
+// Read once at boot; these are static assets, not per-request data.
+const CREATION_PROMPT = readPrompt("scenario-creation.md");
+const EDITING_PROMPT = readPrompt("scenario-editing.md");
+
+/**
+ * Normalise what Gemini returns into the shape the form reads.
+ *
+ * `status` is deliberately not passed through: the Python service set it to
+ * 'success' as a transport flag, and the form treated that as the scenario's
+ * publication status, corrupting it. Draft/Published stays the user's choice.
+ */
+const shapeGenerated = (generated, apiKey) => ({
+  scenario_name: generated.scenario_name || "",
+  scenario_prompt: generated.scenario_prompt || "",
+  questions_for_feedback: generated.questions_for_feedback || [],
+  // The prompt asks for difficulty_level; difficulty_status is accepted because
+  // the old service persisted it under that name.
+  difficulty_level: generated.difficulty_level || generated.difficulty_status || "Medium",
+  movements: generated.movements || { shoulder: {}, neck: {} },
+  api_key: apiKey,
+});
+
+// Generate a brand new scenario and publish it as a Voxio flow.
+router.post(
+  "/ai/generate",
+  protect,
+  checkAccess("moderateScenarios"),
+  async (req, res) => {
+    const query = req.body?.scenario_prompt;
+    if (!query || !String(query).trim()) {
+      return res
+        .status(400)
+        .json({ message: "Missing 'scenario_prompt' in request body." });
+    }
+
+    try {
+      const generated = await generateScenarioJson({
+        systemPrompt: CREATION_PROMPT,
+        userQuery: String(query),
+      });
+
+      const workflow = buildWorkflow({
+        scenarioPrompt: generated.scenario_prompt,
+        feedbackQuestions: generated.questions_for_feedback,
+      });
+
+      const apiKey = await createFlow({
+        flowName: generated.scenario_name || "Untitled Scenario",
+        workflow,
+      });
+
+      res.json({ response: shapeGenerated(generated, apiKey) });
+    } catch (err) {
+      console.error("[AI] generate failed:", err);
+      res.status(503).json({
+        message: publicMessage(err, "AI scenario generation is unavailable right now."),
+      });
+    }
+  },
+);
+
+// Regenerate an existing scenario and overwrite the flow behind its api_key.
+router.post(
+  "/ai/edit",
+  protect,
+  checkAccess("moderateScenarios"),
+  async (req, res) => {
+    const query = req.body?.scenario_prompt;
+    const apiKey = req.body?.api_key;
+
+    if (!query || !String(query).trim()) {
+      return res
+        .status(400)
+        .json({ message: "Missing 'scenario_prompt' in request body." });
+    }
+    if (!apiKey) {
+      return res.status(400).json({
+        message:
+          "Missing 'api_key'. This scenario has no simulator flow yet — generate one first.",
+      });
+    }
+
+    try {
+      const generated = await generateScenarioJson({
+        systemPrompt: EDITING_PROMPT,
+        userQuery: String(query),
+      });
+
+      const workflow = buildWorkflow({
+        scenarioPrompt: generated.scenario_prompt,
+        feedbackQuestions: generated.questions_for_feedback,
+      });
+
+      await updateFlow({
+        apiKey,
+        flowName: generated.scenario_name || "Untitled Scenario",
+        workflow,
+      });
+
+      res.json({ response: shapeGenerated(generated, apiKey) });
+    } catch (err) {
+      console.error("[AI] edit failed:", err);
+      res.status(503).json({
+        message: publicMessage(err, "AI scenario editing is unavailable right now."),
+      });
+    }
+  },
+);
 
 let liveScenario = null;
 
@@ -268,10 +398,24 @@ router.post(
   },
 );
 
+/**
+ * A scenario may be changed by its author, or by the school_admin of the school
+ * it belongs to. Everyone else is refused even though checkAccess let them in,
+ * because the permission matrix is per-action and cannot express ownership.
+ */
+const canManageScenario = (scenario, req) => {
+  if (scenario.educator?.toString() === req.user._id.toString()) return true;
+  return Boolean(
+    req.user.role === "school_admin" &&
+      req.scope?.schoolId &&
+      scenario.schoolId?.toString() === req.scope.schoolId.toString(),
+  );
+};
+
 router.put(
   "/:id",
   protect,
-  checkAccess("manageScenarios"),
+  checkAccess("moderateScenarios"),
   scenarioValidationRules,
   async (req, res) => {
     const errors = validationResult(req);
@@ -319,7 +463,7 @@ router.put(
       if (!scenario)
         return res.status(404).json({ message: "Scenario not found." });
 
-      if (scenario.educator.toString() !== req.user._id.toString()) {
+      if (!canManageScenario(scenario, req)) {
         return res
           .status(403)
           .json({ message: "You are not authorized to edit this scenario." });
@@ -386,7 +530,7 @@ router.put(
 router.delete(
   "/:id",
   protect,
-  checkAccess("manageScenarios"),
+  checkAccess("moderateScenarios"),
   async (req, res) => {
     try {
       if (!mongoose.Types.ObjectId.isValid(req.params.id)) {
@@ -399,10 +543,19 @@ router.delete(
       if (!scenario)
         return res.status(404).json({ message: "Scenario not found." });
 
-      if (scenario.educator.toString() !== req.user._id.toString()) {
+      if (!canManageScenario(scenario, req)) {
         return res
           .status(403)
           .json({ message: "You are not authorized to delete this scenario." });
+      }
+
+      if (
+        req.scope.schoolId &&
+        scenario.schoolId?.toString() !== req.scope.schoolId.toString()
+      ) {
+        return res
+          .status(403)
+          .json({ message: "Access denied: Scenario not in your school" });
       }
 
       await scenario.deleteOne();

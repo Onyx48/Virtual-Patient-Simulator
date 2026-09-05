@@ -343,7 +343,7 @@ router.get("/:id", protect, checkAccess("manageUsers"), async (req, res) => {
 // UPDATE USER
 router.put("/:id", protect, checkAccess("manageUsers"), async (req, res) => {
   const { id } = req.params;
-  const { name, email, role, schoolId, department } = req.body;
+  const { name, email, role, schoolId, department, groupId } = req.body;
 
   try {
     const user = await User.findById(id).populate("schoolId");
@@ -367,6 +367,29 @@ router.put("/:id", protect, checkAccess("manageUsers"), async (req, res) => {
 
     if (role) {
       user.role = role.toLowerCase();
+    }
+
+    // The student modal sends groupId on edit. Without this the selection was
+    // accepted by the UI and then silently dropped here.
+    if (groupId !== undefined) {
+      if (!groupId) {
+        user.groupId = null;
+      } else {
+        const Group = (await import("../models/groupModel.js")).default;
+        const group = await Group.findById(groupId);
+        if (!group) {
+          return res.status(400).json({ message: "Invalid group." });
+        }
+        if (
+          req.scope.schoolId &&
+          group.schoolId?.toString() !== req.scope.schoolId.toString()
+        ) {
+          return res
+            .status(403)
+            .json({ message: "Access denied: group belongs to another school." });
+        }
+        user.groupId = group._id;
+      }
     }
 
     const updatedUser = await user.save();

@@ -10,6 +10,7 @@ import multer from "multer";
 import path from "path";
 import { protect } from "../middleware/authMiddleware.js";
 import { sendWelcomeEmail } from "../utils/emailService.js";
+import { canonicalizeEmail, findUserByEmail } from "../utils/emailLookup.js";
 
 const router = express.Router();
 
@@ -146,7 +147,7 @@ router.post(
   "/register",
   [
     body("name", "Name is required").notEmpty().trim(),
-    body("email", "Please include a valid email").isEmail().normalizeEmail(),
+    body("email", "Please include a valid email").isEmail().trim(),
     body("password", "Password must be at least 6 characters").isLength({
       min: 6,
     }),
@@ -173,7 +174,7 @@ router.post(
 
     const { name, email, password, roleToCreate, creatorRole, schoolId } =
       req.body;
-    const lowerEmail = email.toLowerCase();
+    const lowerEmail = canonicalizeEmail(email);
     const lowerRoleToCreate = roleToCreate.toLowerCase();
 
     try {
@@ -235,7 +236,7 @@ router.post(
 router.post(
   "/login",
   [
-    body("email", "Please include a valid email").isEmail().normalizeEmail(),
+    body("email", "Please include a valid email").isEmail().trim(),
     body("password", "Password is required").exists(),
   ],
   async (req, res) => {
@@ -244,12 +245,9 @@ router.post(
       return res.status(400).json({ errors: errors.array() });
 
     const { email, password } = req.body;
-    const lowerEmail = email.toLowerCase();
 
     try {
-      const user = await User.findOne({ email: lowerEmail }).select(
-        "+password",
-      );
+      const user = await findUserByEmail(email, "+password");
 
       if (!user)
         return res.status(401).json({ message: "Invalid credentials." });
@@ -283,20 +281,21 @@ router.post(
 
 router.post(
   "/forgot-password",
-  [body("email").isEmail().normalizeEmail()],
+  [body("email").isEmail().trim()],
   async (req, res) => {
     const { email } = req.body;
-    const lowerEmail = email.toLowerCase();
 
     try {
-      const user = await User.findOne({ email: lowerEmail });
+      const user = await findUserByEmail(email);
       if (!user)
         return res
           .status(200)
           .json({ message: "If account exists, OTP sent." });
 
+      // Key the OTP on the address as stored, not as typed, so verify-otp can
+      // arrive at the same key from a differently-cased/dotted spelling.
       const otp = generateOTP();
-      await storeOTPAndAttempts(lowerEmail, otp);
+      await storeOTPAndAttempts(user.email, otp);
       console.log("[AUTH] OTP email skipped (temporarily disabled). OTP:", otp);
 
       res.status(200).json({ message: "OTP sent." });
@@ -310,13 +309,16 @@ router.post(
 router.post(
   "/verify-otp",
   [
-    body("email").isEmail().normalizeEmail(),
+    body("email").isEmail().trim(),
     body("otp").isLength({ min: 6, max: 6 }).isNumeric(),
   ],
   async (req, res) => {
     const { email, otp } = req.body;
     try {
-      const result = await verifyOTPAndHandleAttempts(email, otp);
+      const user = await findUserByEmail(email);
+      if (!user) return res.status(400).json({ message: "Invalid OTP." });
+
+      const result = await verifyOTPAndHandleAttempts(user.email, otp);
       if (result.success) {
         res
           .status(200)
@@ -333,13 +335,13 @@ router.post(
 router.post(
   "/reset-password",
   [
-    body("email").isEmail().normalizeEmail(),
+    body("email").isEmail().trim(),
     body("newPassword").isLength({ min: 6 }),
   ],
   async (req, res) => {
     const { email, newPassword } = req.body;
     try {
-      const user = await User.findOne({ email });
+      const user = await findUserByEmail(email);
       if (!user) return res.status(404).json({ message: "User not found." });
 
       user.password = newPassword;
@@ -397,7 +399,7 @@ router.put(
   "/change-email",
   protect,
   [
-    body("newEmail", "Valid email is required").isEmail().normalizeEmail(),
+    body("newEmail", "Valid email is required").isEmail().trim(),
     body("password", "Password is required").exists(),
   ],
   async (req, res) => {

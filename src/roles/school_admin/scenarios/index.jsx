@@ -1,19 +1,41 @@
 import React, { useState, useMemo, useEffect } from "react";
 import { useSelector, useDispatch } from "react-redux";
+import { useNavigate } from "react-router-dom";
+import { toast } from "react-hot-toast";
+import { Squares2X2Icon, TableCellsIcon } from "@heroicons/react/24/outline";
 
 import ScenarioManagementControls from "../../educator/scenarios/ScenarioManagementControls.jsx";
 import ScenarioTable from "../../educator/scenarios/ScenarioTable.jsx";
+import ScenarioListTable from "./ScenarioListTable.jsx";
 import PaginationBar from "../../../components/ui/PaginationBar";
+import ConfirmationModal from "../../../components/ui/ConfirmationModal";
 
 import { usePagination } from "../../../lib/hooks/usePagination";
 import { Spinner } from "../../../lib/hooks/useLoading";
 
-import { fetchScenarios } from "../../../redux/slices/scenarioSlice.js";
+import {
+  fetchScenarios,
+  deleteScenario,
+  setSelectedScenario,
+} from "../../../redux/slices/scenarioSlice.js";
+
+const VIEW_STORAGE_KEY = "schoolAdmin.scenarios.view";
 
 function SchoolAdminScenariosPage() {
   const dispatch = useDispatch();
+  const navigate = useNavigate();
 
   const { scenarios, loading, error } = useSelector((state) => state.scenarios);
+
+  // Table is the default view; the choice is remembered per browser so the
+  // page does not snap back to a view the admin just switched away from.
+  const [view, setView] = useState(
+    () => localStorage.getItem(VIEW_STORAGE_KEY) || "table",
+  );
+
+  useEffect(() => {
+    localStorage.setItem(VIEW_STORAGE_KEY, view);
+  }, [view]);
 
   const [searchTerm, setSearchTerm] = useState("");
   const [sortConfig, setSortConfig] = useState({
@@ -21,6 +43,8 @@ function SchoolAdminScenariosPage() {
     direction: "desc",
   });
   const [filterCriteria, setFilterCriteria] = useState({});
+
+  const [pendingDelete, setPendingDelete] = useState(null);
 
   useEffect(() => {
     dispatch(fetchScenarios());
@@ -94,11 +118,11 @@ function SchoolAdminScenariosPage() {
     rangeStart,
     rangeEnd,
     resetPage,
-  } = usePagination(filteredAndSortedScenarios, 8);
+  } = usePagination(filteredAndSortedScenarios, view === "table" ? 15 : 8);
 
   useEffect(() => {
     resetPage();
-  }, [searchTerm, filterCriteria]);
+  }, [searchTerm, filterCriteria, view]);
 
   const handleSort = (key) => {
     let direction = "asc";
@@ -116,6 +140,24 @@ function SchoolAdminScenariosPage() {
     setFilterCriteria((prev) => ({ ...prev, ...filters }));
   };
 
+  const handleEditClick = (scenario) => {
+    // ScenarioFormPage reads the record from the store rather than refetching.
+    dispatch(setSelectedScenario(scenario));
+    navigate(`/scenarios/edit/${scenario._id || scenario.id}`);
+  };
+
+  const handleDeleteConfirm = async () => {
+    const scenario = pendingDelete;
+    setPendingDelete(null);
+    if (!scenario) return;
+    try {
+      await dispatch(deleteScenario(scenario._id || scenario.id)).unwrap();
+      toast.success("Scenario deleted.");
+    } catch (err) {
+      toast.error(err?.message || "Failed to delete the scenario.");
+    }
+  };
+
   if (loading)
     return (
       <div className="p-8 text-center"><Spinner size={32} /></div>
@@ -129,9 +171,32 @@ function SchoolAdminScenariosPage() {
 
   return (
     <div className="p-6 bg-gray-50 min-h-screen">
-      <h1 className="text-2xl font-bold text-gray-900 mb-6">
-        Scenarios Management
-      </h1>
+      <div className="flex flex-wrap items-center justify-between gap-4 mb-6">
+        <h1 className="text-2xl font-bold text-gray-900">
+          Scenarios Management
+        </h1>
+
+        <div className="inline-flex rounded-lg border border-gray-200 bg-white p-1">
+          {[
+            { key: "table", label: "Table", Icon: TableCellsIcon },
+            { key: "cards", label: "Cards", Icon: Squares2X2Icon },
+          ].map((option) => (
+            <button
+              key={option.key}
+              onClick={() => setView(option.key)}
+              aria-pressed={view === option.key}
+              className={`flex items-center gap-2 px-3.5 py-1.5 rounded-md text-sm font-semibold transition-colors ${
+                view === option.key
+                  ? "bg-black text-white"
+                  : "text-gray-600 hover:bg-gray-50"
+              }`}
+            >
+              <option.Icon className="w-4 h-4" />
+              {option.label}
+            </button>
+          ))}
+        </div>
+      </div>
 
       <ScenarioManagementControls
         searchTerm={searchTerm}
@@ -140,13 +205,25 @@ function SchoolAdminScenariosPage() {
         onApplyFilters={handleApplyFilters}
       />
 
-      <ScenarioTable
-        data={paginatedData}
-        canEdit={false}
-        variant="table"
-        onSort={handleSort}
-        sortConfig={sortConfig}
-      />
+      {view === "table" ? (
+        <ScenarioListTable
+          data={paginatedData}
+          sortConfig={sortConfig}
+          onSort={handleSort}
+          onEditClick={handleEditClick}
+          onDeleteClick={setPendingDelete}
+          canManage
+        />
+      ) : (
+        <ScenarioTable
+          data={paginatedData}
+          canEdit
+          onEditClick={handleEditClick}
+          onSort={handleSort}
+          sortConfig={sortConfig}
+        />
+      )}
+
       <PaginationBar
         currentPage={currentPage}
         totalPages={totalPages}
@@ -159,6 +236,18 @@ function SchoolAdminScenariosPage() {
         isLastPage={isLastPage}
         rangeStart={rangeStart}
         rangeEnd={rangeEnd}
+      />
+
+      <ConfirmationModal
+        isOpen={!!pendingDelete}
+        onClose={() => setPendingDelete(null)}
+        onConfirm={handleDeleteConfirm}
+        title="Delete Scenario"
+        message={
+          pendingDelete
+            ? `Delete "${pendingDelete.scenarioName}"? This cannot be undone.`
+            : ""
+        }
       />
     </div>
   );
