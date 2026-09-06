@@ -90,6 +90,24 @@ router.post(
 
       const sessionId = new mongoose.Types.ObjectId().toString();
 
+      /*
+       * The session row is created here, empty, rather than by the callback.
+       *
+       * posta's _persist_to_session does update_one({session_id}) with no
+       * upsert, so without a row already carrying this session_id the assessed
+       * score is computed and then dropped. Creating it up front also means an
+       * abandoned run still leaves a record, so the dashboards can show attempts
+       * and not just completions.
+       */
+      await Session.create({
+        session_id: sessionId,
+        student_id: String(req.user._id),
+        scenario_id: String(scenario._id),
+        transcription: [],
+        feedback: "",
+        score: 0,
+      });
+
       // Hand this scenario to the external simulator, which reads it from
       // GET /api/scenarios/json. Last-write-wins by design: whoever pressed
       // Start most recently is the scenario the simulator will load. Done after
