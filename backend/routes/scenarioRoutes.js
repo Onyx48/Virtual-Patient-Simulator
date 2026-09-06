@@ -12,7 +12,12 @@ import defaultScenarioJson from "../data/defaultScenarioJson.js";
 import { generateScenarioJson } from "../utils/geminiClient.js";
 import { buildWorkflow, createFlow, updateFlow } from "../utils/voxioClient.js";
 import { publicMessage } from "../utils/appEnv.js";
-import { setLiveScenario, getLiveScenario } from "../state/liveScenario.js";
+import {
+  setLiveScenario,
+  getLiveScenario,
+  getLiveMeta,
+} from "../state/liveScenario.js";
+import { toBubbleScenarioJson } from "../utils/bubbleScenario.js";
 
 const router = express.Router();
 
@@ -225,7 +230,9 @@ router.post("/json", protect, async (req, res) => {
     if (!scenario)
       return res.status(404).json({ message: "Scenario not found." });
 
-    setLiveScenario(scenario);
+    // Educator pressing Test: no student and no session, so Id is the educator's
+    // own id and StreamSessionId stays empty.
+    setLiveScenario(scenario, { userId: req.user._id });
     res.json({ message: "Scenario JSON set." });
   } catch (err) {
     console.error("Set Scenario JSON Error:", err);
@@ -237,14 +244,10 @@ router.get("/json", (req, res) => {
   const liveScenario = getLiveScenario();
   if (!liveScenario) return res.json({ response: defaultScenarioJson });
 
-  res.json({
-    response: {
-      cursor: 0,
-      count: 1,
-      remaining: 0,
-      results: [liveScenario],
-    },
-  });
+  // Reshaped into the same Bubble payload the fallback above serves. Serving the
+  // raw document here is what made the simulator read missing keys and post
+  // empty ids to posta.
+  res.json({ response: toBubbleScenarioJson(liveScenario, getLiveMeta()) });
 });
 
 router.get("/:id", protect, checkAccess("viewScenarios"), async (req, res) => {

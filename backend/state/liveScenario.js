@@ -16,11 +16,21 @@
 import { decodeScenarioText } from "../utils/richText.js";
 
 let liveScenario = null;
+let liveMeta = {};
 
-export const setLiveScenario = (scenario) => {
+/**
+ * @param meta.userId     who opened the simulator; surfaces as `Id` in the
+ *                        published payload and comes back as posta's `user_id`
+ * @param meta.sessionId  the run's id; surfaces as `StreamSessionId`
+ */
+export const setLiveScenario = (scenario, meta = {}) => {
   // Normalised once here rather than on every GET, since the simulator may poll
   // this endpoint far more often than a scenario is published.
   liveScenario = decodeScenarioText(scenario);
+  liveMeta = meta;
 };
 
 export const getLiveScenario = () => liveScenario;
+
+/** Set alongside the scenario, so it is replaced by the same last-write-wins. */
+export const getLiveMeta = () => liveMeta;

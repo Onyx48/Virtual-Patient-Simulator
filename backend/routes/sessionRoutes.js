@@ -88,15 +88,17 @@ router.post(
           .json({ message: "Scenario not assigned to this student." });
       }
 
+      const sessionId = new mongoose.Types.ObjectId().toString();
+
       // Hand this scenario to the external simulator, which reads it from
       // GET /api/scenarios/json. Last-write-wins by design: whoever pressed
       // Start most recently is the scenario the simulator will load. Done after
       // every check above so a rejected start cannot displace a live run.
-      setLiveScenario(scenario);
-
-      // Still minted and returned so the client has something to correlate a
-      // run with, even though nothing carries it to the simulator today.
-      const sessionId = new mongoose.Types.ObjectId().toString();
+      //
+      // The student and session ids travel with it as `Id` / `StreamSessionId`,
+      // which is how they come back to posta's /get-results as user_id and
+      // session_id.
+      setLiveScenario(scenario, { userId: req.user._id, sessionId });
 
       res.json({ session_id: sessionId, redirect_url: getSimulatorUrl() });
     } catch (err) {
