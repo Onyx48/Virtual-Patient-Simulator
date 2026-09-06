@@ -19,15 +19,49 @@ function StudentScenariosPage() {
   useEffect(() => {
     const fetchScenarios = async () => {
       await withLoading(async () => {
-        const response = await axios.get("/api/scenarios", getAuthHeaders());
-        const mappedScenarios = response.data.map((scenario) => ({
-          id: scenario._id,
-          scenarioName: scenario.scenarioName,
-          description: scenario.description,
-          difficulty: scenario.difficulty,
-          highestScore: "N/A",
-          status: scenario.status,
-        }));
+        /*
+         * Both calls are needed: /api/scenarios has no idea whether *this*
+         * student has attempted anything, and its `status` field is the
+         * educator's publication state ("Published"), not a completion state.
+         * Reading it as one is why every card showed a bare "Start Now" —
+         * ScenrioGridStudent keys the Results / Start Again pair off
+         * status === "Completed", which the scenario document never says.
+         *
+         * /api/dashboard/student-stats derives isCompleted and bestScore per
+         * scenario from this student's sessions, so a finished run turns the
+         * card into two buttons. Mirrors roles/student/Dashboard.jsx.
+         */
+        const [statsResponse, scenariosResponse] = await Promise.all([
+          axios.get("/api/dashboard/student-stats", getAuthHeaders()),
+          axios.get("/api/scenarios", getAuthHeaders()),
+        ]);
+
+        const stats = statsResponse.data;
+
+        const assignedScenarios = scenariosResponse.data.filter(
+          (scenario) =>
+            scenario.assignedTo &&
+            scenario.assignedTo.some(
+              (a) => (a._id ?? a).toString() === user._id.toString(),
+            ),
+        );
+
+        const mappedScenarios = assignedScenarios.map((scenario) => {
+          const scenarioStat = stats.scenarioScores?.find(
+            (s) => s.scenarioId === scenario._id,
+          );
+          return {
+            id: scenario._id,
+            scenarioName: scenario.scenarioName,
+            description: scenario.description,
+            difficulty: scenario.difficulty,
+            highestScore:
+              scenarioStat?.bestScore != null
+                ? Math.round(scenarioStat.bestScore * 100)
+                : null,
+            status: scenarioStat?.isCompleted ? "Completed" : "Available",
+          };
+        });
         setScenarios(mappedScenarios);
       });
     };
