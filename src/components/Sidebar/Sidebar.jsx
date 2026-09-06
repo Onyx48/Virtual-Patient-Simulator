@@ -78,14 +78,20 @@ function Sidebar({ logo }) {
 
   return (
     <aside className="fixed top-0 left-0 h-screen w-64 bg-[#0F0F0F] text-gray-400 flex flex-col transition-all duration-300 z-50 font-sans">
-      <div className="h-16 flex items-center px-6 border-b border-gray-800 bg-black">
+      {/*
+        Height is content-driven rather than the h-16 it used to be: the logo is
+        now h-24 (96px), which cannot fit a 64px bar. This block is the sidebar's
+        own header — the main content is offset from Header's top-16, not from
+        here — so growing it only pushes the menu down.
+      */}
+      <div className="flex items-center justify-center px-6 py-6 border-b border-gray-800 bg-black">
         {logo ? (
           logo
         ) : (
           <img
             src={sitLogo}
             alt="Singapore Institute of Technology"
-            className="h-9 w-auto object-contain"
+            className="h-24 w-auto object-contain"
           />
         )}
       </div>

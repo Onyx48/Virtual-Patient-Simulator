@@ -15,6 +15,7 @@ function StudentScenarioDetails({ onBack }) {
   const { id: scenarioId } = useParams();
   const dispatch = useDispatch();
   const [activeAttempt, setActiveAttempt] = useState(1);
+  const [showAllTurns, setShowAllTurns] = useState(false);
 
   const { sessions, scenarioData, totalCount, hasMore, loading } = useSelector(
     (state) => state.sessions
@@ -108,23 +109,37 @@ function StudentScenarioDetails({ onBack }) {
       return <p className="text-gray-500">No transcript available</p>;
     }
 
+    const turns = currentSession.transcription.filter(
+      (t) => t.role !== "system",
+    );
+
     return (
       <div className="space-y-4">
-        {currentSession.transcription
-          .filter((t) => t.role !== "system")
-          .slice(0, 10)
-          .map((item, idx) => (
+        {(showAllTurns ? turns : turns.slice(0, 10)).map((item, idx) => (
             <p key={idx} className="text-xs leading-relaxed text-gray-600">
+              {/*
+                The speaker's own name ("h", "John Smith") when the transcript
+                carried one, falling back to the role for older rows that have
+                no speaker field.
+              */}
               <span className="font-bold text-gray-900">
-                {item.role === "user" ? "User:" : "Assistant:"}
+                {item.speaker?.trim()
+                  ? `${item.speaker.trim()}:`
+                  : item.role === "user"
+                    ? "User:"
+                    : "Assistant:"}
               </span>{" "}
-              {item.content?.slice(0, 200)}
-              {item.content?.length > 200 && "..."}
-            </p>
-          ))}
-        {currentSession.transcription.length > 10 && (
-          <button className="text-[#F59E0B] font-bold hover:underline mt-2">
-            + Load More
+            {item.content}
+          </p>
+        ))}
+        {turns.length > 10 && (
+          <button
+            onClick={() => setShowAllTurns((shown) => !shown)}
+            className="text-[#F59E0B] font-bold hover:underline mt-2"
+          >
+            {showAllTurns
+              ? "− Show Less"
+              : `+ Load More (${turns.length - 10} more)`}
           </button>
         )}
       </div>

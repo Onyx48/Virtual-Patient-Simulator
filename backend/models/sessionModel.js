@@ -3,6 +3,10 @@ import mongoose from "mongoose";
 const transcriptionSchema = new mongoose.Schema({
   role: { type: String, required: true, enum: ["system", "user", "assistant"] },
   content: { type: String, required: true },
+  // The name the simulator used for this speaker ("h", "John Smith"). Kept so the
+  // transcript can be labelled with who actually spoke instead of the generic
+  // role; optional, since older rows and list-shaped transcripts carry no name.
+  speaker: { type: String, default: "" },
 }, { _id: false });
 
 const sessionSchema = new mongoose.Schema({

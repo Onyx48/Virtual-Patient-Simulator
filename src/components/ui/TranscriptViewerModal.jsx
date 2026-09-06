@@ -191,16 +191,15 @@ function TranscriptViewerModal({ isOpen, onClose, student }) {
                               : "text-purple-600"
                           }`}
                         >
-                          {msg.role === "user"
+                          {msg.speaker?.trim()
+                            ? `${msg.speaker.trim()}:`
+                            : msg.role === "user"
                             ? "You:"
                             : msg.role === "assistant"
                             ? "AI:"
                             : "System:"}
                         </span>{" "}
-                        <span className="text-gray-600">
-                          {msg.content?.slice(0, 500)}
-                          {msg.content?.length > 500 && "..."}
-                        </span>
+                        <span className="text-gray-600">{msg.content}</span>
                       </div>
                     ))}
                   </div>
