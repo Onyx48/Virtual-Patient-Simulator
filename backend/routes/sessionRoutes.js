@@ -1,6 +1,6 @@
 import express from "express";
 import mongoose from "mongoose";
-import { EncryptJWT, jwtDecrypt } from "jose";
+import { jwtDecrypt } from "jose";
 import { createSecretKey } from "crypto";
 import { fetchSessionState } from "../utils/voxioClient.js";
 import { publicMessage } from "../utils/appEnv.js";
@@ -34,16 +34,21 @@ const getJweKey = () => {
   return createSecretKey(keyBytes);
 };
 
-const buildRedirectUrl = (token) => {
-  const baseUrl = process.env.VASSIST_REDIRECT_BASE_URL;
-  if (!baseUrl) {
-    const error = new Error("VASSIST_REDIRECT_BASE_URL is not set.");
-    error.statusCode = 500;
-    throw error;
-  }
-  const separator = baseUrl.includes("?") ? "&" : "?";
-  return `${baseUrl}${separator}token=${encodeURIComponent(token)}`;
-};
+/*
+ * Where a student is sent to run a scenario.
+ *
+ * The simulator is told which scenario to run by GET /api/scenarios/json, not
+ * by anything in this URL, so there is nothing to sign or encrypt here — the
+ * link is the same for everyone. This deliberately mirrors the educator Test
+ * button, which opens VITE_SIMULATOR_URL after publishing to the same slot.
+ *
+ * SIMULATOR_URL is read first so the API can be pointed somewhere else without
+ * touching the frontend build; VITE_SIMULATOR_URL is the shared default.
+ */
+const getSimulatorUrl = () =>
+  process.env.SIMULATOR_URL ||
+  process.env.VITE_SIMULATOR_URL ||
+  "https://share.streampixel.io/6a9bdb0a635d17b54874e623";
 
 router.post(
   "/start",
@@ -83,56 +88,17 @@ router.post(
           .json({ message: "Scenario not assigned to this student." });
       }
 
-      if (!scenario.apiKey) {
-        return res
-          .status(400)
-          .json({ message: "Scenario API key is missing." });
-      }
-
-      const student_id = req.user._id.toString();
-      const educator_id = req.user.supervisor?._id?.toString();
-
-      if (!educator_id) {
-        return res
-          .status(400)
-          .json({ message: "Assigned educator is missing for student." });
-      }
-
       // Hand this scenario to the external simulator, which reads it from
       // GET /api/scenarios/json. Last-write-wins by design: whoever pressed
       // Start most recently is the scenario the simulator will load. Done after
       // every check above so a rejected start cannot displace a live run.
       setLiveScenario(scenario);
 
-      const companyId = "@STRAITS";
+      // Still minted and returned so the client has something to correlate a
+      // run with, even though nothing carries it to the simulator today.
       const sessionId = new mongoose.Types.ObjectId().toString();
 
-      const payload = {
-        api_key: scenario.apiKey,
-        session_id: sessionId,
-        student_id: student_id,
-        educator_id: educator_id,
-        company_id: companyId,
-        scenario_id: scenario_id,
-      };
-
-      console.log("JWE Payload:", JSON.stringify(payload, null, 2));
-
-      const key = getJweKey();
-
-      const jwe = await new EncryptJWT(payload)
-        .setProtectedHeader({
-          alg: "A256KW",
-          enc: "A256CBC-HS512",
-          typ: "JWE",
-        })
-        .setIssuedAt()
-        .setExpirationTime("10m")
-        .encrypt(key);
-
-      const redirectUrl = buildRedirectUrl(jwe);
-
-      res.json({ session_id: sessionId, redirect_url: redirectUrl });
+      res.json({ session_id: sessionId, redirect_url: getSimulatorUrl() });
     } catch (err) {
       console.error("Start Session Error:", err);
       res
