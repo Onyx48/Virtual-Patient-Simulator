@@ -2,7 +2,7 @@ import React from "react";
 import { NavLink } from "react-router-dom";
 import { useAuth } from "../../AuthContext";
 import { useLanguage } from "../../i18n/LanguageContext";
-import sitLogo from "../../assets/SIT.png";
+import sitLogo from "../../assets/SIT-logo.jpg";
 import {
   Squares2X2Icon,
   BuildingLibraryIcon,
