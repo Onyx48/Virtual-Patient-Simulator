@@ -102,7 +102,7 @@ You must fill every string field **strictly** using one of the allowed categoric
 * `Patient Profile:` **MUST include a plausible full Name (e.g., 'Name: Sarah Chen')**, Age, Occupation, Presenting Complaint.
 * `History of Present Illness:` (Detailed onset, character, location, radiation, severity, timing, aggravating/relieving factors, associated symptoms, pertinent negatives/red flags). **Use precise medical terminology.**
 * `Medical History:` (PMH, Surgical Hx, Medications, Allergies, Family Hx). **Use precise medical terminology.**
-* `Social History:` **MUST include relevant life context details** beyond just habits (e.g., 'Lives alone and worried about managing chores', 'Primary income earner, concerned about time off work', 'Avid tennis player, frustrated by inability to play'). Also include habits (smoking, alcohol), occupation details, functional status.
+* `Social History:` **MUST include relevant life context details** beyond just habits (e.g., 'Lives alone and worried about managing chores', 'Primary income earner, concerned about time off work', 'Avid tennis player, frustrated by inability to play', 'Recently retired, was looking forward to gardening'). Also include habits (smoking, alcohol), occupation details, functional status. **Use precise medical terminology where applicable (e.g., pack-years).**
 * `Relevant Investigations:` (Existing diagnostic results). **Use precise medical terminology.**
 * `Previous Treatment:` (Prior therapies). **Use precise medical terminology.**
 * `Simulated Physical Examination Findings:` (Expected findings: General appearance, specific Neck/Shoulder exam - ROM matching the data mapped in the `movements` JSON object, palpation, special tests, Neurological screen).
@@ -171,3 +171,7 @@ You must fill every string field **strictly** using one of the allowed categoric
 ### 5. `difficulty_level` (String)
 
 * Assign **one** level: `"Easy"`, `"Medium"`, or `"Hard"` (using double quotes). Base assessment on case complexity (comorbidities, presentation clarity, and psychosocial factors).
+
+---
+
+**Final Check:** Ensure the entire output is *only* the generated JSON object, adhering strictly to JSON syntax (double quotes for keys and outer string values, including list items in `questions_for_feedback`), but using single quotes *only* within the `scenario_prompt` string value as instructed. Ensure a name is present, persona and life context are described, every key inside `movements` has a value, and `questions_for_feedback` contains exactly 23 items (18 core + 5 specific).
