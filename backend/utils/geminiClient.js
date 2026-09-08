@@ -70,11 +70,15 @@ const callGemini = async ({ systemPrompt, userQuery, model, json = true }) => {
         ? "The AI service is unavailable right now."
         : `Gemini responded ${response.status}: ${raw.slice(0, 500)}`,
     );
-    // Carried so callers can retry a busy model without re-parsing the message.
-    // 429 rate limit, 500/503 overload — all worth a second attempt; a 400 or
-    // 403 is our own mistake and will fail again identically.
     err.status = response.status;
-    err.transient = [429, 500, 502, 503, 504].includes(response.status);
+    /*
+     * Only a server-side overload is worth another attempt. A 429 is excluded on
+     * purpose: on the free tier it is usually the *daily* request cap, which
+     * reports a retryDelay of ~38s and will still be exhausted after any backoff
+     * we are willing to wait. Retrying it just delays the fallback by seconds.
+     * A 400/403/404 is our own mistake and will fail again identically.
+     */
+    err.retryable = [500, 502, 503, 504].includes(response.status);
     throw err;
   }
 
@@ -100,10 +104,11 @@ const sleep = (ms) => new Promise((resolve) => setTimeout(resolve, ms));
  * usable. Any leftover markdown fence is stripped in case the prompt pushes the
  * model toward a code block.
  *
- * Retries up to three times on a busy model, backing off 0.5s then 1.5s.
+ * Retries up to three times on a server-side overload, backing off 1s then 1.5s.
  * "gemini-2.5-flash is experiencing high demand" is common enough that a single
- * attempt turns a routine spike into a user-visible failure; a non-transient
- * error (bad key, bad model name) is thrown on the first try instead.
+ * attempt turns a routine spike into a user-visible failure. A quota error or a
+ * bad key/model is thrown on the first try instead, so the caller's fallback
+ * takes over immediately.
  */
 export const generateText = async ({
   systemPrompt,
@@ -118,7 +123,7 @@ export const generateText = async ({
       const text = await callGemini({ systemPrompt, userQuery, model, json: false });
       return stripFence(text);
     } catch (err) {
-      if (!err.transient || attempt >= attempts) throw err;
+      if (!err.retryable || attempt >= attempts) throw err;
       console.warn(
         `[AI] attempt ${attempt}/${attempts} failed with ${err.status}, retrying`,
       );

@@ -3,7 +3,7 @@ import mongoose from "mongoose";
 import { readFileSync } from "fs";
 import Scenario from "../models/scenarioModel.js";
 import Session from "../models/sessionModel.js";
-import { generateText } from "../utils/geminiClient.js";
+import { generateTextWithFallback } from "../utils/aiText.js";
 import { htmlToText, questionsToArray } from "../utils/bubbleScenario.js";
 import { publicMessage } from "../utils/appEnv.js";
 
@@ -206,12 +206,16 @@ const askReason = async (req, res) => {
       query,
     });
 
-    const response = await generateText({
+    const { text, provider, model } = await generateTextWithFallback({
       systemPrompt: ASK_REASON_PROMPT,
       userQuery,
     });
 
-    res.json({ response });
+    console.log(
+      `[ask-reason] answered by ${provider} (${model}), ${text.length} chars`,
+    );
+
+    res.json({ response: text });
   } catch (err) {
     console.error("[ask-reason] failed:", err);
     res.status(503).json({
