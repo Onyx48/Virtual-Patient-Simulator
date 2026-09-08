@@ -5,6 +5,7 @@ import Scenario from "../models/scenarioModel.js";
 import Session from "../models/sessionModel.js";
 import { generateTextWithFallback } from "../utils/aiText.js";
 import { htmlToText, questionsToArray } from "../utils/bubbleScenario.js";
+import { findLegacyScenario } from "../data/legacyScenarios.js";
 import { publicMessage } from "../utils/appEnv.js";
 
 const router = express.Router();
@@ -149,20 +150,31 @@ const askReason = async (req, res) => {
     });
   }
 
-  if (!mongoose.Types.ObjectId.isValid(scenarioId)) {
+  /*
+   * A short Bubble code such as "9C2F7X" resolves from the compatibility table
+   * instead of Mongo. Checked before the ObjectId validation, because that check
+   * is exactly what used to reject these callers.
+   */
+  const legacyScenario = findLegacyScenario(scenarioId);
+
+  if (!legacyScenario && !mongoose.Types.ObjectId.isValid(scenarioId)) {
     return res
       .status(400)
       .json({ message: `'scenarioId' is not a valid id: ${scenarioId}` });
   }
 
   try {
-    const scenario = await Scenario.findById(scenarioId).lean();
+    const scenario = legacyScenario || (await Scenario.findById(scenarioId).lean());
 
     if (!scenario) {
       console.warn(`[ask-reason] no scenario with _id ${scenarioId}`);
       return res
         .status(404)
         .json({ message: `No scenario found with scenarioId: ${scenarioId}` });
+    }
+
+    if (legacyScenario) {
+      console.log(`[ask-reason] scenarioId ${scenarioId} resolved from the legacy table`);
     }
 
     /*
@@ -196,12 +208,25 @@ const askReason = async (req, res) => {
         `transcript chars = ${transcriptionText.length}, query chars = ${query.length}`,
     );
 
-    const userQuery = JSON.stringify({
+    /*
+     * A legacy record already holds plain prose and a real array; a Mongo
+     * document holds rich text and a Quill list, so only that one needs
+     * converting. Both end up as the same payload shape.
+     */
+    const scenarioFields = legacyScenario || {
       scenario_name: scenario.scenarioName || "",
       scenario_prompt: htmlToText(scenario.scenarioPrompt),
       questions_for_feedback: questionsToArray(scenario.aiQuestions),
       difficulty: scenario.difficulty || "Medium",
       movements: scenario.animationTriggers || {},
+    };
+
+    const userQuery = JSON.stringify({
+      scenario_name: scenarioFields.scenario_name,
+      scenario_prompt: scenarioFields.scenario_prompt,
+      questions_for_feedback: scenarioFields.questions_for_feedback,
+      difficulty: scenarioFields.difficulty,
+      movements: scenarioFields.movements,
       transcription: transcriptionText,
       query,
     });
