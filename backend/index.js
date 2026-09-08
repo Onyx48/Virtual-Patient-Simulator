@@ -11,6 +11,7 @@ import sessionRoutes from "./routes/sessionRoutes.js";
 import dashboardRoutes from "./routes/dashboardRoutes.js";
 import importRoutes from "./routes/importRoutes.js";
 import groupRoutes from "./routes/groupRoutes.js";
+import askReasonRoutes from "./routes/askReasonRoutes.js";
 import { APP_ENV, isDev, isProd, publicMessage } from "./utils/appEnv.js";
 
 const app = express();
@@ -69,6 +70,15 @@ app.use("/api/sessions", sessionRoutes);
 app.use("/api/dashboard", dashboardRoutes);
 app.use("/api/import", importRoutes);
 app.use("/api/groups", groupRoutes);
+
+/*
+ * Mounted twice on purpose. `/ask-reason` is the path the external simulator was
+ * given, and it holds no JWT so it does not go through the /api prefix the
+ * frontend uses; `/api/ask-reason` is the same router, so our own pages can call
+ * it through the Vite proxy without a second hostname.
+ */
+app.use("/ask-reason", askReasonRoutes);
+app.use("/api/ask-reason", askReasonRoutes);
 
 app.get("/", (req, res) => {
   res.json({ message: "Backend server (Single User Model) is running!" });

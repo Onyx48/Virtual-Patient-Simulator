@@ -38,7 +38,12 @@ const stripFence = (text) =>
     .replace(/```\s*$/, "")
     .trim();
 
-const callGemini = async ({ systemPrompt, userQuery, model }) => {
+/**
+ * @param {boolean} json  Ask for the JSON mime type. Off for callers that want
+ *   prose — requesting JSON and then handing the caller a quoted string would
+ *   make every reply arrive wrapped in double quotes.
+ */
+const callGemini = async ({ systemPrompt, userQuery, model, json = true }) => {
   const url = `${GEMINI_BASE_URL}/models/${model}:generateContent`;
 
   const response = await fetch(url, {
@@ -52,7 +57,7 @@ const callGemini = async ({ systemPrompt, userQuery, model }) => {
       contents: [{ role: "user", parts: [{ text: userQuery }] }],
       // The prompts already demand a bare JSON object; asking for the JSON mime
       // type as well stops Gemini wrapping it in prose or a fence.
-      generationConfig: { responseMimeType: "application/json" },
+      generationConfig: json ? { responseMimeType: "application/json" } : {},
     }),
   });
 
@@ -60,11 +65,17 @@ const callGemini = async ({ systemPrompt, userQuery, model }) => {
 
   if (!response.ok) {
     console.error("[AI] Gemini error", response.status, raw);
-    throw new Error(
+    const err = new Error(
       isProd
         ? "The AI service is unavailable right now."
         : `Gemini responded ${response.status}: ${raw.slice(0, 500)}`,
     );
+    // Carried so callers can retry a busy model without re-parsing the message.
+    // 429 rate limit, 500/503 overload — all worth a second attempt; a 400 or
+    // 403 is our own mistake and will fail again identically.
+    err.status = response.status;
+    err.transient = [429, 500, 502, 503, 504].includes(response.status);
+    throw err;
   }
 
   const body = JSON.parse(raw);
@@ -78,6 +89,42 @@ const callGemini = async ({ systemPrompt, userQuery, model }) => {
   }
 
   return text;
+};
+
+const sleep = (ms) => new Promise((resolve) => setTimeout(resolve, ms));
+
+/**
+ * Run a prompt and return the reply as prose.
+ *
+ * No JSON parse — there is nothing to validate, so a reply that arrives is
+ * usable. Any leftover markdown fence is stripped in case the prompt pushes the
+ * model toward a code block.
+ *
+ * Retries up to three times on a busy model, backing off 0.5s then 1.5s.
+ * "gemini-2.5-flash is experiencing high demand" is common enough that a single
+ * attempt turns a routine spike into a user-visible failure; a non-transient
+ * error (bad key, bad model name) is thrown on the first try instead.
+ */
+export const generateText = async ({
+  systemPrompt,
+  userQuery,
+  model = GEMINI_MODEL,
+  attempts = 3,
+}) => {
+  assertGeminiConfigured();
+
+  for (let attempt = 1; ; attempt += 1) {
+    try {
+      const text = await callGemini({ systemPrompt, userQuery, model, json: false });
+      return stripFence(text);
+    } catch (err) {
+      if (!err.transient || attempt >= attempts) throw err;
+      console.warn(
+        `[AI] attempt ${attempt}/${attempts} failed with ${err.status}, retrying`,
+      );
+      await sleep(attempt * 500 + 500);
+    }
+  }
 };
 
 /**

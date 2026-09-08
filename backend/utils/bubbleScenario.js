@@ -22,7 +22,7 @@ const SHOULDER_ID = "1752920237639x881632483753590800";
 const SHOULDER_NECK_ID = "1753175510809x517007094324133900";
 
 /** Rich text to the plain prose an LLM prompt wants. */
-const htmlToText = (value) => {
+export const htmlToText = (value) => {
   if (typeof value !== "string" || !value) return "";
 
   return decodeEntities(
@@ -44,7 +44,7 @@ const htmlToText = (value) => {
  * `questions_for_feedback: [...]`. Falls back to line splitting for a scenario
  * whose questions were typed as plain paragraphs rather than a list.
  */
-const questionsToArray = (value) => {
+export const questionsToArray = (value) => {
   if (typeof value !== "string" || !value) return [];
 
   const items = [...value.matchAll(/<li[^>]*>([\s\S]*?)<\/li>/gi)].map((match) =>
