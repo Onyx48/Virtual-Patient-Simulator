@@ -59,17 +59,82 @@ const transcriptionToText = (transcription) => {
     .trim();
 };
 
+/**
+ * Pull one logical field out of the request under any of its accepted names.
+ *
+ * The Python service this replaces used snake_case (`scenario_id`, `session_id`),
+ * so callers written against it send those. Rejecting them would be a pointless
+ * 400 over a naming style, and the two can never collide.
+ */
+const FIELD_ALIASES = {
+  query: ["query", "question"],
+  scenarioId: ["scenarioId", "scenario_id"],
+  sessionId: ["sessionId", "session_id"],
+  transcription: ["transcription", "transcript"],
+};
+
+const pick = (input, field) => {
+  for (const name of FIELD_ALIASES[field]) {
+    const value = input[name];
+    if (value !== undefined && value !== null && String(value).trim() !== "") {
+      return value;
+    }
+  }
+  return undefined;
+};
+
+/**
+ * Read the payload out of the body, the query string, or a body that arrived
+ * without a usable Content-Type.
+ *
+ * Express only parses JSON when the header says so. A caller sending the right
+ * JSON as text/plain, or with no Content-Type at all, otherwise reaches the
+ * handler with an empty body and gets told its fields are missing — which reads
+ * as a bug in the endpoint rather than in the header.
+ */
+const readInput = (req) => {
+  const body = req.body;
+
+  if (typeof body === "string" && body.trim()) {
+    try {
+      const parsed = JSON.parse(body);
+      if (parsed && typeof parsed === "object") return { ...req.query, ...parsed };
+    } catch {
+      // Not JSON. Fall through to the query string rather than failing here.
+    }
+  }
+
+  /*
+   * A JSON body sent as form-urlencoded arrives as one key with an empty value,
+   * because that is how the urlencoded parser reads it. Recover the JSON.
+   */
+  if (body && typeof body === "object" && !Array.isArray(body)) {
+    const keys = Object.keys(body);
+    if (keys.length === 1 && body[keys[0]] === "" && keys[0].trim().startsWith("{")) {
+      try {
+        const parsed = JSON.parse(keys[0]);
+        if (parsed && typeof parsed === "object") return { ...req.query, ...parsed };
+      } catch {
+        // Leave it; the missing-field error below will report what arrived.
+      }
+    }
+    return { ...req.query, ...body };
+  }
+
+  // A GET carries no body, so the query string is the payload.
+  return { ...req.query };
+};
+
 const askReason = async (req, res) => {
-  // A GET carries no body, so fall back to the query string for both.
-  const input = { ...(req.query || {}), ...(req.body || {}) };
+  const input = readInput(req);
 
-  const query = String(input.query ?? "").trim();
-  const scenarioId = String(input.scenarioId ?? "").trim();
-  const sessionId = String(input.sessionId ?? "").trim();
+  const query = String(pick(input, "query") ?? "").trim();
+  const scenarioId = String(pick(input, "scenarioId") ?? "").trim();
+  const sessionId = String(pick(input, "sessionId") ?? "").trim();
 
-  const missing = ["query", "scenarioId", "sessionId"].filter(
-    (field) => !String(input[field] ?? "").trim(),
-  );
+  const missing = Object.entries({ query, scenarioId, sessionId })
+    .filter(([, value]) => !value)
+    .map(([field]) => field);
 
   if (missing.length) {
     // The access log shows only a bare 400, so record what the caller did send.
@@ -77,7 +142,10 @@ const askReason = async (req, res) => {
       `[ask-reason] rejected: missing ${missing.join(", ")}; got keys ${Object.keys(input).sort().join(", ") || "(none)"}`,
     );
     return res.status(400).json({
-      message: `Missing ${missing.map((f) => `'${f}'`).join(", ")} in request body or query string.`,
+      message:
+        `Missing ${missing.map((f) => `'${f}' (or '${FIELD_ALIASES[f][1]}')`).join(", ")} ` +
+        `in request body or query string. Received: ${Object.keys(input).sort().join(", ") || "nothing"}. ` +
+        `If the body was JSON, check the request sent Content-Type: application/json.`,
     });
   }
 
@@ -120,7 +188,7 @@ const askReason = async (req, res) => {
      * stored copy is the fallback for a caller that sends no transcript.
      */
     const transcriptionText =
-      transcriptionToText(input.transcription) ||
+      transcriptionToText(pick(input, "transcription")) ||
       transcriptionToText(session.transcription);
 
     console.log(
@@ -151,6 +219,14 @@ const askReason = async (req, res) => {
     });
   }
 };
+
+/*
+ * Catches a body the global express.json() declined because the Content-Type was
+ * text/plain, absent, or something else. It only sees a request the JSON parser
+ * already skipped, so it cannot interfere with a correct caller — readInput then
+ * tries to JSON.parse the string.
+ */
+router.use(express.text({ type: "*/*", limit: "2mb" }));
 
 router.post("/", askReason);
 router.get("/", askReason);
