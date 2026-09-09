@@ -34,6 +34,43 @@ const ASK_REASON_PROMPT = readFileSync(
   "utf8",
 );
 
+/*
+ * The coach answers from a fixed script — no Gemini, no Groq, no model call at
+ * all. Deliberate: while the AI providers are unreliable (a spent Gemini free
+ * tier returns 429 and this route then 503s), a student mid-consultation is
+ * better served by generic coaching than by an error, and this costs nothing and
+ * cannot rate-limit.
+ *
+ * The live AI path below is left intact and is reached the moment this flag is
+ * false, so restoring it is a one-line change rather than a rewrite. Set
+ * ASK_REASON_USE_AI=true in the environment to turn it back on for one box
+ * without editing code.
+ *
+ * Note what this gives up: the answer ignores `query`, the transcript and the
+ * scenario entirely. A student asking "why did you rule out radiculopathy?"
+ * gets the same paragraph as one asking "what should I do next?". It is a
+ * holding pattern, not a working coach.
+ */
+const standardResponseEnabled = () =>
+  !["true", "1", "yes"].includes(String(process.env.ASK_REASON_USE_AI).toLowerCase());
+
+/*
+ * Written to be true of any consultation and useful in most: it points at
+ * method rather than at findings, since it cannot know the findings. Kept to the
+ * shape a real coach answer takes so the simulator's rendering is unchanged.
+ */
+const STANDARD_RESPONSE = [
+  "Work from what the patient has actually told you rather than from the diagnosis you expect.",
+  "",
+  "Start by laying out the history you have: where the pain is, how long it has been there, what brings it on and what settles it, and how it is affecting sleep, work and daily activities. Then ask what is still missing — most reasoning gaps at this stage are missing information, not faulty logic.",
+  "",
+  "Screen for red flags explicitly before you commit to a mechanical explanation: unexplained weight loss, night pain, trauma, neurological symptoms such as numbness, weakness or pins and needles, and any history of cancer or inflammatory disease. Say out loud which ones you have cleared.",
+  "",
+  "Then hold two or three explanations side by side rather than one. For each, name the finding that would support it and the finding that would argue against it, and decide which question or movement test would best tell them apart. That is the step that turns a guess into reasoning.",
+  "",
+  "Before you offer a diagnosis or a plan, summarise what you have heard back to the patient and check you have it right. It catches your own errors, and it tells the patient you were listening.",
+].join("\n");
+
 /**
  * Flatten a transcript into one readable block for the prompt.
  *
@@ -187,6 +224,21 @@ const askReason = async (req, res) => {
         `in request body or query string. Received: ${Object.keys(input).sort().join(", ") || "nothing"}. ` +
         `If the body was JSON, check the request sent Content-Type: application/json.`,
     });
+  }
+
+  /*
+   * Answered here, before the scenario and session lookups. Nothing below this
+   * point is needed to produce the fixed answer, and skipping it means the coach
+   * cannot 404 on an unknown scenario, 503 on a spent quota, or hang on a slow
+   * Mongo — the three ways it currently fails a student mid-session.
+   */
+  if (standardResponseEnabled()) {
+    console.log(
+      `[ask-reason ${reqId}] answered from the fixed script (no AI call) ` +
+        `scenario=${scenarioId} session=${sessionId} queryChars=${query.length} ` +
+        `in ${Date.now() - startedAt}ms`,
+    );
+    return res.json({ response: STANDARD_RESPONSE });
   }
 
   /*
