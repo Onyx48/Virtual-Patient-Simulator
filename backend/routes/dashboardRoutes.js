@@ -5,6 +5,10 @@ import User from "../models/userModel.js";
 import Session from "../models/sessionModel.js";
 import { protect } from "../middleware/authMiddleware.js";
 import { checkAccess } from "../middleware/roleAccessMiddleware.js";
+import {
+  assignedStudentIdsByScenario,
+  assignedToStudentQuery,
+} from "../utils/scenarioAssignment.js";
 
 const router = express.Router();
 
@@ -83,9 +87,10 @@ router.get(
     try {
       const studentId = req.user._id.toString();
 
-      const assignedScenarios = await Scenario.find({
-        assignedTo: studentId,
-      }).select("_id scenarioName");
+      // Individually assigned plus everything assigned to this student's group.
+      const assignedScenarios = await Scenario.find(
+        assignedToStudentQuery(req.user),
+      ).select("_id scenarioName");
 
       const totalAssigned = assignedScenarios.length;
 
@@ -274,16 +279,20 @@ router.get(
       if (schoolId) scenarioMatch.schoolId = schoolId;
       if (educatorId) scenarioMatch.educator = educatorId;
 
-      const scenarios =
-        await Scenario.find(scenarioMatch).select("_id assignedTo");
+      const scenarios = await Scenario.find(scenarioMatch).select(
+        "_id assignedTo assignedGroups",
+      );
       let totalAssigned = 0;
       let totalCompleted = 0;
 
+      // Group members count as assigned, so the total is taken from the unioned
+      // student set rather than the assignedTo array alone.
+      const assignedIdsByScenario = await assignedStudentIdsByScenario(scenarios);
+      const inScope = new Set(studentIds.map((id) => id.toString()));
+
       scenarios.forEach((scenario) => {
-        const assignedToStudent = scenario.assignedTo.filter((id) =>
-          studentIds.some((sid) => sid.toString() === id.toString()),
-        );
-        totalAssigned += assignedToStudent.length;
+        const ids = assignedIdsByScenario.get(scenario._id.toString());
+        totalAssigned += [...ids].filter((id) => inScope.has(id)).length;
       });
 
       const sessionMatch = {};
@@ -377,8 +386,9 @@ router.get(
       if (educatorId) scenarioMatch.educator = educatorId;
 
       const scenarios = await Scenario.find(scenarioMatch).select(
-        "_id scenarioName assignedTo",
+        "_id scenarioName assignedTo assignedGroups",
       );
+      const assignedIdsByScenario = await assignedStudentIdsByScenario(scenarios);
 
       const scenarioIds = scenarios.map((s) => s._id);
 
@@ -405,7 +415,8 @@ router.get(
         const sessionCount =
           sessionCounts.find((s) => s._id === scenario._id.toString())
             ?.sessionCount || 0;
-        const assignmentCount = scenario.assignedTo?.length || 0;
+        const assignmentCount =
+          assignedIdsByScenario.get(scenario._id.toString())?.size || 0;
         const total = sessionCount + assignmentCount;
 
         return {

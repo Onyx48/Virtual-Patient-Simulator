@@ -25,7 +25,13 @@ const scenarioSchema = new mongoose.Schema(
       enum: ["Read Only", "Write Only", "Both"],
       default: "Read Only",
     },
+    /*
+     * Two independent assignment lists, unioned when deciding what a student can
+     * see — see utils/scenarioAssignment.js for why groups are not expanded into
+     * assignedTo at write time.
+     */
     assignedTo: [{ type: mongoose.Schema.Types.ObjectId, ref: "User" }],
+    assignedGroups: [{ type: mongoose.Schema.Types.ObjectId, ref: "Group" }],
 
     template: { type: String },
     scenarioPrompt: { type: String },

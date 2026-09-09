@@ -121,6 +121,21 @@ function ScenarioTable({ data, onEditClick, canEdit = true }) {
                 <span className="text-gray-500">
                   {scenario.assignedTo?.length || 0} students
                 </span>
+                {/*
+                  Group count is shown separately rather than folded into the
+                  student number: expanding it would need each group's membership,
+                  which this list does not fetch, and a guessed total is worse
+                  than an honest breakdown.
+                */}
+                {scenario.assignedGroups?.length > 0 && (
+                  <>
+                    <span className="text-gray-300">•</span>
+                    <span className="text-orange-600">
+                      {scenario.assignedGroups.length}{" "}
+                      {scenario.assignedGroups.length === 1 ? "group" : "groups"}
+                    </span>
+                  </>
+                )}
                 <span className="text-gray-300">•</span>
                 <span className="text-gray-500">
                   {scenario.totalSessions || 0} sessions

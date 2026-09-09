@@ -8,6 +8,7 @@ import PaginationBar from "./ui/PaginationBar";
 import { usePagination } from "../lib/hooks/usePagination";
 import { useLoading, Spinner } from "../lib/hooks/useLoading";
 import toast from "react-hot-toast";
+import { isAssignedToStudent } from "../lib/assignment.js";
 
 function StudentScenariosPage() {
   const { user } = useAuth();
@@ -38,12 +39,8 @@ function StudentScenariosPage() {
 
         const stats = statsResponse.data;
 
-        const assignedScenarios = scenariosResponse.data.filter(
-          (scenario) =>
-            scenario.assignedTo &&
-            scenario.assignedTo.some(
-              (a) => (a._id ?? a).toString() === user._id.toString(),
-            ),
+        const assignedScenarios = scenariosResponse.data.filter((scenario) =>
+          isAssignedToStudent(scenario, user),
         );
 
         const mappedScenarios = assignedScenarios.map((scenario) => {

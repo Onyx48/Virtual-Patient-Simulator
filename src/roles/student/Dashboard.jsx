@@ -2,6 +2,7 @@ import React, { useState, useMemo, useEffect } from "react";
 import { useAuth } from "../../AuthContext";
 import axios from "axios";
 import { getAuthHeaders } from "../../lib/utils.js";
+import { isAssignedToStudent } from "../../lib/assignment.js";
 import {
   ResponsiveContainer,
   PieChart,
@@ -64,12 +65,8 @@ function StudentDashboard() {
         setStudentStats(stats);
 
         const allScenarios = scenariosResponse.data;
-        const assignedScenarios = allScenarios.filter(
-          (scenario) =>
-            scenario.assignedTo &&
-            scenario.assignedTo.some(
-              (a) => (a._id ?? a).toString() === user._id.toString(),
-            ),
+        const assignedScenarios = allScenarios.filter((scenario) =>
+          isAssignedToStudent(scenario, user),
         );
 
         const mapped = assignedScenarios.map((scenario) => {

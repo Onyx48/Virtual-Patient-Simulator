@@ -5,6 +5,7 @@ import User from "../models/userModel.js";
 import { protect } from "../middleware/authMiddleware.js";
 import { checkAccess } from "../middleware/roleAccessMiddleware.js";
 import redisClient from "../utils/redisClient.js";
+import { assignedStudentIdsByScenario } from "../utils/scenarioAssignment.js";
 
 const router = express.Router();
 const STUDENTS_CACHE_TTL = 120;
@@ -121,16 +122,38 @@ router.get("/", protect, checkAccess("viewStudents"), async (req, res) => {
 
     const studentIds = students.map((s) => s._id);
 
-    const scenarioStats = await Scenario.aggregate([
-      { $match: { assignedTo: { $in: studentIds } } },
-      { $unwind: "$assignedTo" },
-      {
-        $group: {
-          _id: "$assignedTo",
-          assignedScenariosCount: { $sum: 1 },
-        },
-      },
-    ]);
+    /*
+     * Assigned-scenario count per student. Computed in JS rather than with an
+     * $unwind aggregate, because a scenario can reach a student through their
+     * group as well as through assignedTo, and the count must not double up when
+     * both apply.
+     */
+    const studentGroupIds = [
+      ...new Set(
+        students
+          .map((s) => (s.groupId?._id || s.groupId)?.toString())
+          .filter(Boolean),
+      ),
+    ];
+
+    const relevantScenarios = await Scenario.find({
+      $or: [
+        { assignedTo: { $in: studentIds } },
+        { assignedGroups: { $in: studentGroupIds } },
+      ],
+    })
+      .select("_id assignedTo assignedGroups")
+      .lean();
+
+    const assignedIdsByScenario =
+      await assignedStudentIdsByScenario(relevantScenarios);
+
+    const scenarioCountByStudent = new Map();
+    assignedIdsByScenario.forEach((ids) => {
+      ids.forEach((id) => {
+        scenarioCountByStudent.set(id, (scenarioCountByStudent.get(id) || 0) + 1);
+      });
+    });
 
     const sessionStats = await Session.aggregate([
       {
@@ -147,15 +170,13 @@ router.get("/", protect, checkAccess("viewStudents"), async (req, res) => {
     ]);
 
     const studentsWithStats = students.map((student) => {
-      const scenarioStat = scenarioStats.find(
-        (s) => s._id.toString() === student._id.toString(),
-      );
       const sessionStat = sessionStats.find(
         (s) => s._id === student._id.toString(),
       );
       return {
         ...student.toObject(),
-        assignedScenariosCount: scenarioStat?.assignedScenariosCount || 0,
+        assignedScenariosCount:
+          scenarioCountByStudent.get(student._id.toString()) || 0,
         bestScore: sessionStat?.bestScore || null,
         avgScore: sessionStat?.avgScore || null,
         totalSessions: sessionStat?.totalSessions || 0,

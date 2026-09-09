@@ -10,6 +10,7 @@ import Session from "../models/sessionModel.js";
 import User from "../models/userModel.js";
 import { protect } from "../middleware/authMiddleware.js";
 import { checkAccess } from "../middleware/roleAccessMiddleware.js";
+import { isAssignedToStudent } from "../utils/scenarioAssignment.js";
 
 const router = express.Router();
 
@@ -79,10 +80,9 @@ router.post(
         return res.status(404).json({ message: "Scenario not found." });
       }
 
-      const isAssigned = scenario.assignedTo?.some(
-        (id) => id.toString() === req.user._id.toString(),
-      );
-      if (!isAssigned) {
+      // Counts a group assignment too, or a student assigned only via their
+      // group would be refused the scenario their dashboard just offered them.
+      if (!isAssignedToStudent(scenario, req.user)) {
         return res
           .status(403)
           .json({ message: "Scenario not assigned to this student." });

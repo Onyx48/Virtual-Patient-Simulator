@@ -74,7 +74,14 @@ export const assignScenarios = createAsyncThunk(
         promises.push(
           axios.put(
             `/api/scenarios/${change.scenarioId}`,
-            { assignedTo: change.assignedToIds },
+            {
+              assignedTo: change.assignedToIds,
+              // Sent only when the caller tracks groups, so an older caller
+              // cannot blank out a scenario's group assignments by omission.
+              ...(change.assignedGroupIds !== undefined && {
+                assignedGroups: change.assignedGroupIds,
+              }),
+            },
             getAuthHeaders(),
           ),
         );

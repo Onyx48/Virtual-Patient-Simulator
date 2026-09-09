@@ -268,6 +268,9 @@ router.post(
         email: user.email,
         role: user.role,
         schoolId: user.schoolId,
+        // Needed by the student UI to recognise a scenario assigned to their
+        // group rather than to them individually (src/lib/assignment.js).
+        groupId: user.groupId,
         phoneNumber: user.phoneNumber,
         profilePicture: user.profilePicture,
         token: token,

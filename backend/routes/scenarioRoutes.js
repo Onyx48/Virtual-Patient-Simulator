@@ -11,6 +11,8 @@ import { checkAccess } from "../middleware/roleAccessMiddleware.js";
 import defaultScenarioJson from "../data/defaultScenarioJson.js";
 import { generateJsonWithFallback } from "../utils/aiText.js";
 import { emptyMovements, emptyTriggers } from "../utils/bodyRegions.js";
+import { withStudentScope } from "../utils/scenarioAssignment.js";
+import Group from "../models/groupModel.js";
 import { buildWorkflow, createFlow, updateFlow } from "../utils/voxioClient.js";
 import { publicMessage } from "../utils/appEnv.js";
 import {
@@ -49,13 +51,16 @@ router.get("/", protect, checkAccess("viewScenarios"), async (req, res) => {
       } else if (req.scope.schoolId) {
         query.schoolId = req.scope.schoolId;
       } else if (req.scope.userId) {
-        query.assignedTo = { $in: [req.scope.userId] };
+        // Individually assigned OR a member of an assigned group. Merged as $and
+        // so it cannot clobber the searchTerm $or set above.
+        query = withStudentScope(query, req.user);
       }
     }
 
     const scenarios = await Scenario.find(query)
       .populate("educator", "name email")
       .populate("assignedTo", "name")
+      .populate("assignedGroups", "name")
       .sort({ createdAt: -1 });
 
     // Attach session stats (avgScore, totalSessions) to each scenario
@@ -305,6 +310,7 @@ router.post(
       status,
       permissions,
       assignedTo,
+      assignedGroups,
       template,
       scenarioPrompt,
       aiAvatarRole,
@@ -355,6 +361,11 @@ router.post(
         });
       }
 
+      const createGroups = await resolveAssignedGroups(assignedGroups, req);
+      if (createGroups.error) {
+        return res.status(400).json({ message: createGroups.error });
+      }
+
       const scenarioData = {
         scenarioName,
         description,
@@ -363,6 +374,7 @@ router.post(
         status: status || "Draft",
         permissions: permissions || "Read Only",
         assignedTo: assignedUserIds,
+        assignedGroups: createGroups.ids || [],
         template,
         scenarioPrompt,
         aiAvatarRole,
@@ -383,6 +395,7 @@ router.post(
 
       await newScenario.populate("educator", "name email");
       await newScenario.populate("assignedTo", "name");
+      await newScenario.populate("assignedGroups", "name");
 
       res.status(201).json({
         message: "Scenario added successfully.",
@@ -409,6 +422,49 @@ router.post(
  * it belongs to. Everyone else is refused even though checkAccess let them in,
  * because the permission matrix is per-action and cannot express ownership.
  */
+/**
+ * Validate an incoming assignedGroups list against what the caller may assign.
+ *
+ * Checked against the database rather than taken on trust: without this an
+ * educator could assign another educator's group by id and hand its students a
+ * scenario they were never meant to see.
+ *
+ * @returns {Promise<{error?: string, ids?: string[]}>}
+ */
+const resolveAssignedGroups = async (assignedGroups, req) => {
+  if (assignedGroups === undefined) return {};
+  if (!Array.isArray(assignedGroups)) {
+    return { error: "'assignedGroups' must be an array of group ids." };
+  }
+  if (assignedGroups.length === 0) return { ids: [] };
+
+  if (assignedGroups.some((id) => !mongoose.Types.ObjectId.isValid(id))) {
+    return { error: "Invalid group IDs in assignedGroups" };
+  }
+
+  // An educator may only assign their own groups; a school_admin any group in
+  // their school. A superadmin is unrestricted, matching checkAccess's scoping.
+  const scopeFilter =
+    req.user.role === "educator"
+      ? { educatorId: req.user._id }
+      : req.scope?.schoolId
+        ? { schoolId: req.scope.schoolId }
+        : {};
+
+  const found = await Group.find({
+    _id: { $in: assignedGroups },
+    ...scopeFilter,
+  })
+    .select("_id")
+    .lean();
+
+  if (found.length !== new Set(assignedGroups.map(String)).size) {
+    return { error: "One or more groups do not exist or are not yours to assign." };
+  }
+
+  return { ids: found.map((g) => g._id) };
+};
+
 const canManageScenario = (scenario, req) => {
   if (scenario.educator?.toString() === req.user._id.toString()) return true;
   return Boolean(
@@ -434,6 +490,7 @@ router.put(
       status,
       permissions,
       assignedTo,
+      assignedGroups,
       template,
       scenarioPrompt,
       aiAvatarRole,
@@ -489,6 +546,11 @@ router.put(
       if (status !== undefined) scenario.status = status;
       if (permissions !== undefined) scenario.permissions = permissions;
       if (assignedTo !== undefined) scenario.assignedTo = assignedUserIds;
+
+      const groups = await resolveAssignedGroups(assignedGroups, req);
+      if (groups.error) return res.status(400).json({ message: groups.error });
+      if (groups.ids !== undefined) scenario.assignedGroups = groups.ids;
+
       if (template !== undefined) scenario.template = template;
       if (scenarioPrompt !== undefined)
         scenario.scenarioPrompt = scenarioPrompt;
@@ -505,6 +567,7 @@ router.put(
       await scenario.save();
       await scenario.populate("educator", "name email");
       await scenario.populate("assignedTo", "name");
+      await scenario.populate("assignedGroups", "name");
 
       // Attach session stats so Redux store keeps avgScore/totalSessions after update
       const sessionStat = await Session.aggregate([
