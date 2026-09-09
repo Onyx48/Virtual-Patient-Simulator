@@ -1,7 +1,7 @@
 /**
- * Creates the Ajon Singh cervical-spondylosis scenario under Daniel Okafor.
+ * Creates the Farukh cervical-spondylosis scenario under Daniel Okafor.
  *
- * Run with: node scripts/seedAjonScenario.mjs
+ * Run with: node scripts/seedFarukhScenario.mjs
  *
  * A one-off, and idempotent: re-running finds the scenario by name and updates it
  * in place rather than adding a second copy. It goes through the real Voxio
@@ -20,31 +20,35 @@ const { buildWorkflow, createFlow, updateFlow } = await import(
 const Scenario = (await import("../backend/models/scenarioModel.js")).default;
 const User = (await import("../backend/models/userModel.js")).default;
 
+// The scenario this script owns. Also the id allow-listed for the simulator in
+// backend/utils/testableScenarios.js, so the two must not drift.
+const SCENARIO_ID = "6a9c857f8df9099b1edea1cd";
+
 const SCENARIO_NAME =
-  "Ajon, a 75-year-old with chronic neck pain and stiffness";
+  "Farukh, a 55-year-old with chronic neck pain and stiffness";
 
-const SCENARIO_PROMPT = `Physiotherapy Case: Chronic Cervical Spondylosis in a Retired Engineer
+const SCENARIO_PROMPT = `Physiotherapy Case: Chronic Cervical Spondylosis in a Civil Engineer
 
-Patient Profile: Name: Ajon Singh, Age: 75, Occupation: Retired civil engineer, Presenting Complaint: Chronic neck pain and stiffness.
+Patient Profile: Name: Farukh, Age: 55, Occupation: Civil engineer, Presenting Complaint: Chronic neck pain and stiffness.
 
-History of Present Illness: Ajon, a 75-year-old retired civil engineer, presents with a 6-month history of worsening neck pain and stiffness. The pain is primarily located in the cervical spine and bilateral trapezius region, described as a dull ache, with occasional sharp twinges upon movement. It does not radiate down the arms. The pain is worse in the mornings and after prolonged reading or watching TV. It is partially relieved by resting and applying a heat pack. He denies any associated numbness, tingling, weakness, or headaches. No history of trauma.
+History of Present Illness: Farukh, a 55-year-old civil engineer, presents with a 6-month history of worsening neck pain and stiffness. The pain is primarily located in the cervical spine and bilateral trapezius region, described as a dull ache, with occasional sharp twinges upon movement. It does not radiate down the arms. The pain is worse in the mornings and after prolonged desk work, reading drawings or watching TV. It is partially relieved by resting and applying a heat pack. He denies any associated numbness, tingling, weakness, or headaches. No history of trauma.
 
-Medical History: PMH: Osteoarthritis (diagnosed 10 years ago, affecting knees), well-controlled hypertension. Surgical Hx: None. Medications: Ramipril 5mg OD, Paracetamol PRN for pain. Allergies: None known. Family Hx: Mother had osteoarthritis.
+Medical History: PMH: Osteoarthritis (diagnosed 5 years ago, affecting knees), well-controlled hypertension. Surgical Hx: None. Medications: Ramipril 5mg OD, Paracetamol PRN for pain. Allergies: None known. Family Hx: Mother had osteoarthritis.
 
-Social History: Ajon lives alone in a single-story house since his wife passed away two years ago. He is very independent but finds that his neck pain is making it harder to read his daily newspaper, enjoy his gardening (looking down is painful), and drive for long periods to visit his grandchildren. He is concerned about becoming dependent on others and losing his ability to maintain his garden, which is his main hobby and source of satisfaction. He smokes occasionally (socially, 2-3 cigarettes/week for years but trying to quit), drinks alcohol rarely.
+Social History: Farukh lives alone in a single-story house since his wife passed away two years ago. He is very independent but finds that his neck pain is making it harder to get through a full day at his desk, read his daily newspaper, enjoy his gardening (looking down is painful), and drive for long periods to visit his family. He is concerned about not being able to keep working as he does and about losing his ability to maintain his garden, which is his main hobby and source of satisfaction. He smokes occasionally (socially, 2-3 cigarettes/week for years but trying to quit), drinks alcohol rarely.
 
-Relevant Investigations: No recent imaging. An X-ray of the cervical spine from 5 years ago showed 'age-related degenerative changes'.
+Relevant Investigations: No recent imaging. An X-ray of the cervical spine from 5 years ago showed 'early degenerative changes'.
 
 Previous Treatment: Tried over-the-counter paracetamol for pain, which offers mild, temporary relief. Has not seen a physiotherapist for this specific issue before.
 
 Simulated Physical Examination Findings: General appearance: Appears comfortable at rest, slightly guarded with neck movements. Neck: Active range of motion (AROM) significantly limited and painful in flexion, extension, left rotation, right rotation, left lateral flexion, right lateral flexion. Retraction is limited and painful. Protraction is full and pain-free. Palpation reveals tenderness over C5-C7 spinous processes and bilateral upper trapezius muscles. No muscle spasm. Shoulder: Bilateral shoulder AROM is full and pain-free in all directions. No tenderness on palpation of shoulder musculature or joints. Neurological screen: Sensation, motor strength, and reflexes intact in bilateral upper extremities. No signs of myelopathy or radiculopathy.
 
-Patient's aim and goals of treatment: Reduce neck pain, improve flexibility to continue reading and gardening, maintain independence, and avoid future worsening.
+Patient's aim and goals of treatment: Reduce neck pain, improve flexibility to keep working comfortably and continue reading and gardening, and avoid future worsening.
 
-Simulation Objectives for Student: 1. Take a comprehensive subjective history focusing on chronic pain and its impact on a senior individual's life. 2. Formulate a differential diagnosis for chronic neck pain in an elderly patient. 3. Discuss appropriate management strategies, considering age, comorbidities, and psychosocial factors. 4. Address the patient's concerns regarding independence and hobbies.
+Simulation Objectives for Student: 1. Take a comprehensive subjective history focusing on chronic pain and its impact on a working adult's life. 2. Formulate a differential diagnosis for chronic neck pain in a middle-aged patient. 3. Discuss appropriate management strategies, considering his age, comorbidities, work demands and psychosocial factors. 4. Address the patient's concerns regarding his work and his hobbies.
 
 --- Simulation Instructions ---
-You are a Patient Education Chatbot. Your purpose is to simulate a patient encounter for a medical student. You will act as Ajon Singh based *only* on the detailed medical case information provided above.
+You are a Patient Education Chatbot. Your purpose is to simulate a patient encounter for a medical student. You will act as Farukh based *only* on the detailed medical case information provided above.
 Before responding to the student's *first* message, verify if the scenario above strictly pertains to the NECK or SHOULDER. If NO, your *only* response must be: 'Sorry we only support neck and shoulder right now'. If YES, proceed with the simulation.
 IMPORTANT: Use simple, everyday language. AVOID medical jargon from the case details unless the scenario explicitly states the patient was told a specific term. Translate medical facts into subjective patient experiences (e.g., if external rotation is limited, say "I struggle to reach for the seatbelt or brush my hair").
 Initial Greeting: If the student's first message is only a greeting (e.g., 'Hi', 'Good morning'), your first response MUST also be only a simple greeting back (e.g., 'Hi', 'Morning').
@@ -52,12 +56,12 @@ Wait for the Prompt: Do NOT immediately state your symptoms or reason for visiti
 Answer Specifically: Once prompted, answer only the specific question asked in each turn. Do not volunteer extra information or 'data dump' your entire history at once.
 Concise Responses: Keep your answers brief, typically 1-3 sentences.
 Let the Student Lead: Allow the student to guide the history-taking process with their questions.
-Act a bit resigned to the pain, but also hopeful that something can be done. He might sigh occasionally when describing how the pain affects his hobbies. He values his independence greatly.
+Act a bit resigned to the pain, but also hopeful that something can be done. He might sigh occasionally when describing how the pain affects his work and his hobbies. He values his independence greatly.
 Base ALL answers *only* on the scenario details. If asked something not covered, give a brief, plausible, patient-like answer.
 Act like a human patient. Do NOT reveal you are a chatbot or AI.
 
 --- Sample Conversation ---
-(role: 'user', content: 'Good morning, Ajon.')
+(role: 'user', content: 'Good morning, Farukh.')
 (role: 'assistant', content: 'Good morning.')
 (role: 'user', content: 'I'm [Student Name], a student physiotherapist. Thanks for coming in. What brings you here today?')
 (role: 'assistant', content: 'Well, it's my neck. It's been aching and stiff for months.')`;
@@ -68,8 +72,8 @@ Act like a human patient. Do NOT reveal you are a chatbot or AI.
  * that phrasing, so a differently-worded question scores unreliably.
  *
  * The first block is the generic subjective-history checklist; the rest are
- * specific to Ajon — his age, his comorbidities, and the independence and
- * gardening worries that are the point of this case.
+ * specific to Farukh — his comorbidities, and the work and gardening worries that
+ * are the point of this case.
  */
 const FEEDBACK_QUESTIONS = [
   "Did the student inquire about the onset and duration of the neck pain?",
@@ -89,9 +93,10 @@ const FEEDBACK_QUESTIONS = [
   "Did the student ask about allergies?",
   "Did the student ask about family history?",
   "Did the student ask about smoking and alcohol?",
+  "Did the student ask about the patient's job and how his desk work and reading drawings affect his symptoms?",
   "Did the student explore how the pain affects the patient's daily activities — reading, watching TV, gardening and driving?",
   "Did the student ask about the patient's home situation and the fact that he lives alone?",
-  "Did the student explore the patient's fear of losing his independence and becoming dependent on others?",
+  "Did the student explore the patient's worry about not being able to keep working as he does?",
   "Did the student acknowledge how much the garden means to the patient rather than treating it as a minor detail?",
   "Did the student ask about the patient's own aim and goals for physiotherapy treatment?",
   "Did the student ask about sleep and sleeping position?",
@@ -100,8 +105,9 @@ const FEEDBACK_QUESTIONS = [
   "Did the student provide a statement showing empathy towards the patient's condition and reassure him about his concerns?",
   "Did the student use clear, professional, layperson language rather than medical jargon throughout?",
   "Did the student demonstrate active listening and appropriate follow-up questions rather than reading from a list?",
-  "Did the student avoid attributing the problem to old age dismissively, and explain the degenerative changes in a way that did not frighten the patient?",
-  "Did the student explain the likely diagnosis and a management plan appropriate to a 75-year-old with osteoarthritis and hypertension?",
+  "Did the student avoid dismissing the problem as simply wear and tear, and explain the degenerative changes in a way that did not frighten the patient?",
+  "Did the student explain the likely diagnosis and a management plan appropriate to a working 55-year-old with osteoarthritis and hypertension?",
+  "Did the student discuss workstation setup, posture and taking breaks from prolonged desk work?",
 ];
 
 /*
@@ -153,7 +159,13 @@ const run = async () => {
     .lean();
   console.log(`assigning to ${students.length} student(s) at his school`);
 
-  const existing = await Scenario.findOne({ scenarioName: SCENARIO_NAME });
+  /*
+   * Looked up by id, not by name. The name has already changed once (this case was
+   * Ajon, 75, before it became Farukh, 55) and matching on it would have created a
+   * second scenario instead of editing the one the simulator is pinned to in
+   * backend/utils/testableScenarios.js.
+   */
+  const existing = await Scenario.findById(SCENARIO_ID);
 
   /*
    * The flow is minted once and thereafter edited in place — a second createFlow
@@ -212,7 +224,9 @@ const run = async () => {
 
   const scenario = existing
     ? await Scenario.findByIdAndUpdate(existing._id, fields, { new: true })
-    : await Scenario.create(fields);
+    // Created with the fixed id, so the simulator allow-list stays valid even if
+    // this ever has to be rebuilt from scratch.
+    : await Scenario.create({ ...fields, _id: SCENARIO_ID });
 
   console.log(`${existing ? "updated" : "created"} scenario ${scenario._id}`);
   console.log(`\nTESTABLE_SCENARIO_IDS=${scenario._id}`);
