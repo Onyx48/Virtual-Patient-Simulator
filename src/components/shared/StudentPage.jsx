@@ -445,7 +445,7 @@ function StudentPage({ role }) {
     return (
       <span
         className={`ml-1.5 align-middle text-base font-bold leading-none ${
-          isActive ? "text-orange-500" : "text-gray-500"
+          isActive ? "text-orange-600" : "text-orange-400"
         }`}
         aria-hidden="true"
       >

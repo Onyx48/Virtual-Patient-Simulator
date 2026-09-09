@@ -38,25 +38,34 @@ const getJweKey = () => {
 /*
  * Where a student is sent to run a scenario.
  *
- * The last path segment is the room, and it is this session's own id rather than
- * one fixed room for everybody. Sharing a single room meant two students who
- * started at the same time were dropped into the same screenshare — each seeing
- * the other's consultation, and the second arrival displacing the first.
+ * The path is the StreamPixel app id and stays fixed — it identifies the
+ * published simulator build, and it is the same link the educator's Test button
+ * opens. The room rides on `?room=`, and it is this session's own id rather than
+ * one fixed room for everybody: sharing a single room meant two students who
+ * started at the same time were dropped into the same stream, each seeing the
+ * other's consultation, with the second arrival displacing the first.
  *
  * The room is created implicitly by being visited, so nothing has to be
  * provisioned ahead of time; the id only has to be unique and unguessable, which
  * the session's ObjectId already is.
  *
- * ROOM_BASE_URL overrides the host without a frontend rebuild.
+ * ROOM_BASE_URL overrides the whole base without a redeploy — including the app
+ * id, since a new StreamPixel build gets a new one.
  */
 const ROOM_BASE_URL = () =>
-  (process.env.ROOM_BASE_URL || "https://screenshare.gospacesxr.com").replace(
-    /\/+$/,
-    "",
-  );
+  (
+    process.env.ROOM_BASE_URL ||
+    "https://share.streampixel.io/6aa14ef480d62d728d8ba6e8"
+  ).replace(/\/+$/, "");
 
-const getRoomUrl = (sessionId) =>
-  `${ROOM_BASE_URL()}/${sessionId}?admin=true`;
+/*
+ * Appended rather than assumed to be the first parameter, so a ROOM_BASE_URL that
+ * already carries a query string is not silently broken by a second '?'.
+ */
+const getRoomUrl = (sessionId) => {
+  const base = ROOM_BASE_URL();
+  return `${base}${base.includes("?") ? "&" : "?"}room=${encodeURIComponent(sessionId)}`;
+};
 
 router.post(
   "/start",

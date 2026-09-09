@@ -20,16 +20,35 @@ import { isProd } from "./appEnv.js";
  *
  * Gemini's own error is what gets thrown — it is the actual reason the request
  * failed, and a "Groq is not configured" would send an operator to the wrong
- * place. But outside production the message says the fallback was skipped too,
- * because a bare 429 makes it look as though no fallback exists at all.
+ * place. But the message says the fallback was skipped too, because a bare 429
+ * makes it look as though no fallback exists at all.
  */
 const noFallbackConfigured = (geminiError) => {
   console.error(
     "[AI] Gemini failed and GROQ_API_KEY is not set — no fallback was attempted",
   );
-  if (!isProd) {
-    geminiError.message += " (Groq fallback skipped: GROQ_API_KEY is not set)";
-  }
+  /*
+   * Said in production too, not only outside it. This message is only ever seen
+   * by an educator or an admin generating a scenario — never by a student — and
+   * the alternative was a bare Gemini 429 that reads as "the fallback is broken"
+   * when the truth is that no fallback was configured to run. Diagnosing that
+   * cost a round trip through the logs every time.
+   */
+  geminiError.message +=
+    " — no Groq fallback was attempted because GROQ_API_KEY is not set on the server.";
+  return geminiError;
+};
+
+/**
+ * Both providers failed.
+ *
+ * Gemini's error is still the one thrown — it is the primary, and it is what an
+ * operator should check first — but Groq's reason is carried along in the message.
+ * Without it the caller sees a Gemini 429 and cannot tell whether the standby was
+ * skipped, rate-limited, or misconfigured.
+ */
+const bothFailed = (geminiError, groqError) => {
+  geminiError.message += ` — the Groq fallback also failed: ${groqError.message}`;
   return geminiError;
 };
 
@@ -60,7 +79,7 @@ export const generateTextWithFallback = async ({ systemPrompt, userQuery }) => {
        * first — so Groq's is logged rather than thrown.
        */
       console.error("[AI] Groq fallback also failed:", groqError.message);
-      throw geminiError;
+      throw bothFailed(geminiError, groqError);
     }
   }
 };
@@ -141,7 +160,7 @@ export const generateJsonWithFallback = async ({ systemPrompt, userQuery }) => {
       return { json, provider: "groq", model: GROQ_MODEL };
     } catch (groqError) {
       console.error("[AI] Groq fallback also failed:", groqError.message);
-      throw geminiError;
+      throw bothFailed(geminiError, groqError);
     }
   }
 };

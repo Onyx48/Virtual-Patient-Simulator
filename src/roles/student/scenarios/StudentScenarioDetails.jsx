@@ -52,17 +52,33 @@ function StudentScenarioDetails({ onBack }) {
     return sortedSessions[activeAttempt - 1] || sortedSessions[0];
   }, [sessions, activeAttempt]);
 
+  /*
+   * Scores reach us on two scales and have to be drawn on one.
+   *
+   * The assessor (posta's /get-results) clamps to 0-10, so a solid 7/10 was being
+   * fed straight into `height: 7%` and drawing a 13px sliver in a 192px box — the
+   * chart looked empty for a student who had done well. Anything at or below 10 is
+   * read as a mark out of ten and multiplied up; anything above is already a
+   * percentage. The ambiguity is real (a genuine 8% is indistinguishable from
+   * 8/10) but it resolves the right way round: the graders in use produce 0-10.
+   */
+  const toPercent = (score) => {
+    const value = Number(score);
+    if (!Number.isFinite(value) || value <= 0) return 0;
+    return Math.min(100, Math.round(value <= 10 ? value * 10 : value));
+  };
+
   const attemptsData = useMemo(() => {
     if (sessions.length === 0) return [];
     return sessions
       .sort((a, b) => new Date(a.createdAt) - new Date(b.createdAt))
-      .map((s) => s.score);
+      .map((s) => toPercent(s.score));
   }, [sessions]);
 
   const results = useMemo(() => {
     if (sessions.length === 0)
       return { lowest: "0%", average: "0%", highest: "0%" };
-    const scores = sessions.map((s) => s.score);
+    const scores = sessions.map((s) => toPercent(s.score));
     const lowest = Math.min(...scores);
     const highest = Math.max(...scores);
     const average = Math.round(
@@ -304,8 +320,10 @@ function StudentScenarioDetails({ onBack }) {
               <span className="block text-[10px] text-gray-400 font-bold uppercase mb-2">
                 Score
               </span>
+              {/* Same scale as the chart and the Results row, or the three
+                  disagree about the same session. */}
               <span className="text-sm font-bold text-gray-900">
-                {currentScore || 0}
+                {toPercent(currentScore)}%
               </span>
             </div>
             <div>
@@ -331,9 +349,14 @@ function StudentScenarioDetails({ onBack }) {
                 className="flex flex-col items-center flex-1 group cursor-pointer h-full justify-end"
               >
                 <div className="relative w-full max-w-[20px] bg-gray-50 rounded-t-full h-full flex items-end overflow-hidden">
+                  {/* minHeight so a low but real score is still a visible bar
+                      rather than nothing at all — 4% of this box is under 8px. */}
                   <div
-                    style={{ height: `${score}%` }}
-                    className="w-full bg-orange-400 rounded-t-full transition-all duration-500 group-hover:bg-orange-500"
+                    style={{
+                      height: `${score}%`,
+                      minHeight: score > 0 ? "6px" : 0,
+                    }}
+                    className="w-full bg-orange-500 rounded-t-full transition-all duration-500 group-hover:bg-orange-600"
                   ></div>
                 </div>
                 <span className="text-[10px] text-gray-400 mt-3 font-medium">

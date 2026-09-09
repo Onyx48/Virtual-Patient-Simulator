@@ -4,11 +4,18 @@ import { useAuth } from "@/AuthContext.jsx";
 import { toast } from "react-hot-toast";
 import axios from "axios";
 
+/*
+ * Placeholders for the avatar only. The name, email and phone were mock values
+ * ("John Doe", "+123456789") shown whenever the account had none — so the phone
+ * field arrived pre-filled with a number the user had never entered, and saving
+ * the form wrote that fake number to their profile. Empty is honest, and an empty
+ * field is what makes the placeholder text below visible.
+ */
 const initialUserData = {
   profilePictureUrl: "https://via.placeholder.com/150/FF5733/FFFFFF?text=JD",
-  fullName: "John Doe",
-  email: "johndoe123@gmail.com",
-  phoneNumber: "+123456789",
+  fullName: "",
+  email: "",
+  phoneNumber: "",
 };
 
 const EditIcon = () => (
@@ -100,7 +107,7 @@ function SettingsPage() {
   const {
     register,
     handleSubmit,
-    setValue,
+    reset,
     watch,
     formState: { errors, isDirty },
   } = useForm({
@@ -121,11 +128,19 @@ function SettingsPage() {
         email: user.email || initialUserData.email,
         phoneNumber: user.phoneNumber || initialUserData.phoneNumber,
       });
-      setValue("fullName", user.name || initialUserData.fullName);
-      setValue("email", user.email || initialUserData.email);
-      setValue("phoneNumber", user.phoneNumber || initialUserData.phoneNumber);
+      /*
+       * reset, not setValue: setValue leaves the form's baseline at the mock
+       * defaults, so the form counted as dirty the moment the real account
+       * loaded and Save was enabled before anything had been edited. reset
+       * moves the baseline, so `isDirty` means "the user changed something".
+       */
+      reset({
+        fullName: user.name || "",
+        email: user.email || "",
+        phoneNumber: user.phoneNumber || "",
+      });
     }
-  }, [user, setValue]);
+  }, [user, reset]);
 
   const onSubmit = async (data) => {
     try {
@@ -137,10 +152,26 @@ function SettingsPage() {
         name: response.data.name,
         phoneNumber: response.data.phoneNumber,
       });
+      /*
+       * The saved value becomes the new baseline, so Save goes back to disabled
+       * and a second click cannot re-send a save that already happened.
+       */
+      reset({ ...data, phoneNumber: response.data.phoneNumber ?? "" });
       toast.success("Profile updated successfully");
     } catch (error) {
       console.error("Profile update error:", error);
-      toast.error(error.response?.data?.message || "Failed to update profile");
+      /*
+       * express-validator answers a rejected field with { errors: [...] } and no
+       * `message`, so the old line fell through to "Failed to update profile" and
+       * the user was told nothing about why the number would not save.
+       */
+      const validation = error.response?.data?.errors?.[0]?.msg;
+      toast.error(
+        validation ||
+          error.response?.data?.message ||
+          error.message ||
+          "Failed to update profile",
+      );
     }
   };
 
@@ -372,8 +403,18 @@ function SettingsPage() {
                 </label>
                 <div className="flex items-center">
                   <input
-                    {...register("phoneNumber")}
-                    type="text"
+                    {...register("phoneNumber", {
+                      pattern: {
+                        // Digits, spaces and the punctuation a written number
+                        // uses. Deliberately loose: numbers are international and
+                        // a strict format rejects valid ones.
+                        value: /^[+()\-.\s\d]{6,20}$/,
+                        message:
+                          "Use digits, spaces and + ( ) - only, 6 to 20 characters.",
+                      },
+                    })}
+                    type="tel"
+                    placeholder="e.g. +44 7700 900123"
                     disabled={!canEditPersonalInfo}
                     className={`flex-1 px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500 ${
                       !canEditPersonalInfo
@@ -383,6 +424,11 @@ function SettingsPage() {
                   />
                   {canEditPersonalInfo && <EditIcon />}
                 </div>
+                {errors.phoneNumber && (
+                  <p className="text-sm text-red-600 mt-1">
+                    {errors.phoneNumber.message}
+                  </p>
+                )}
               </div>
             </div>
           </div>
