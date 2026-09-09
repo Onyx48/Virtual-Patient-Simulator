@@ -10,6 +10,7 @@ import { protect } from "../middleware/authMiddleware.js";
 import { checkAccess } from "../middleware/roleAccessMiddleware.js";
 import defaultScenarioJson from "../data/defaultScenarioJson.js";
 import { generateScenarioJson } from "../utils/geminiClient.js";
+import { emptyMovements, emptyTriggers } from "../utils/bodyRegions.js";
 import { buildWorkflow, createFlow, updateFlow } from "../utils/voxioClient.js";
 import { publicMessage } from "../utils/appEnv.js";
 import {
@@ -123,7 +124,7 @@ const shapeGenerated = (generated, apiKey) => ({
   // The prompt asks for difficulty_level; difficulty_status is accepted because
   // the old service persisted it under that name.
   difficulty_level: generated.difficulty_level || generated.difficulty_status || "Medium",
-  movements: generated.movements || { shoulder: {}, neck: {} },
+  movements: generated.movements || emptyMovements(),
   api_key: apiKey,
 });
 
@@ -366,7 +367,7 @@ router.post(
         aiInstructions,
         aiQuestions,
         difficulty: difficulty || "Medium",
-        animationTriggers: animationTriggers || { shoulder: [], neck: [] },
+        animationTriggers: animationTriggers || emptyTriggers(),
         apiKey: apiKey || "",
         html: html || "",
       };

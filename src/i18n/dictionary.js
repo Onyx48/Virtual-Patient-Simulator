@@ -394,6 +394,11 @@ export const ja = {
   Preview: "プレビュー",
   "Animation triggers - Shoulder": "アニメーショントリガー - 肩",
   "Animation triggers - Neck": "アニメーショントリガー - 首",
+  "Animation triggers - Lower back": "アニメーショントリガー - 腰部",
+  "Animation triggers - Hip": "アニメーショントリガー - 股関節",
+  "Animation triggers - Knee": "アニメーショントリガー - 膝関節",
+  "Animation triggers - Ankle": "アニメーショントリガー - 足関節",
+  "Animation triggers - Foot": "アニメーショントリガー - 足部",
   "Junior MSK physiotherapist practicing history taking and clinical...":
     "問診と臨床推論を練習する初級運動器理学療法士...",
 
@@ -413,6 +418,16 @@ export const ja = {
   Right_Rotation: "右回旋",
   Left_Lateral_Flexion: "左側屈",
   Right_Lateral_Flexion: "右側屈",
+  // Lower limb. Longer keys are matched before shorter ones, so
+  // Great_Toe_Flexion is never partly replaced by the bare Flexion entry.
+  Dorsiflexion: "背屈",
+  Plantarflexion: "底屈",
+  Inversion: "内がえし",
+  Eversion: "外がえし",
+  Great_Toe_Extension: "母趾伸展",
+  Great_Toe_Flexion: "母趾屈曲",
+  Forefoot_Pronation: "前足部回内",
+  Forefoot_Supination: "前足部回外",
   Full: "全可動域",
   Ltd: "制限あり",
 

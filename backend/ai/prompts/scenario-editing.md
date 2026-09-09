@@ -8,7 +8,7 @@ Update the provided JSON scenario based on the user's specific instructions. Thi
 **Inputs:**
 
 1. **Current Scenario JSON:** The existing medical case in JSON format.
-2. **Modification Request:** A description of what needs to be changed (e.g., 'Change the patient to a 70-year-old retired veteran with severe osteoarthritis', 'Switch the case from a rotator cuff strain to a frozen shoulder with a severely restricted capsule').
+2. **Modification Request:** A description of what needs to be changed (e.g., 'Change the patient to a 70-year-old retired veteran with severe osteoarthritis', 'Switch the case from a rotator cuff strain to a frozen shoulder with a severely restricted capsule', 'Make the low back pain radiate below the knee with a positive straight-leg raise').
 
 **JSON Template Structure:**
 
@@ -36,6 +36,38 @@ Update the provided JSON scenario based on the user's specific instructions. Thi
             "retraction": "",
             "right_lateral_flexion": "",
             "left_lateral_flexion": ""
+        },
+        "lower_back": {
+            "flexion": "",
+            "extension": "",
+            "left_lateral_flexion": "",
+            "right_lateral_flexion": "",
+            "left_rotation": "",
+            "right_rotation": ""
+        },
+        "hip": {
+            "flexion": "",
+            "extension": "",
+            "abduction": "",
+            "adduction": "",
+            "internal_rotation": "",
+            "external_rotation": ""
+        },
+        "knee": {
+            "flexion": "",
+            "extension": ""
+        },
+        "ankle": {
+            "dorsiflexion": "",
+            "plantarflexion": "",
+            "inversion": "",
+            "eversion": ""
+        },
+        "foot": {
+            "great_toe_extension": "",
+            "great_toe_flexion": "",
+            "forefoot_pronation": "",
+            "forefoot_supination": ""
         }
     },
     "questions_for_feedback": [],
@@ -48,7 +80,7 @@ Update the provided JSON scenario based on the user's specific instructions. Thi
 
 ## Constraints & Rules
 
-1. **Scope Limitation:** If the modification request changes the clinical area to anything **other than the neck or shoulder**, you must populate the `scenario_prompt` field with the exact string: `'Sorry we only support neck and shoulder right now'`. Set `scenario_name` to "Unsupported Scenario", `questions_for_feedback` to [], `difficulty_level` to "N/A", and all movement keys to `"N/A"`.
+1. **Scope Limitation:** If the modification request changes the clinical area to anything **other than the neck, shoulder, lower back, hip, knee, ankle or foot**, you must populate the `scenario_prompt` field with the exact string: `'Sorry we only support neck, shoulder, lower back, hip, knee, ankle and foot right now'`. Set `scenario_name` to "Unsupported Scenario", `questions_for_feedback` to [], `difficulty_level` to "N/A", and all movement keys to `"N/A"`.
 2. **Single Quote Rule:** Within the `scenario_prompt` string value, you MUST use **single quotes (')** for all internal quotes, titles, dialogue, or names. Double quotes are strictly reserved for JSON keys and outer string boundaries.
 3. **Question Consistency:** The `questions_for_feedback` must always contain exactly 23 items. The first 18 are mandatory and fixed. The last 5 **must be updated** to reflect the specific details of the *newly modified* scenario.
 4. **Output Format:** Return ONLY the valid JSON object. No preamble, no explanation, no markdown text blocks around the JSON itself.
@@ -67,7 +99,12 @@ Update the provided JSON scenario based on the user's specific instructions. Thi
 * **Enforced Categorical Values:** Ensure all values are strictly limited to the following configurations derived from clinical data:
 * `shoulder` -> `flexion`: `"Full"`, `"90_Ltd"`, or `"120_Ltd"`
 * `shoulder` -> all other keys: `"Full"` or `"Ltd"`
-* `neck` -> all keys: `"Full"` or `"Ltd"`
+* `hip` -> `flexion`: `"Full"`, `"Ltd"`, `"90_Ltd"`, or `"120_Ltd"`
+* `knee` -> `flexion`: `"Full"`, `"Ltd"`, `"90_Ltd"`, or `"120_Ltd"`
+* `neck`, `lower_back`, `ankle`, `foot`, and all remaining `hip` / `knee` keys: `"Full"` or `"Ltd"`
+
+* **Regions Not Involved:** Any region the modified complaint does not affect must be `"Full"` throughout. If a modification moves the case to a different region, reset the region it left to `"Full"` — a knee case that becomes an ankle case must not keep the old knee restrictions.
+* **Fixed Region Set:** Do not add or rename regions or movement keys. The seven regions in the template above are the only ones the simulation engine understands.
 
 
 * **Cross-Field Validation:** The status of these parameters must match the objective findings written out in the `Simulated Physical Examination Findings` section inside the `scenario_prompt`.

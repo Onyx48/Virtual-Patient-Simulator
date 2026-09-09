@@ -1,4 +1,5 @@
 import mongoose from "mongoose";
+import { BODY_REGIONS } from "../utils/bodyRegions.js";
 
 const scenarioSchema = new mongoose.Schema(
   {
@@ -35,10 +36,17 @@ const scenarioSchema = new mongoose.Schema(
 
     apiKey: { type: String },
 
-    animationTriggers: {
-      shoulder: [{ type: String }],
-      neck: [{ type: String }],
-    },
+    /*
+     * Range-of-motion limits, one array of "Movement_Value" strings per body
+     * region. The region list lives in utils/bodyRegions.js — see there for what
+     * else has to change alongside it.
+     *
+     * Older scenarios only have shoulder and neck; the rest are simply absent,
+     * which reads the same as "no limitation recorded".
+     */
+    animationTriggers: Object.fromEntries(
+      BODY_REGIONS.map((region) => [region, [{ type: String }]]),
+    ),
     html: { type: String },
   },
   {

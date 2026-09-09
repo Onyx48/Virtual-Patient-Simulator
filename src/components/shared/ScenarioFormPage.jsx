@@ -52,6 +52,32 @@ const ErrorModal = ({ isOpen, message, onClose }) => {
   );
 };
 
+/*
+ * The body regions a scenario can cover, and the movements each one offers.
+ *
+ * This drives the animation-trigger UI, the payload sent to the backend and the
+ * parsing of what comes back, so a region only has to be described once. It must
+ * stay in step with backend/utils/bodyRegions.js (the region list) and the
+ * `movements` templates in backend/ai/prompts/scenario-{creation,editing}.md
+ * (which movements exist per region, and their allowed values) — the AI fills
+ * these same keys, and a mismatch silently drops its answer on the floor.
+ *
+ * Values are categorical, not degrees: "Full", "Ltd", or a graded limit like
+ * "90_Ltd" where a threshold is clinically meaningful.
+ */
+const FULL_LTD = ["Full", "Ltd"];
+// Shoulder flexion only. The graded values name animations in the avatar rig, so
+// this list is a contract with the simulator and must not gain a value the rig
+// has no clip for.
+const GRADED = ["Full", "90_Ltd", "120_Ltd"];
+/*
+ * Hip and knee flexion. Same grading, plus a plain "Ltd" for a case where no
+ * threshold is clinically meaningful — the AI reaches for it often, and without
+ * it the value matches no radio, so the restriction silently vanishes when the
+ * educator saves. Safe to add here because these regions have no avatar rig yet.
+ */
+const GRADED_OR_LTD = ["Full", "Ltd", "90_Ltd", "120_Ltd"];
+
 const SHOULDER_MOVEMENTS = [
   { id: "flexion", label: "Flexion", options: ["Full", "90_Ltd", "120_Ltd"] },
   { id: "extension", label: "Extension", options: ["Full", "Ltd"] },
@@ -102,6 +128,77 @@ const NECK_MOVEMENTS = [
   },
 ];
 
+const LOWER_BACK_MOVEMENTS = [
+  { id: "flexion", label: "Flexion", options: FULL_LTD },
+  { id: "extension", label: "Extension", options: FULL_LTD },
+  {
+    id: "left_lateral_flexion",
+    label: "Left_Lateral_Flexion",
+    options: FULL_LTD,
+  },
+  {
+    id: "right_lateral_flexion",
+    label: "Right_Lateral_Flexion",
+    options: FULL_LTD,
+  },
+  { id: "left_rotation", label: "Left_Rotation", options: FULL_LTD },
+  { id: "right_rotation", label: "Right_Rotation", options: FULL_LTD },
+];
+
+const HIP_MOVEMENTS = [
+  { id: "flexion", label: "Flexion", options: GRADED_OR_LTD },
+  { id: "extension", label: "Extension", options: FULL_LTD },
+  { id: "abduction", label: "Abduction", options: FULL_LTD },
+  { id: "adduction", label: "Adduction", options: FULL_LTD },
+  { id: "internal_rotation", label: "Internal_Rotation", options: FULL_LTD },
+  { id: "external_rotation", label: "External_Rotation", options: FULL_LTD },
+];
+
+const KNEE_MOVEMENTS = [
+  { id: "flexion", label: "Flexion", options: GRADED_OR_LTD },
+  // "Ltd" here means an extension lag or fixed flexion deformity.
+  { id: "extension", label: "Extension", options: FULL_LTD },
+];
+
+const ANKLE_MOVEMENTS = [
+  { id: "dorsiflexion", label: "Dorsiflexion", options: FULL_LTD },
+  { id: "plantarflexion", label: "Plantarflexion", options: FULL_LTD },
+  { id: "inversion", label: "Inversion", options: FULL_LTD },
+  { id: "eversion", label: "Eversion", options: FULL_LTD },
+];
+
+const FOOT_MOVEMENTS = [
+  {
+    id: "great_toe_extension",
+    label: "Great_Toe_Extension",
+    options: FULL_LTD,
+  },
+  { id: "great_toe_flexion", label: "Great_Toe_Flexion", options: FULL_LTD },
+  { id: "forefoot_pronation", label: "Forefoot_Pronation", options: FULL_LTD },
+  {
+    id: "forefoot_supination",
+    label: "Forefoot_Supination",
+    options: FULL_LTD,
+  },
+];
+
+/*
+ * Order here is the order the sections appear in the form: head down to toe,
+ * which is how a clinician reads a body chart.
+ */
+const REGIONS = [
+  { id: "shoulder", label: "Shoulder", movements: SHOULDER_MOVEMENTS },
+  { id: "neck", label: "Neck", movements: NECK_MOVEMENTS },
+  { id: "lower_back", label: "Lower back", movements: LOWER_BACK_MOVEMENTS },
+  { id: "hip", label: "Hip", movements: HIP_MOVEMENTS },
+  { id: "knee", label: "Knee", movements: KNEE_MOVEMENTS },
+  { id: "ankle", label: "Ankle", movements: ANKLE_MOVEMENTS },
+  { id: "foot", label: "Foot", movements: FOOT_MOVEMENTS },
+];
+
+const emptyMovements = () =>
+  Object.fromEntries(REGIONS.map((region) => [region.id, {}]));
+
 const quillModules = {
   toolbar: [
     [{ font: [] }, { size: [] }],
@@ -121,58 +218,47 @@ const quillModules = {
   ],
 };
 
-const formatMovementsForBackend = (movementsObj) => {
-  const shoulder = [];
-  const neck = [];
+/**
+ * Form state -> the backend's `animationTriggers`: one array of "Label_Value"
+ * strings per region. Unset movements are omitted rather than sent empty, so a
+ * region nobody touched stays an empty array.
+ */
+const formatMovementsForBackend = (movementsObj) =>
+  Object.fromEntries(
+    REGIONS.map(({ id, movements }) => {
+      const chosen = movementsObj?.[id] || {};
 
-  if (movementsObj?.shoulder) {
-    Object.entries(movementsObj.shoulder).forEach(([key, val]) => {
-      if (val) {
-        const conf = SHOULDER_MOVEMENTS.find((m) => m.id === key);
-        if (conf) shoulder.push(`${conf.label}_${val}`);
-      }
-    });
-  }
+      const triggers = movements
+        .filter((movement) => chosen[movement.id])
+        .map((movement) => `${movement.label}_${chosen[movement.id]}`);
 
-  if (movementsObj?.neck) {
-    Object.entries(movementsObj.neck).forEach(([key, val]) => {
-      if (val) {
-        const conf = NECK_MOVEMENTS.find((m) => m.id === key);
-        if (conf) neck.push(`${conf.label}_${val}`);
-      }
-    });
-  }
+      return [id, triggers];
+    }),
+  );
 
-  return { shoulder, neck };
-};
-
+/**
+ * The inverse, tolerant of both shapes we might be handed: the stored
+ * "Label_Value" arrays, or the `{ flexion: "Ltd" }` maps the AI returns under
+ * `movements`. An unrecognised region or movement is ignored — an older scenario
+ * has no lower-limb keys at all, and that is not an error.
+ */
 const processIncomingMovements = (incoming) => {
-  const result = { shoulder: {}, neck: {} };
+  const result = emptyMovements();
   if (!incoming) return result;
 
-  if (Array.isArray(incoming.shoulder)) {
-    incoming.shoulder.forEach((str) => {
-      const match = SHOULDER_MOVEMENTS.find((m) =>
-        str.startsWith(m.label + "_"),
-      );
-      if (match) {
-        result.shoulder[match.id] = str.replace(match.label + "_", "");
-      }
-    });
-  } else if (typeof incoming.shoulder === "object") {
-    result.shoulder = { ...incoming.shoulder };
-  }
+  REGIONS.forEach(({ id, movements }) => {
+    const value = incoming[id];
+    if (!value) return;
 
-  if (Array.isArray(incoming.neck)) {
-    incoming.neck.forEach((str) => {
-      const match = NECK_MOVEMENTS.find((m) => str.startsWith(m.label + "_"));
-      if (match) {
-        result.neck[match.id] = str.replace(match.label + "_", "");
-      }
-    });
-  } else if (typeof incoming.neck === "object") {
-    result.neck = { ...incoming.neck };
-  }
+    if (Array.isArray(value)) {
+      value.forEach((str) => {
+        const match = movements.find((m) => str.startsWith(m.label + "_"));
+        if (match) result[id][match.id] = str.replace(match.label + "_", "");
+      });
+    } else if (typeof value === "object") {
+      result[id] = { ...value };
+    }
+  });
 
   return result;
 };
@@ -195,10 +281,7 @@ function ScenarioFormPage() {
       difficulty: "Medium",
       status: "Draft",
       shortDescription: "",
-      movements: {
-        shoulder: {},
-        neck: {},
-      },
+      movements: emptyMovements(),
       html: "",
       scenarioPrompt: "",
       questionsForFeedback: "",
@@ -480,67 +563,48 @@ function ScenarioFormPage() {
                 />
               </div>
 
-              <div>
-                <h3 className="text-sm font-bold text-gray-800 mb-2">
-                  Animation triggers - Shoulder
-                </h3>
-                <div className="grid grid-cols-1 md:grid-cols-2 gap-y-3">
-                  {SHOULDER_MOVEMENTS.map((movement) => (
-                    <div key={`shoulder-${movement.id}`} className="space-y-1">
-                      <label className="text-xs font-semibold text-gray-600 block">
-                        {movement.label}
-                      </label>
-                      <div className="flex flex-wrap gap-4 items-center">
-                        {movement.options.map((opt) => (
-                          <label
-                            key={opt}
-                            className="flex items-center text-xs text-gray-700 cursor-pointer"
-                          >
-                            <input
-                              type="radio"
-                              {...register(`movements.shoulder.${movement.id}`)}
-                              value={opt}
-                              className="mr-1.5 w-3.5 h-3.5 text-blue-600 border-gray-300 focus:ring-blue-500 cursor-pointer"
-                            />
-                            {`${movement.label}_${opt}`}
-                          </label>
-                        ))}
+              {/*
+                One block per region. Every region is always shown: the form has
+                no way to know which one the case is about, and a limitation left
+                unset simply is not sent.
+              */}
+              {REGIONS.map((region, index) => (
+                <div key={region.id} className={index === 0 ? undefined : "pt-2"}>
+                  <h3 className="text-sm font-bold text-gray-800 mb-2">
+                    {`Animation triggers - ${region.label}`}
+                  </h3>
+                  <div className="grid grid-cols-1 md:grid-cols-2 gap-y-3">
+                    {region.movements.map((movement) => (
+                      <div
+                        key={`${region.id}-${movement.id}`}
+                        className="space-y-1"
+                      >
+                        <label className="text-xs font-semibold text-gray-600 block">
+                          {movement.label}
+                        </label>
+                        <div className="flex flex-wrap gap-4 items-center">
+                          {movement.options.map((opt) => (
+                            <label
+                              key={opt}
+                              className="flex items-center text-xs text-gray-700 cursor-pointer"
+                            >
+                              <input
+                                type="radio"
+                                {...register(
+                                  `movements.${region.id}.${movement.id}`,
+                                )}
+                                value={opt}
+                                className="mr-1.5 w-3.5 h-3.5 text-blue-600 border-gray-300 focus:ring-blue-500 cursor-pointer"
+                              />
+                              {`${movement.label}_${opt}`}
+                            </label>
+                          ))}
+                        </div>
                       </div>
-                    </div>
-                  ))}
+                    ))}
+                  </div>
                 </div>
-              </div>
-
-              <div className="pt-2">
-                <h3 className="text-sm font-bold text-gray-800 mb-2">
-                  Animation triggers - Neck
-                </h3>
-                <div className="grid grid-cols-1 md:grid-cols-2 gap-y-3">
-                  {NECK_MOVEMENTS.map((movement) => (
-                    <div key={`neck-${movement.id}`} className="space-y-1">
-                      <label className="text-xs font-semibold text-gray-600 block">
-                        {movement.label}
-                      </label>
-                      <div className="flex flex-wrap gap-4 items-center">
-                        {movement.options.map((opt) => (
-                          <label
-                            key={opt}
-                            className="flex items-center text-xs text-gray-700 cursor-pointer"
-                          >
-                            <input
-                              type="radio"
-                              {...register(`movements.neck.${movement.id}`)}
-                              value={opt}
-                              className="mr-1.5 w-3.5 h-3.5 text-blue-600 border-gray-300 focus:ring-blue-500 cursor-pointer"
-                            />
-                            {`${movement.label}_${opt}`}
-                          </label>
-                        ))}
-                      </div>
-                    </div>
-                  ))}
-                </div>
-              </div>
+              ))}
 
               <div>
                 <label className="block text-xs font-semibold text-gray-700 mb-1">
