@@ -209,6 +209,36 @@ const askReason = async (req, res) => {
   const scenarioId = String(pick(input, "scenarioId") ?? "").trim();
   const sessionId = String(pick(input, "sessionId") ?? "").trim();
 
+  /*
+   * Answered before validation and before any lookup, so a bare POST with no body
+   * at all still gets coaching. The fixed script does not read query, scenarioId
+   * or sessionId, so requiring them would only manufacture a 400 for a request
+   * this route can in fact answer — which is exactly what was happening: the
+   * simulator sends no sessionId, and every call was being rejected.
+   *
+   * Nothing is validated, looked up or awaited here, so the coach cannot 400 on a
+   * thin request, 404 on an unknown scenario, 503 on a spent quota, or hang on a
+   * slow Mongo.
+   *
+   * What arrived is still logged, because a caller that has stopped sending
+   * sessionId is worth knowing about even while it is being tolerated — and it
+   * has to be fixed before the AI path below is switched back on, which needs it.
+   */
+  if (standardResponseEnabled()) {
+    const absent = Object.entries({ query, scenarioId, sessionId })
+      .filter(([, value]) => !value)
+      .map(([field]) => field);
+
+    console.log(
+      `[ask-reason ${reqId}] answered from the fixed script (no AI call) ` +
+        `scenario=${scenarioId || "(none)"} session=${sessionId || "(none)"} ` +
+        `queryChars=${query.length}` +
+        `${absent.length ? ` tolerated-missing=${absent.join(",")}` : ""} ` +
+        `in ${Date.now() - startedAt}ms`,
+    );
+    return res.json({ response: STANDARD_RESPONSE });
+  }
+
   const missing = Object.entries({ query, scenarioId, sessionId })
     .filter(([, value]) => !value)
     .map(([field]) => field);
@@ -224,21 +254,6 @@ const askReason = async (req, res) => {
         `in request body or query string. Received: ${Object.keys(input).sort().join(", ") || "nothing"}. ` +
         `If the body was JSON, check the request sent Content-Type: application/json.`,
     });
-  }
-
-  /*
-   * Answered here, before the scenario and session lookups. Nothing below this
-   * point is needed to produce the fixed answer, and skipping it means the coach
-   * cannot 404 on an unknown scenario, 503 on a spent quota, or hang on a slow
-   * Mongo — the three ways it currently fails a student mid-session.
-   */
-  if (standardResponseEnabled()) {
-    console.log(
-      `[ask-reason ${reqId}] answered from the fixed script (no AI call) ` +
-        `scenario=${scenarioId} session=${sessionId} queryChars=${query.length} ` +
-        `in ${Date.now() - startedAt}ms`,
-    );
-    return res.json({ response: STANDARD_RESPONSE });
   }
 
   /*
