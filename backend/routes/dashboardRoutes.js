@@ -192,6 +192,16 @@ router.get(
         };
       }
 
+      /*
+       * One count per month: sessions started. A row exists from the moment a
+       * student presses Start (see POST /api/sessions/start — it has to exist
+       * before the simulator can call back), so counting rows counts attempts.
+       *
+       * This used to report that same count under the name `completed` and then
+       * invent two more series from it — `active: completed * 0.7` and
+       * `inactive: completed * 0.3` — so the chart drew three bars of which two
+       * were arithmetic on the first.
+       */
       const monthlySessions = await Session.aggregate([
         { $match: sessionMatch },
         {
@@ -200,8 +210,7 @@ router.get(
               year: { $year: "$createdAt" },
               month: { $month: "$createdAt" },
             },
-            completed: { $sum: 1 },
-            totalScore: { $sum: "$score" },
+            started: { $sum: 1 },
           },
         },
         { $sort: { "_id.year": 1, "_id.month": 1 } },
@@ -234,11 +243,11 @@ router.get(
           (m) => m._id.year === year && m._id.month === month,
         );
 
+        // A month with no sessions is still pushed, so the axis always shows six
+        // months rather than collapsing to however many had activity.
         result.push({
           name: monthName,
-          completed: monthData ? monthData.completed : 0,
-          active: monthData ? Math.ceil(monthData.completed * 0.7) : 0,
-          inactive: monthData ? Math.floor(monthData.completed * 0.3) : 0,
+          started: monthData ? monthData.started : 0,
         });
       }
 

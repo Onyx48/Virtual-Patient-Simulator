@@ -291,22 +291,13 @@ function EducatorDashboard() {
           <div className="lg:col-span-2 bg-white p-6 rounded-2xl shadow-sm border border-gray-100 flex flex-col">
             <div className="flex justify-between items-center mb-6">
               <h3 className="font-bold text-gray-800 text-sm">
-                Monthly Student Activity
+                Sessions Started per Month
               </h3>
-              <div className="flex gap-4 text-[10px] font-medium text-gray-500">
-                <div className="flex items-center gap-1.5">
-                  <span className="w-2 h-2 rounded-full bg-blue-600"></span>
-                  Completed
-                </div>
-                <div className="flex items-center gap-1.5">
-                  <span className="w-2 h-2 rounded-full bg-green-500"></span>
-                  Active
-                </div>
-                <div className="flex items-center gap-1.5">
-                  <span className="w-2 h-2 rounded-full bg-gray-900"></span>
-                  Inactive
-                </div>
-              </div>
+              {/*
+                One series, so no legend — the title already says what the bars
+                are. The old chart had three: Completed, plus an Active and an
+                Inactive the backend derived as 70% and 30% of it.
+              */}
             </div>
             <div className="w-full" style={{ height: 260 }}>
               <ResponsiveContainer
@@ -336,6 +327,9 @@ function EducatorDashboard() {
                     axisLine={false}
                     tickLine={false}
                     tick={{ fontSize: 11, fill: "#9ca3af" }}
+                    // Sessions are whole things; with only a handful of them the
+                    // default ticks read 0, 0.5, 1.
+                    allowDecimals={false}
                   />
                   <Tooltip
                     cursor={{ fill: "#f9fafb" }}
@@ -347,22 +341,11 @@ function EducatorDashboard() {
                     }}
                   />
                   <Bar
-                    dataKey="completed"
+                    dataKey="started"
+                    name="Sessions started"
                     fill="#2563eb"
                     radius={[3, 3, 0, 0]}
-                    barSize={8}
-                  />
-                  <Bar
-                    dataKey="active"
-                    fill="#10b981"
-                    radius={[3, 3, 0, 0]}
-                    barSize={8}
-                  />
-                  <Bar
-                    dataKey="inactive"
-                    fill="#111827"
-                    radius={[3, 3, 0, 0]}
-                    barSize={8}
+                    barSize={22}
                   />
                 </BarChart>
               </ResponsiveContainer>
