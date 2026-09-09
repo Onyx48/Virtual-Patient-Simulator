@@ -26,6 +26,55 @@ const getAuthHeaders = () => {
   return { headers: { Authorization: `Bearer ${token}` } };
 };
 
+/*
+ * Mirrors backend/utils/inviteStatus.js. `pending` is styled as a warning
+ * rather than a neutral state on purpose — it means this person was never sent
+ * a way to log in, which is a problem to fix, not a stage to wait out.
+ */
+const INVITE_BADGES = {
+  active: { label: "Active", className: "bg-green-100 text-green-800" },
+  invited: { label: "Invited", className: "bg-blue-100 text-blue-800" },
+  pending: { label: "Pending", className: "bg-amber-100 text-amber-800" },
+};
+
+function InviteStatusCell({ student, canResend, isBusy, onResend }) {
+  const badge = INVITE_BADGES[student.inviteStatus] || INVITE_BADGES.pending;
+  const sentAt = student.credentialsSentAt
+    ? new Date(student.credentialsSentAt).toLocaleDateString()
+    : null;
+
+  const title =
+    student.inviteStatus === "active"
+      ? "This student has logged in successfully."
+      : sentAt
+        ? `Login details were emailed on ${sentAt}, but the account has not been used yet.`
+        : "No login details have ever reached this student. Click to send them.";
+
+  return (
+    <div className="flex flex-col items-start gap-1">
+      <span
+        title={title}
+        className={`inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium ${badge.className}`}
+      >
+        {badge.label}
+      </span>
+      {canResend && (
+        <button
+          onClick={onResend}
+          disabled={isBusy}
+          className="text-xs text-blue-600 hover:text-blue-800 underline decoration-blue-300 underline-offset-2 disabled:opacity-50 disabled:no-underline"
+        >
+          {isBusy
+            ? "Sending…"
+            : student.inviteStatus === "pending"
+              ? "Send login"
+              : "Resend"}
+        </button>
+      )}
+    </div>
+  );
+}
+
 function StudentPage({ role }) {
   const { user } = useAuth();
 
@@ -36,9 +85,9 @@ function StudentPage({ role }) {
   const showGroupColumn = role === "educator" || role === "school_admin";
   const showScenariosColumn = role !== "school_admin";
   const canManageStudents = role !== "school_admin";
-  // ID, Name, Email, School, Progress, Transcript, Action are always present.
+  // ID, Name, Email, School, Progress, Login, Transcript, Action are always present.
   const columnCount =
-    7 + (showGroupColumn ? 1 : 0) + (showScenariosColumn ? 1 : 0);
+    8 + (showGroupColumn ? 1 : 0) + (showScenariosColumn ? 1 : 0);
 
   const [students, setStudents] = useState([]);
   const [groups, setGroups] = useState([]);
@@ -69,6 +118,11 @@ function StudentPage({ role }) {
   const [selectedStudent, setSelectedStudent] = useState(null);
   const [editingStudent, setEditingStudent] = useState(null);
 
+  // Which row's resend is in flight, so only that badge shows a spinner and a
+  // double click cannot mail two different passwords in a row (the second would
+  // win and the first email would be dead on arrival).
+  const [resendingId, setResendingId] = useState(null);
+
   const [isConfirmModalOpen, setIsConfirmModalOpen] = useState(false);
   const [confirmTitle, setConfirmTitle] = useState("");
   const [confirmMessage, setConfirmMessage] = useState("");
@@ -95,6 +149,8 @@ function StudentPage({ role }) {
           ? `${Math.round(student.bestScore * 100)}%`
           : null,
         totalSessions: student.totalSessions || 0,
+        inviteStatus: student.inviteStatus || "pending",
+        credentialsSentAt: student.credentialsSentAt || null,
         originalData: student,
       }));
       setStudents(mappedData);
@@ -251,6 +307,54 @@ function StudentPage({ role }) {
     setIsConfirmModalOpen(true);
   };
 
+  /*
+   * Confirmed rather than fired on the first click, because it is destructive in
+   * a way the label does not suggest: the stored password is only a bcrypt hash,
+   * so it cannot be read back and re-sent. A resend issues a *new* password and
+   * the old one stops working — which locks the student out if they had already
+   * received and were using the first one.
+   */
+  const requestResend = (student) => {
+    setConfirmTitle("Send new login details");
+    setConfirmMessage(
+      `Email a newly generated password to ${student.email}. ` +
+        "Their current password will stop working immediately — the existing one " +
+        "cannot be re-sent because it is only stored encrypted.",
+    );
+    setOnConfirmAction(() => async () => {
+      setResendingId(student.id);
+      try {
+        const { data } = await axios.post(
+          `/api/users/${student.id}/resend-invite`,
+          {},
+          getAuthHeaders(),
+        );
+        // Reflect the new status without a refetch, which would otherwise be
+        // served the stale cached roster.
+        setStudents((prev) =>
+          prev.map((s) =>
+            s.id === student.id
+              ? {
+                  ...s,
+                  inviteStatus: s.inviteStatus === "active" ? "active" : "invited",
+                  credentialsSentAt: data.credentialsSentAt || new Date().toISOString(),
+                }
+              : s,
+          ),
+        );
+        toast.success(data.message || "Login details sent.");
+      } catch (error) {
+        toast.error(
+          error.response?.data?.message ||
+            "Could not send the login details. Nothing was changed.",
+        );
+      } finally {
+        setResendingId(null);
+      }
+    });
+    setIsConfirmModalOpen(true);
+  };
+
   const handleSaveStudent = async (formData) => {
     try {
       if (formData.id) {
@@ -269,7 +373,7 @@ function StudentPage({ role }) {
         );
         toast.success("Student updated successfully.");
       } else {
-        await axios.post(
+        const { data } = await axios.post(
           "/api/users",
           {
             name: formData.name,
@@ -280,7 +384,20 @@ function StudentPage({ role }) {
           },
           getAuthHeaders(),
         );
-        toast.success("Student created successfully.");
+        /*
+         * The account is created either way, so this is not an error — but it is
+         * not a plain success either. Reporting only "created" is what let
+         * students be added with no idea their credentials never went out.
+         */
+        if (data?.emailSent === false) {
+          toast.error(
+            `Student created, but the login email was not sent. ${data.emailError || ""} ` +
+              "Use Resend in the Login column once email is working.",
+            { duration: 9000 },
+          );
+        } else {
+          toast.success("Student created and login details emailed.");
+        }
       }
       await Promise.all([fetchStudents(), showGroupColumn ? fetchGroups() : Promise.resolve()]);
       setIsStudentModalOpen(false);
@@ -510,6 +627,12 @@ function StudentPage({ role }) {
                   Scenarios{getSortIcon("assignedScenariosCount")}
                 </th>
               )}
+              <th
+                className="px-6 py-4 text-left text-xs font-semibold text-gray-500 uppercase tracking-wider cursor-pointer select-none hover:text-gray-700"
+                onClick={() => handleSort("inviteStatus")}
+              >
+                Login{getSortIcon("inviteStatus")}
+              </th>
               <th className="px-6 py-4 text-left text-xs font-semibold text-gray-500 uppercase tracking-wider">
                 Transcript
               </th>
@@ -591,6 +714,14 @@ function StudentPage({ role }) {
                       )}
                     </td>
                   )}
+                  <td className="px-6 py-4 whitespace-nowrap text-sm">
+                    <InviteStatusCell
+                      student={student}
+                      canResend={canManageStudents}
+                      isBusy={resendingId === student.id}
+                      onResend={() => requestResend(student)}
+                    />
+                  </td>
                   <td className="px-6 py-4 whitespace-nowrap text-sm">
                     <button
                       onClick={() =>

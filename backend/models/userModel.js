@@ -68,6 +68,22 @@ const userSchema = new mongoose.Schema(
       ref: "Group",
       default: null,
     },
+    /*
+     * When the welcome email carrying this account's credentials was last
+     * accepted by SES. Null means nobody has ever been told how to log in —
+     * either mail was unconfigured or the send failed. Together with
+     * `lastLoginAt` this drives the invite status shown on the roster, so an
+     * account that silently never received credentials is visible instead of
+     * looking identical to one that did.
+     */
+    credentialsSentAt: {
+      type: Date,
+      default: null,
+    },
+    lastLoginAt: {
+      type: Date,
+      default: null,
+    },
   },
   {
     timestamps: true,

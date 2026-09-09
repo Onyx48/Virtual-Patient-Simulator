@@ -6,31 +6,16 @@ import { protect } from "../middleware/authMiddleware.js";
 import { checkAccess } from "../middleware/roleAccessMiddleware.js";
 import redisClient from "../utils/redisClient.js";
 import { assignedStudentIdsByScenario } from "../utils/scenarioAssignment.js";
+import {
+  studentsCacheKey,
+  invalidateStudentsCache,
+} from "../utils/studentsCache.js";
+import { inviteStatusOf } from "../utils/inviteStatus.js";
 
 const router = express.Router();
 const STUDENTS_CACHE_TTL = 120;
 
 const isRedisReady = () => redisClient && redisClient.status === "ready";
-
-const studentsCacheKey = (scope) => {
-  if (scope.educatorId) return `students:educator:${scope.educatorId}`;
-  if (scope.schoolId) return `students:school:${scope.schoolId}`;
-  return "students:all";
-};
-
-const invalidateStudentsCache = async (scope) => {
-  if (!isRedisReady()) return;
-  try {
-    const keys = [
-      scope?.educatorId ? `students:educator:${scope.educatorId}` : null,
-      scope?.schoolId ? `students:school:${scope.schoolId}` : null,
-      "students:all",
-    ].filter(Boolean);
-    await Promise.all(keys.map((k) => redisClient.del(k)));
-  } catch (err) {
-    console.error("Redis students cache invalidation error:", err.message);
-  }
-};
 
 router.post("/", protect, checkAccess("manageStudents"), async (req, res) => {
   const { name, email, password } = req.body;
@@ -101,6 +86,9 @@ router.get("/", protect, checkAccess("viewStudents"), async (req, res) => {
         role: "student",
         supervisor: req.scope.educatorId,
       })
+        // Without this the bcrypt hash is spread into the response by
+        // `...student.toObject()` below.
+        .select("-password")
         .populate("schoolId", "schoolName")
         .populate("groupId", "name");
     } else if (req.scope.schoolId) {
@@ -108,10 +96,12 @@ router.get("/", protect, checkAccess("viewStudents"), async (req, res) => {
         role: "student",
         schoolId: req.scope.schoolId,
       })
+        .select("-password")
         .populate("schoolId", "schoolName")
         .populate("groupId", "name");
     } else {
       students = await User.find({ role: "student" })
+        .select("-password")
         .populate("schoolId", "schoolName")
         .populate("groupId", "name");
     }
@@ -181,6 +171,9 @@ router.get("/", protect, checkAccess("viewStudents"), async (req, res) => {
         avgScore: sessionStat?.avgScore || null,
         totalSessions: sessionStat?.totalSessions || 0,
         groupId: student.groupId || null,
+        // Derived server-side so the roster and any other consumer cannot
+        // disagree about what counts as invited — see utils/inviteStatus.js.
+        inviteStatus: inviteStatusOf(student),
       };
     });
 
@@ -199,10 +192,9 @@ router.get("/", protect, checkAccess("viewStudents"), async (req, res) => {
 
 router.get("/:id", protect, checkAccess("viewStudents"), async (req, res) => {
   try {
-    const student = await User.findById(req.params.id).populate(
-      "schoolId",
-      "schoolName",
-    );
+    const student = await User.findById(req.params.id)
+      .select("-password")
+      .populate("schoolId", "schoolName");
 
     if (!student || student.role !== "student") {
       return res.status(404).json({ message: "Student not found" });

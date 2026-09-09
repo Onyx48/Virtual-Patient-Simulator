@@ -262,6 +262,14 @@ router.post(
         { expiresIn: "24h" },
       );
 
+      /*
+       * Stamped without awaiting and without failing the login: this only feeds
+       * the roster's invite status, and a write error here must not stop someone
+       * with correct credentials from getting in.
+       */
+      User.updateOne({ _id: user._id }, { $set: { lastLoginAt: new Date() } })
+        .catch((err) => console.error("[AUTH] lastLoginAt update failed:", err.message));
+
       res.json({
         _id: user._id,
         name: user.name,

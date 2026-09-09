@@ -2,6 +2,7 @@ import express from "express";
 import Group from "../models/groupModel.js";
 import User from "../models/userModel.js";
 import { protect } from "../middleware/authMiddleware.js";
+import { invalidateStudentsCache } from "../utils/studentsCache.js";
 
 const router = express.Router();
 
@@ -116,6 +117,12 @@ router.delete("/:id", protect, requireEducatorOrAdmin, async (req, res) => {
 
     await User.updateMany({ groupId: group._id }, { $set: { groupId: null } });
     await Group.findByIdAndDelete(req.params.id);
+    // The cached roster carries each student's group name, so it is wrong the
+    // moment those members are turned loose.
+    await invalidateStudentsCache({
+      schoolId: group.schoolId,
+      educatorIds: [group.educatorId],
+    });
     res.json({ message: "Group deleted" });
   } catch (err) {
     res.status(500).json({ message: err.message });

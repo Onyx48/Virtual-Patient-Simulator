@@ -38,18 +38,25 @@ const getJweKey = () => {
 /*
  * Where a student is sent to run a scenario.
  *
- * The simulator is told which scenario to run by GET /api/scenarios/json, not
- * by anything in this URL, so there is nothing to sign or encrypt here — the
- * link is the same for everyone. This deliberately mirrors the educator Test
- * button, which opens VITE_SIMULATOR_URL after publishing to the same slot.
+ * The last path segment is the room, and it is this session's own id rather than
+ * one fixed room for everybody. Sharing a single room meant two students who
+ * started at the same time were dropped into the same screenshare — each seeing
+ * the other's consultation, and the second arrival displacing the first.
  *
- * SIMULATOR_URL is read first so the API can be pointed somewhere else without
- * touching the frontend build; VITE_SIMULATOR_URL is the shared default.
+ * The room is created implicitly by being visited, so nothing has to be
+ * provisioned ahead of time; the id only has to be unique and unguessable, which
+ * the session's ObjectId already is.
+ *
+ * ROOM_BASE_URL overrides the host without a frontend rebuild.
  */
-const getSimulatorUrl = () =>
-  process.env.SIMULATOR_URL ||
-  process.env.VITE_SIMULATOR_URL ||
-  "https://share.streampixel.io/6aa14ef480d62d728d8ba6e8";
+const ROOM_BASE_URL = () =>
+  (process.env.ROOM_BASE_URL || "https://screenshare.gospacesxr.com").replace(
+    /\/+$/,
+    "",
+  );
+
+const getRoomUrl = (sessionId) =>
+  `${ROOM_BASE_URL()}/${sessionId}?admin=true`;
 
 router.post(
   "/start",
@@ -118,7 +125,13 @@ router.post(
       // session_id.
       setLiveScenario(scenario, { userId: req.user._id, sessionId });
 
-      res.json({ session_id: sessionId, redirect_url: getSimulatorUrl() });
+      const redirectUrl = getRoomUrl(sessionId);
+      console.log(
+        `[SESSION] started session=${sessionId} student=${req.user._id} ` +
+          `scenario=${scenario._id} room=${redirectUrl}`,
+      );
+
+      res.json({ session_id: sessionId, redirect_url: redirectUrl });
     } catch (err) {
       console.error("Start Session Error:", err);
       res
@@ -145,10 +158,17 @@ router.post(
  * system/user/assistant, so anything malformed is dropped rather than failing
  * the whole save — losing one line beats losing the session and its score.
  */
-const normaliseTranscription = (history) => {
-  if (!Array.isArray(history)) return [];
+const normaliseTranscription = (history, sessionId) => {
+  if (!Array.isArray(history)) {
+    if (history != null) {
+      console.warn(
+        `[SESSION] transcript was ${typeof history}, not an array session=${sessionId} — storing none`,
+      );
+    }
+    return [];
+  }
 
-  return history.reduce((acc, entry) => {
+  const normalised = history.reduce((acc, entry) => {
     if (!entry || typeof entry !== "object") return acc;
 
     const role = entry.role === "model" ? "assistant" : entry.role;
@@ -160,6 +180,20 @@ const normaliseTranscription = (history) => {
     acc.push({ role, content: String(content) });
     return acc;
   }, []);
+
+  // Dropping entries is intentional (see above) but was completely silent, so a
+  // transcript quietly losing half its turns to an unexpected role name looked
+  // like the student barely spoke.
+  const dropped = history.length - normalised.length;
+  if (dropped > 0) {
+    const roles = [...new Set(history.map((e) => e?.role))].join(",");
+    console.warn(
+      `[SESSION] dropped ${dropped}/${history.length} malformed transcript entries ` +
+        `session=${sessionId} rolesSeen=${roles}`,
+    );
+  }
+
+  return normalised;
 };
 
 router.post("/complete", async (req, res) => {
@@ -205,14 +239,27 @@ router.post("/complete", async (req, res) => {
 
     const { transcription, feedback, score } = await fetchSessionState(session_id);
 
+    if (!Number.isFinite(Number(score))) {
+      console.warn(
+        `[SESSION] score was ${JSON.stringify(score)} session=${session_id} — storing 0, ` +
+          "which is indistinguishable from a genuinely bad consultation on the dashboard",
+      );
+    }
+
     const session = await Session.create({
       session_id,
       student_id: String(student_id),
       scenario_id: String(scenario_id),
-      transcription: normaliseTranscription(transcription),
+      transcription: normaliseTranscription(transcription, session_id),
       feedback: feedback ?? "",
       score: Number.isFinite(Number(score)) ? Number(score) : 0,
     });
+
+    console.log(
+      `[SESSION] recorded session=${session_id} _id=${session._id} ` +
+        `student=${student_id} scenario=${scenario_id} ` +
+        `turns=${session.transcription.length} score=${session.score}`,
+    );
 
     res.status(201).json({
       status: "success",

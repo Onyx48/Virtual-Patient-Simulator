@@ -6,6 +6,8 @@ import { checkAccess } from "../middleware/roleAccessMiddleware.js";
 import { sendWelcomeEmail } from "../utils/emailService.js";
 import crypto from "crypto";
 import redisClient from "../utils/redisClient.js";
+import { invalidateStudentsCache } from "../utils/studentsCache.js";
+import { publicMessage } from "../utils/appEnv.js";
 
 const router = express.Router();
 const USERS_CACHE_TTL = 120; // seconds
@@ -20,7 +22,18 @@ const usersListCacheKey = (scopeSchoolId, role) => {
 
 const isRedisReady = () => redisClient && redisClient.status === "ready";
 
-const invalidateUsersCache = async (schoolId) => {
+/*
+ * `educatorIds` are the supervisors whose student lists this change touches —
+ * on a reassignment, both the old and the new one.
+ *
+ * Creating a student here has to purge the students cache as well as the users
+ * cache: GET /api/students is cached separately, so clearing only `users:*`
+ * left an educator's roster claiming for two minutes that the student they had
+ * just added did not exist.
+ */
+const invalidateUsersCache = async (schoolId, educatorIds = []) => {
+  await invalidateStudentsCache({ schoolId, educatorIds });
+
   if (!isRedisReady()) return;
   try {
     const roles = ["student", "educator", "school_admin", "all"];
@@ -180,13 +193,28 @@ router.post("/", protect, checkAccess("manageUsers"), async (req, res) => {
       }
     }
 
+    /*
+     * A failed send must not undo the account, which already exists — but it
+     * must not be invisible either. The outcome is reported back so the UI can
+     * say the credentials did not go out; swallowing it silently meant accounts
+     * were created for people who never received a way to log in.
+     */
+    let emailSent = false;
+    let emailError = null;
     try {
       await sendWelcomeEmail({ toEmail: email, name, password });
+      emailSent = true;
+      newUser.credentialsSentAt = new Date();
+      await newUser.save();
     } catch (emailErr) {
+      emailError =
+        emailErr.code === "MAIL_NOT_CONFIGURED"
+          ? "Email is not configured on the server, so no credentials were sent."
+          : publicMessage(emailErr, "The welcome email could not be sent.");
       console.error("[USER] Failed to send welcome email for:", email, emailErr);
     }
 
-    await invalidateUsersCache(finalSchoolId);
+    await invalidateUsersCache(finalSchoolId, [newUser.supervisor]);
 
     if (normalizedRole === "school_admin") {
       await School.findByIdAndUpdate(finalSchoolId, {
@@ -208,7 +236,7 @@ router.post("/", protect, checkAccess("manageUsers"), async (req, res) => {
       department: newUser.department,
       groupId: newUser.groupId,
     };
-    res.status(201).json({ success: true, user: userResponse });
+    res.status(201).json({ success: true, user: userResponse, emailSent, emailError });
   } catch (err) {
     if (err.name === "ValidationError")
       return res.status(400).json({ message: err.message });
@@ -216,6 +244,86 @@ router.post("/", protect, checkAccess("manageUsers"), async (req, res) => {
     res.status(500).json({ message: err.message });
   }
 });
+
+/*
+ * RESEND CREDENTIALS
+ *
+ * Passwords are stored only as bcrypt hashes, so the original cannot be read
+ * back and re-sent — there is no way to "email them the same password". A
+ * resend therefore issues a fresh one and invalidates the old, which is also
+ * the safer behaviour: a password that has been sitting unclaimed in an inbox
+ * is exactly the one worth rotating. The response says so explicitly so the UI
+ * can warn before doing it.
+ */
+router.post(
+  "/:id/resend-invite",
+  protect,
+  checkAccess("manageUsers"),
+  async (req, res) => {
+    try {
+      const user = await User.findById(req.params.id);
+      if (!user) return res.status(404).json({ message: "User not found" });
+
+      // Same school boundary the update and delete handlers enforce, so a
+      // school_admin cannot mail a new password to somebody else's user.
+      if (
+        req.scope.schoolId &&
+        user.schoolId?.toString() !== req.scope.schoolId.toString()
+      ) {
+        return res.status(403).json({
+          message: "Access denied: Cannot manage user from another school",
+        });
+      }
+      if (
+        req.scope.educatorId &&
+        user.supervisor?.toString() !== req.scope.educatorId.toString()
+      ) {
+        return res.status(403).json({
+          message: "Access denied: This user is not one of yours",
+        });
+      }
+
+      const password = crypto.randomBytes(8).toString("hex");
+
+      /*
+       * Sent before the new password is persisted. If SES rejects it, the
+       * account keeps the credentials it already had — whereas saving first
+       * would leave the user locked out with a password that only ever existed
+       * inside an email that never arrived.
+       */
+      try {
+        await sendWelcomeEmail({ toEmail: user.email, name: user.name, password });
+      } catch (emailErr) {
+        console.error("[USER] Resend failed for:", user.email, emailErr);
+        return res.status(502).json({
+          success: false,
+          message:
+            emailErr.code === "MAIL_NOT_CONFIGURED"
+              ? "Email is not configured on the server, so nothing was sent. The existing password is unchanged."
+              : publicMessage(
+                  emailErr,
+                  "The email could not be sent. The existing password is unchanged.",
+                ),
+        });
+      }
+
+      user.password = password; // hashed by the pre-save hook
+      user.credentialsSentAt = new Date();
+      await user.save();
+
+      await invalidateUsersCache(user.schoolId, [user.supervisor]);
+
+      res.json({
+        success: true,
+        message: `New credentials sent to ${user.email}. Their previous password no longer works.`,
+        credentialsSentAt: user.credentialsSentAt,
+      });
+    } catch (err) {
+      console.error("Server Error in POST /api/users/:id/resend-invite:", err);
+      res.status(500).json({ message: publicMessage(err, "Server error") });
+    }
+  },
+);
 
 // BULK CREATE USERS (STUDENTS OR EDUCATORS)
 router.post("/bulk", protect, checkAccess("manageUsers"), async (req, res) => {
@@ -302,7 +410,7 @@ router.post("/bulk", protect, checkAccess("manageUsers"), async (req, res) => {
     }
   }
 
-  await invalidateUsersCache(creator.schoolId);
+  await invalidateUsersCache(creator.schoolId, [creator._id]);
 
   return res
     .status(207)
@@ -349,6 +457,12 @@ router.put("/:id", protect, checkAccess("manageUsers"), async (req, res) => {
     const user = await User.findById(id).populate("schoolId");
     if (!user) return res.status(404).json({ message: "User not found" });
 
+    // Captured before any mutation: if the supervisor changes below, the
+    // previous educator's cached roster has to be purged too or it keeps
+    // listing a student who has moved to someone else.
+    const previousSupervisor = user.supervisor;
+    const previousSchoolId = user.schoolId?._id || user.schoolId;
+
     if (
       req.scope.schoolId &&
       user.schoolId?._id.toString() !== req.scope.schoolId.toString()
@@ -393,7 +507,13 @@ router.put("/:id", protect, checkAccess("manageUsers"), async (req, res) => {
     }
 
     const updatedUser = await user.save();
-    await invalidateUsersCache(updatedUser.schoolId);
+    await invalidateUsersCache(updatedUser.schoolId, [
+      updatedUser.supervisor,
+      previousSupervisor,
+    ]);
+    if (previousSchoolId?.toString() !== updatedUser.schoolId?.toString()) {
+      await invalidateUsersCache(previousSchoolId, [previousSupervisor]);
+    }
     res.status(200).json({ success: true, user: updatedUser });
   } catch (err) {
     res.status(500).json({ message: err.message });
@@ -424,7 +544,7 @@ router.delete("/:id", protect, checkAccess("manageUsers"), async (req, res) => {
       });
     }
     await User.findByIdAndDelete(id);
-    await invalidateUsersCache(user.schoolId);
+    await invalidateUsersCache(user.schoolId, [user.supervisor]);
     res
       .status(200)
       .json({ success: true, message: "User deleted successfully" });
