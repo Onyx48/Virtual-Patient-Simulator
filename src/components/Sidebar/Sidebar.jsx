@@ -18,6 +18,32 @@ const hasAccess = (userRole, allowedRoles) => {
   return allowedRoles.includes(userRole);
 };
 
+// Trailing slashes stripped so the uuid is not appended to a "//".
+const ROOM_BASE_URL = (
+  import.meta.env.VITE_ROOM_BASE_URL || "https://screenshare.gospacesxr.com"
+).replace(/\/+$/, "");
+
+/*
+ * crypto.randomUUID only exists in a secure context, so it is there on https and
+ * on localhost but not when the dev server is reached over plain http by IP. The
+ * fallback is not cryptographically strong and does not need to be — the uuid
+ * only has to be unlikely to collide with another room opened at the same moment.
+ */
+const randomUuid = () => {
+  if (typeof crypto !== "undefined" && crypto.randomUUID) return crypto.randomUUID();
+  return "xxxxxxxx-xxxx-4xxx-yxxx-xxxxxxxxxxxx".replace(/[xy]/g, (char) => {
+    const value = (Math.random() * 16) | 0;
+    return (char === "x" ? value : (value & 0x3) | 0x8).toString(16);
+  });
+};
+
+/*
+ * A fresh room every time Create Room is clicked — that is what makes it
+ * "create". Reusing one uuid would drop everyone who clicked into the same call.
+ * admin=true is what gives the clicker host controls in the room.
+ */
+const buildRoomUrl = () => `${ROOM_BASE_URL}/${randomUuid()}?admin=true`;
+
 function Sidebar({ logo }) {
   const { user, logout } = useAuth();
   const { t } = useLanguage();
@@ -60,17 +86,15 @@ function Sidebar({ logo }) {
     {
       name: t("nav.createRoom"),
       /*
-       * The hosted simulator, opened directly. This used to point at
+       * A new screenshare room, opened directly. This used to point at
        * /create-room/<userId>, which has no route and no page — the click fell
        * through to the catch-all in ContentArea.jsx and silently bounced back to
        * the dashboard, so the button looked broken.
        *
-       * Set VITE_SIMULATOR_URL to move it without a code change; the same var
-       * drives the educator card's Test button.
+       * Built per click rather than held as a constant, because each room needs
+       * its own uuid. Set VITE_ROOM_BASE_URL to move the host.
        */
-      href:
-        import.meta.env.VITE_SIMULATOR_URL ||
-        "https://share.streampixel.io/6aa14ef480d62d728d8ba6e8",
+      buildHref: buildRoomUrl,
       icon: <VideoCameraIcon className="w-5 h-5" />,
       allowedRoles: ["superadmin", "school_admin", "educator", "student"],
     },
@@ -142,18 +166,27 @@ function Sidebar({ logo }) {
             "flex items-center gap-3 px-3 py-2.5 rounded-lg text-sm font-medium transition-colors duration-200";
 
           /*
-           * An item with `href` leaves the app, so it is a plain anchor: a
+           * An item with `buildHref` leaves the app, so it is a plain anchor: a
            * NavLink would try to resolve it as an in-app route. New tab, and
-           * noreferrer alongside noopener because the simulator has no business
-           * seeing which page sent the student.
+           * noreferrer alongside noopener because the room host has no business
+           * seeing which page sent the user.
+           *
+           * The click is handled rather than left to the browser so a second
+           * click gets a second room — the href alone is fixed until the sidebar
+           * re-renders, which it has no reason to do. It is still set, so
+           * middle-click and "copy link address" give a working room too.
            */
-          if (item.href) {
+          if (item.buildHref) {
             return (
               <a
                 key={item.name}
-                href={item.href}
+                href={item.buildHref()}
                 target="_blank"
                 rel="noopener noreferrer"
+                onClick={(event) => {
+                  event.preventDefault();
+                  window.open(item.buildHref(), "_blank", "noopener,noreferrer");
+                }}
                 className={`${linkClasses} hover:bg-gray-800 hover:text-white`}
               >
                 {item.icon}
