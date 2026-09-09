@@ -178,20 +178,16 @@ const askReason = async (req, res) => {
     }
 
     /*
-     * The session gates the endpoint. It is unauthenticated because the caller
-     * is the external simulator, which holds no JWT — requiring a real session
-     * id is what stops an anonymous caller spending Gemini quota at will.
+     * Looked up only for its stored transcript, which is the fallback when the
+     * caller sends none. It is not a gate: see below.
+     *
+     * Note this leaves the endpoint unauthenticated with nothing throttling it —
+     * the caller is the external simulator, which holds no JWT. A shared secret
+     * header is the fix if AI spend from unknown callers becomes a problem.
      */
     const session = await Session.findOne({ session_id: sessionId })
       .select("transcription")
       .lean();
-
-    if (!session) {
-      console.warn(`[ask-reason] no session with session_id ${sessionId}`);
-      return res
-        .status(404)
-        .json({ message: `No session found with sessionId: ${sessionId}` });
-    }
 
     /*
      * The caller's transcript wins. The simulator owns the conversation and is
@@ -201,7 +197,27 @@ const askReason = async (req, res) => {
      */
     const transcriptionText =
       transcriptionToText(pick(input, "transcription")) ||
-      transcriptionToText(session.transcription);
+      transcriptionToText(session?.transcription);
+
+    if (!session) {
+      /*
+       * An unknown session id is not fatal. Old clients send a Bubble
+       * StreamSessionId for a run we never recorded, so the lookup can only
+       * fail — and the session was never the point: the transcript is what the
+       * coach reasons about, and the caller supplies it. A 404 here would leave
+       * those clients with no coach at all.
+       *
+       * If the request carries no transcript either, the model is asked about an
+       * empty consultation, which the prompt handles by telling the student to
+       * begin rather than inventing one. Logged, because a sudden run of these
+       * means sessions have stopped being recorded.
+       */
+      console.warn(
+        `[ask-reason] no session stored for session_id ${sessionId}; ` +
+          `continuing with the transcript from the request ` +
+          `(${transcriptionText.length} chars)`,
+      );
+    }
 
     console.log(
       `[ask-reason] scenarioId = ${scenarioId}, sessionId = ${sessionId}, ` +
