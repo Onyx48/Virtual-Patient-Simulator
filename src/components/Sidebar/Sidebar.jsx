@@ -22,8 +22,6 @@ function Sidebar({ logo }) {
   const { user, logout } = useAuth();
   const { t } = useLanguage();
   const userRole = user?.role;
-  // 1. Get the user's ID from the authentication context.
-  const userId = user?._id;
 
   const menuItems = [
     {
@@ -61,7 +59,18 @@ function Sidebar({ logo }) {
   const supportItems = [
     {
       name: t("nav.createRoom"),
-      path: "/create-room", // This is the base path
+      /*
+       * The hosted simulator, opened directly. This used to point at
+       * /create-room/<userId>, which has no route and no page — the click fell
+       * through to the catch-all in ContentArea.jsx and silently bounced back to
+       * the dashboard, so the button looked broken.
+       *
+       * Set VITE_SIMULATOR_URL to move it without a code change; the same var
+       * drives the educator card's Test button.
+       */
+      href:
+        import.meta.env.VITE_SIMULATOR_URL ||
+        "https://share.streampixel.io/6aa14ef480d62d728d8ba6e8",
       icon: <VideoCameraIcon className="w-5 h-5" />,
       allowedRoles: ["superadmin", "school_admin", "educator", "student"],
     },
@@ -72,9 +81,6 @@ function Sidebar({ logo }) {
       allowedRoles: ["superadmin", "school_admin", "educator", "student"],
     },
   ];
-
-  // "Create Room" needs special-case pathing, so match on path not label.
-  const CREATE_ROOM_PATH = "/create-room";
 
   return (
     <aside className="fixed top-0 left-0 h-screen w-64 bg-[#0F0F0F] text-gray-400 flex flex-col transition-all duration-300 z-50 font-sans">
@@ -128,23 +134,40 @@ function Sidebar({ logo }) {
         <div className="my-6 border-t border-gray-800 mx-3"></div>
 
         {supportItems.map((item) => {
-          // 2. Check if the current user has access to this menu item
           if (!hasAccess(userRole, item.allowedRoles)) {
             return null;
           }
 
-          // 3. Dynamically create the path for "Create Room"
-          let finalPath = item.path;
-          if (item.path === CREATE_ROOM_PATH && userId) {
-            finalPath = `${item.path}/${userId}`;
+          const linkClasses =
+            "flex items-center gap-3 px-3 py-2.5 rounded-lg text-sm font-medium transition-colors duration-200";
+
+          /*
+           * An item with `href` leaves the app, so it is a plain anchor: a
+           * NavLink would try to resolve it as an in-app route. New tab, and
+           * noreferrer alongside noopener because the simulator has no business
+           * seeing which page sent the student.
+           */
+          if (item.href) {
+            return (
+              <a
+                key={item.name}
+                href={item.href}
+                target="_blank"
+                rel="noopener noreferrer"
+                className={`${linkClasses} hover:bg-gray-800 hover:text-white`}
+              >
+                {item.icon}
+                {item.name}
+              </a>
+            );
           }
 
           return (
             <NavLink
               key={item.name}
-              to={finalPath} // 4. Use the final, potentially dynamic path
+              to={item.path}
               className={({ isActive }) =>
-                `flex items-center gap-3 px-3 py-2.5 rounded-lg text-sm font-medium transition-colors duration-200 ${
+                `${linkClasses} ${
                   isActive
                     ? "bg-orange-500/10 text-orange-500"
                     : "hover:bg-gray-800 hover:text-white"
