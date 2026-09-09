@@ -7,6 +7,7 @@ import { generateTextWithFallback } from "../utils/aiText.js";
 import { htmlToText, questionsToArray } from "../utils/bubbleScenario.js";
 import { findLegacyScenario } from "../data/legacyScenarios.js";
 import { publicMessage } from "../utils/appEnv.js";
+import { startTrace } from "../utils/routeTrace.js";
 
 const router = express.Router();
 
@@ -164,17 +165,6 @@ const readInput = (req) => {
 };
 
 /*
- * Every line for one call carries the same short id.
- *
- * The coach is called by an external simulator, concurrently, for different
- * students — so without a correlator the log is interleaved fragments and there
- * is no way to tell which "answered by groq" belongs to which rejected request.
- * Short and random rather than sequential: it only has to be unique among the
- * requests in flight.
- */
-const newRequestId = () => Math.random().toString(36).slice(2, 8);
-
-/*
  * Transcripts and coach answers are patient-consultation material, so contents
  * are off by default and only counts are logged. Set AI_DEBUG_LOG=true to get
  * excerpts when diagnosing a bad answer — a deliberate, temporary choice on a
@@ -189,25 +179,38 @@ const excerpt = (value, limit = 400) => {
 };
 
 const askReason = async (req, res) => {
-  const reqId = newRequestId();
-  const startedAt = Date.now();
+  /*
+   * startTrace logs the request line and the raw body. The failures worth
+   * diagnosing on this route are malformed requests — a caller sending the wrong
+   * Content-Type reached the handler with an empty body, and the access log showed
+   * only a 400 with no hint that the header was the cause. It also carries the
+   * correlator: the simulator calls this route concurrently for different
+   * students, so without one the log is interleaved fragments.
+   */
+  const trace = startTrace("ask-reason", req);
+
   const input = readInput(req);
 
   /*
-   * Logged before validation, because the failures worth diagnosing here are
-   * malformed requests — a caller sending the wrong Content-Type reached the
-   * handler with an empty body, and the access log showed only a 400 with no
-   * hint that the header was the cause.
+   * The payload *after* readInput has recovered it from a text/plain body or a
+   * form-urlencoded key, which is often not what the raw body looked like. Both
+   * are logged, because the difference between them is the bug.
    */
-  console.log(
-    `[ask-reason ${reqId}] ${req.method} from ${req.ip} ` +
-      `content-type=${req.get("content-type") || "(none)"} ` +
-      `bodyType=${typeof req.body} keys=${Object.keys(input).sort().join(",") || "(none)"}`,
-  );
+  trace.log("payload after parsing", input);
 
   const query = String(pick(input, "query") ?? "").trim();
   const scenarioId = String(pick(input, "scenarioId") ?? "").trim();
   const sessionId = String(pick(input, "sessionId") ?? "").trim();
+
+  // Aliases mean a field can arrive under two names; this says which one won.
+  trace.log("fields resolved from the payload", {
+    query,
+    scenarioId,
+    sessionId,
+    transcriptionType: Array.isArray(pick(input, "transcription"))
+      ? `array[${pick(input, "transcription").length}]`
+      : typeof pick(input, "transcription"),
+  });
 
   /*
    * Answered before validation and before any lookup, so a bare POST with no body
@@ -229,14 +232,11 @@ const askReason = async (req, res) => {
       .filter(([, value]) => !value)
       .map(([field]) => field);
 
-    console.log(
-      `[ask-reason ${reqId}] answered from the fixed script (no AI call) ` +
-        `scenario=${scenarioId || "(none)"} session=${sessionId || "(none)"} ` +
-        `queryChars=${query.length}` +
-        `${absent.length ? ` tolerated-missing=${absent.join(",")}` : ""} ` +
-        `in ${Date.now() - startedAt}ms`,
-    );
-    return res.json({ response: STANDARD_RESPONSE });
+    trace.log("ASK_REASON_USE_AI is off — answering from the fixed script, no AI call", {
+      toleratedMissing: absent,
+      responseChars: STANDARD_RESPONSE.length,
+    });
+    return trace.send(res, 200, { response: STANDARD_RESPONSE });
   }
 
   const missing = Object.entries({ query, scenarioId, sessionId })
@@ -245,10 +245,8 @@ const askReason = async (req, res) => {
 
   if (missing.length) {
     // The access log shows only a bare 400, so record what the caller did send.
-    console.warn(
-      `[ask-reason ${reqId}] rejected: missing ${missing.join(", ")}`,
-    );
-    return res.status(400).json({
+    trace.warn("rejected: the AI path needs these fields", { missing });
+    return trace.send(res, 400, {
       message:
         `Missing ${missing.map((f) => `'${f}' (or '${FIELD_ALIASES[f][1]}')`).join(", ")} ` +
         `in request body or query string. Received: ${Object.keys(input).sort().join(", ") || "nothing"}. ` +
@@ -264,24 +262,26 @@ const askReason = async (req, res) => {
   const legacyScenario = findLegacyScenario(scenarioId);
 
   if (!legacyScenario && !mongoose.Types.ObjectId.isValid(scenarioId)) {
-    return res
-      .status(400)
-      .json({ message: `'scenarioId' is not a valid id: ${scenarioId}` });
+    trace.warn("scenarioId is neither a legacy code nor an ObjectId", { scenarioId });
+    return trace.send(res, 400, {
+      message: `'scenarioId' is not a valid id: ${scenarioId}`,
+    });
   }
 
   try {
     const scenario = legacyScenario || (await Scenario.findById(scenarioId).lean());
 
     if (!scenario) {
-      console.warn(`[ask-reason ${reqId}] no scenario with _id ${scenarioId}`);
-      return res
-        .status(404)
-        .json({ message: `No scenario found with scenarioId: ${scenarioId}` });
+      trace.warn("no scenario with that id", { scenarioId });
+      return trace.send(res, 404, {
+        message: `No scenario found with scenarioId: ${scenarioId}`,
+      });
     }
 
-    if (legacyScenario) {
-      console.log(`[ask-reason ${reqId}] scenarioId ${scenarioId} resolved from the legacy table`);
-    }
+    trace.log(
+      `resolved the scenario from ${legacyScenario ? "the legacy table" : "Mongo"}`,
+      scenario,
+    );
 
     /*
      * Looked up only for its stored transcript, which is the fallback when the
@@ -318,27 +318,31 @@ const askReason = async (req, res) => {
        * begin rather than inventing one. Logged, because a sudden run of these
        * means sessions have stopped being recorded.
        */
-      console.warn(
-        `[ask-reason ${reqId}] no session stored for session_id ${sessionId}; ` +
-          `continuing with the transcript from the request ` +
-          `(${transcriptionText.length} chars)`,
-      );
+      trace.warn("no session stored for that session_id, using the request transcript", {
+        sessionId,
+        transcriptChars: transcriptionText.length,
+      });
     }
 
-    console.log(
-      `[ask-reason ${reqId}] resolved scenario=${scenarioId}` +
-        `${legacyScenario ? " (legacy)" : ""} session=${sessionId} ` +
-        `transcriptChars=${transcriptionText.length} ` +
-        `transcriptFrom=${
-          pick(input, "transcription") ? "request" : session ? "stored" : "none"
-        } queryChars=${query.length}`,
-    );
+    trace.log("assembled the coach input", {
+      transcriptFrom: pick(input, "transcription")
+        ? "request"
+        : session
+          ? "stored"
+          : "none",
+      transcriptChars: transcriptionText.length,
+      queryChars: query.length,
+    });
 
+    /*
+     * The transcript and the student's question are patient-consultation
+     * material, so the text itself stays behind AI_DEBUG_LOG while the counts
+     * above are always logged. Turn it on to diagnose a bad answer, on one box,
+     * temporarily.
+     */
     if (logContent()) {
-      console.log(`[ask-reason ${reqId}] query: ${excerpt(query)}`);
-      console.log(
-        `[ask-reason ${reqId}] transcript: ${excerpt(transcriptionText, 1500)}`,
-      );
+      trace.log("query text", excerpt(query));
+      trace.log("transcript text", excerpt(transcriptionText, 1500));
     }
 
     /*
@@ -367,10 +371,12 @@ const askReason = async (req, res) => {
     // Prompt size is logged because it is the usual cause of a slow or truncated
     // answer, and it grows with the transcript rather than with anything visible
     // in the request.
-    console.log(
-      `[ask-reason ${reqId}] calling AI: systemPromptChars=${ASK_REASON_PROMPT.length} ` +
-        `userQueryChars=${userQuery.length}`,
-    );
+    // Prompt size is the usual cause of a slow or truncated answer, and it grows
+    // with the transcript rather than with anything visible in the request.
+    trace.log("calling the AI provider", {
+      systemPromptChars: ASK_REASON_PROMPT.length,
+      userQueryChars: userQuery.length,
+    });
 
     const aiStartedAt = Date.now();
     const { text, provider, model } = await generateTextWithFallback({
@@ -379,34 +385,28 @@ const askReason = async (req, res) => {
     });
     const aiMs = Date.now() - aiStartedAt;
 
-    console.log(
-      `[ask-reason ${reqId}] answered by ${provider} (${model}) ` +
-        `${text.length} chars in ${aiMs}ms (total ${Date.now() - startedAt}ms)`,
-    );
+    // Which provider answered matters: it is how you tell a working Gemini from a
+    // silent permanent failover to Groq.
+    trace.log(`answered by ${provider} (${model})`, {
+      chars: text.length,
+      aiMs,
+    });
 
     // An empty answer still returns 200, so it would otherwise look like success
     // while the student sees a blank coach.
     if (!text.trim()) {
-      console.warn(
-        `[ask-reason ${reqId}] ${provider} returned an empty answer — the student will see nothing`,
-      );
+      trace.warn(`${provider} returned an empty answer — the student will see nothing`);
     }
 
-    if (logContent()) {
-      console.log(`[ask-reason ${reqId}] answer: ${excerpt(text, 1500)}`);
-    }
+    if (logContent()) trace.log("answer text", excerpt(text, 1500));
 
-    res.json({ response: text });
+    return trace.send(res, 200, { response: text });
   } catch (err) {
-    // Status and provider detail matter here: this is where a Gemini 429 with no
-    // Groq key configured surfaces, and the bare stack does not say which
-    // provider gave up or how long was spent before it did.
-    console.error(
-      `[ask-reason ${reqId}] failed after ${Date.now() - startedAt}ms ` +
-        `status=${err.status || err.statusCode || "none"}: ${err.message}`,
-    );
-    console.error(err);
-    res.status(503).json({
+    // trace.fail carries the status and provider detail the bare stack does not:
+    // this is where a Gemini 429 with no Groq key configured surfaces, and it does
+    // not otherwise say which provider gave up or how long was spent first.
+    trace.fail(err);
+    return trace.send(res, 503, {
       message: publicMessage(err, "The reasoning coach is unavailable right now."),
     });
   }

@@ -21,6 +21,7 @@ import {
   getLiveMeta,
 } from "../state/liveScenario.js";
 import { toBubbleScenarioJson } from "../utils/bubbleScenario.js";
+import { startTrace } from "../utils/routeTrace.js";
 
 const router = express.Router();
 
@@ -297,11 +298,14 @@ router.post(
   checkAccess("manageScenarios"),
   scenarioValidationRules,
   async (req, res) => {
+    const trace = startTrace("add-scenario", req);
+
     const errors = validationResult(req);
     if (!errors.isEmpty()) {
-      console.log("Validation Failed:", errors.array());
-      return res.status(400).json({ errors: errors.array() });
+      trace.warn("express-validator rejected the body", errors.array());
+      return trace.send(res, 400, { errors: errors.array() });
     }
+    trace.log("validation passed");
 
     const {
       _id,
@@ -323,48 +327,75 @@ router.post(
     } = req.body;
 
 
+    /*
+     * assignedTo arrives here as email addresses (the edit route takes ids), so
+     * both what was asked for and what resolved are logged — an address with no
+     * account resolves to nothing and the scenario is silently created assigned
+     * to fewer students than the educator selected.
+     */
     let assignedUserIds = [];
     if (assignedTo && Array.isArray(assignedTo) && assignedTo.length > 0) {
       try {
         const users = await User.find({ email: { $in: assignedTo } });
         assignedUserIds = users.map((u) => u._id);
+        trace.log("resolved assignedTo emails → user ids", {
+          requested: assignedTo,
+          resolved: users.map((u) => ({ _id: u._id, email: u.email })),
+          unmatched: assignedTo.filter(
+            (email) => !users.some((u) => u.email === String(email).toLowerCase()),
+          ),
+        });
       } catch (err) {
-        console.error("Error resolving assigned users:", err);
+        trace.warn(`resolving assignedTo failed, continuing unassigned: ${err.message}`);
       }
+    } else {
+      trace.log("no assignedTo in the request", { assignedTo });
     }
 
     try {
       let customId = null;
       if (_id) {
-        console.log("Checking _id from AI:", _id);
         if (mongoose.Types.ObjectId.isValid(_id)) {
           const existingScenario = await Scenario.findById(_id);
           if (existingScenario) {
-            console.log("Duplicate _id found:", _id);
-            return res.status(400).json({
+            trace.warn("client-supplied _id already exists", { _id });
+            return trace.send(res, 400, {
               message: "A scenario with this ID already exists.",
             });
           }
           customId = _id;
-          console.log("Using custom _id:", _id);
+          trace.log("using the client-supplied _id", { _id });
         } else {
-          console.warn(`Ignoring invalid ObjectId provided by AI: ${_id}`);
+          trace.warn("ignoring an invalid client-supplied _id", { _id });
         }
       }
 
       const userSchoolId = req.user.schoolId?._id || req.user.schoolId;
 
       if (!userSchoolId) {
-        return res.status(400).json({
+        trace.warn("creator has no schoolId, cannot create", {
+          user: req.user._id,
+          role: req.user.role,
+        });
+        return trace.send(res, 400, {
           message:
             "Account configuration error: You must belong to a school to create a scenario.",
         });
       }
+      trace.log("resolved the owning school", { schoolId: userSchoolId });
 
       const createGroups = await resolveAssignedGroups(assignedGroups, req);
       if (createGroups.error) {
-        return res.status(400).json({ message: createGroups.error });
+        trace.warn("assignedGroups rejected", {
+          assignedGroups,
+          reason: createGroups.error,
+        });
+        return trace.send(res, 400, { message: createGroups.error });
       }
+      trace.log("resolved assignedGroups", {
+        requested: assignedGroups,
+        resolved: createGroups.ids,
+      });
 
       const scenarioData = {
         scenarioName,
@@ -390,29 +421,38 @@ router.post(
         scenarioData._id = customId;
       }
 
+      // The document as it will be written, after every default and fallback in
+      // this handler has been applied — which is what the request body alone does
+      // not tell you.
+      trace.log("saving scenario document", scenarioData);
+
       const newScenario = new Scenario(scenarioData);
       await newScenario.save();
+      trace.log("saved", {
+        _id: newScenario._id,
+        status: newScenario.status,
+        hasApiKey: Boolean(newScenario.apiKey),
+      });
 
       await newScenario.populate("educator", "name email");
       await newScenario.populate("assignedTo", "name");
       await newScenario.populate("assignedGroups", "name");
+      trace.log("populated educator, assignedTo, assignedGroups");
 
-      res.status(201).json({
+      return trace.send(res, 201, {
         message: "Scenario added successfully.",
         scenario: newScenario,
       });
     } catch (err) {
-      console.error("Create Scenario Error:", err);
-      console.log("Error details:", err);
+      trace.fail(err);
       if (err.code === 11000) {
-        console.log("Duplicate key error:", err.keyValue);
-        return res.status(400).json({
+        return trace.send(res, 400, {
           message: "Duplicate scenario ID or Name detected.",
         });
       }
-      res
-        .status(500)
-        .json({ message: "Server error creating scenario: " + err.message });
+      return trace.send(res, 500, {
+        message: "Server error creating scenario: " + err.message,
+      });
     }
   },
 );
@@ -480,9 +520,14 @@ router.put(
   checkAccess("moderateScenarios"),
   scenarioValidationRules,
   async (req, res) => {
+    const trace = startTrace("edit-scenario", req);
+
     const errors = validationResult(req);
-    if (!errors.isEmpty())
-      return res.status(400).json({ errors: errors.array() });
+    if (!errors.isEmpty()) {
+      trace.warn("express-validator rejected the body", errors.array());
+      return trace.send(res, 400, { errors: errors.array() });
+    }
+    trace.log("validation passed");
 
     const {
       scenarioName,
@@ -508,38 +553,75 @@ router.put(
         (id) => !mongoose.Types.ObjectId.isValid(id),
       );
       if (invalidIds.length > 0) {
-        return res
-          .status(400)
-          .json({ message: "Invalid user IDs in assignedTo" });
+        trace.warn("assignedTo holds non-ObjectId values", { invalidIds });
+        return trace.send(res, 400, { message: "Invalid user IDs in assignedTo" });
       }
       assignedUserIds = assignedTo;
     }
 
     try {
       if (!mongoose.Types.ObjectId.isValid(req.params.id)) {
-        return res
-          .status(404)
-          .json({ message: "Scenario not found (Invalid ID)." });
+        trace.warn("the :id in the path is not an ObjectId", { id: req.params.id });
+        return trace.send(res, 404, {
+          message: "Scenario not found (Invalid ID).",
+        });
       }
 
       const scenario = await Scenario.findById(req.params.id);
-      if (!scenario)
-        return res.status(404).json({ message: "Scenario not found." });
+      if (!scenario) {
+        trace.warn("no scenario with that _id", { id: req.params.id });
+        return trace.send(res, 404, { message: "Scenario not found." });
+      }
+
+      /*
+       * The document before any field is applied. This is the half of an edit the
+       * request body cannot show you: with a partial update, a field that looks
+       * wrong afterwards was either changed by this request or was already wrong,
+       * and only the before-state distinguishes the two.
+       */
+      trace.log("loaded the existing scenario", scenario);
 
       if (!canManageScenario(scenario, req)) {
-        return res
-          .status(403)
-          .json({ message: "You are not authorized to edit this scenario." });
+        trace.warn("caller does not own this scenario and is not its school_admin", {
+          scenarioEducator: scenario.educator,
+          scenarioSchool: scenario.schoolId,
+          caller: req.user._id,
+          callerRole: req.user.role,
+          callerScope: req.scope,
+        });
+        return trace.send(res, 403, {
+          message: "You are not authorized to edit this scenario.",
+        });
       }
 
       if (
         req.scope.schoolId &&
         scenario.schoolId.toString() !== req.scope.schoolId.toString()
       ) {
-        return res
-          .status(403)
-          .json({ message: "Access denied: Scenario not in your school" });
+        trace.warn("scenario belongs to another school", {
+          scenarioSchool: scenario.schoolId,
+          callerSchool: req.scope.schoolId,
+        });
+        return trace.send(res, 403, {
+          message: "Access denied: Scenario not in your school",
+        });
       }
+      trace.log("authorised to edit");
+
+      /*
+       * Which fields this request actually changes. A partial update is defined by
+       * what is absent, so the absent list is the useful half: "the educator says
+       * the prompt did not save" is answered by seeing scenarioPrompt in `absent`.
+       */
+      const incoming = {
+        scenarioName, description, status, permissions, assignedTo, assignedGroups,
+        template, scenarioPrompt, aiAvatarRole, aiInstructions, aiQuestions,
+        difficulty, animationTriggers, apiKey, html,
+      };
+      trace.log("fields in this update", {
+        present: Object.keys(incoming).filter((k) => incoming[k] !== undefined),
+        absent: Object.keys(incoming).filter((k) => incoming[k] === undefined),
+      });
 
       if (scenarioName !== undefined) scenario.scenarioName = scenarioName;
       if (description !== undefined) scenario.description = description;
@@ -548,7 +630,13 @@ router.put(
       if (assignedTo !== undefined) scenario.assignedTo = assignedUserIds;
 
       const groups = await resolveAssignedGroups(assignedGroups, req);
-      if (groups.error) return res.status(400).json({ message: groups.error });
+      if (groups.error) {
+        trace.warn("assignedGroups rejected", {
+          assignedGroups,
+          reason: groups.error,
+        });
+        return trace.send(res, 400, { message: groups.error });
+      }
       if (groups.ids !== undefined) scenario.assignedGroups = groups.ids;
 
       if (template !== undefined) scenario.template = template;
@@ -564,10 +652,21 @@ router.put(
       if (apiKey !== undefined) scenario.apiKey = apiKey;
       if (html !== undefined) scenario.html = html;
 
+      /*
+       * Mongoose tracks which paths were actually mutated, so this distinguishes a
+       * field the request sent from a field the request *changed* — a re-save of
+       * identical values reports nothing modified, which is the answer to "I
+       * saved it and nothing happened".
+       */
+      trace.log("modified paths", scenario.modifiedPaths());
+
       await scenario.save();
+      trace.log("saved");
+
       await scenario.populate("educator", "name email");
       await scenario.populate("assignedTo", "name");
       await scenario.populate("assignedGroups", "name");
+      trace.log("populated educator, assignedTo, assignedGroups");
 
       // Attach session stats so Redux store keeps avgScore/totalSessions after update
       const sessionStat = await Session.aggregate([
@@ -581,17 +680,25 @@ router.put(
         totalSessions: stat?.totalSessions ?? 0,
       };
 
-      res.status(200).json({
+      trace.log("attached session stats", {
+        avgScore: scenarioObj.avgScore,
+        totalSessions: scenarioObj.totalSessions,
+      });
+
+      return trace.send(res, 200, {
         message: "Scenario updated successfully.",
         scenario: scenarioObj,
       });
     } catch (err) {
-      console.error("Update Scenario Error:", err);
-      if (err.code === 11000)
-        return res
-          .status(400)
-          .json({ message: "Scenario name already exists." });
-      res.status(500).json({ message: "Server error updating scenario." });
+      trace.fail(err);
+      if (err.code === 11000) {
+        return trace.send(res, 400, {
+          message: "Scenario name already exists.",
+        });
+      }
+      return trace.send(res, 500, {
+        message: "Server error updating scenario.",
+      });
     }
   },
 );
