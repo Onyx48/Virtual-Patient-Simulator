@@ -1,7 +1,7 @@
 import React, { useState, useEffect, useMemo } from "react";
 import { useNavigate, useParams } from "react-router-dom";
 import { useDispatch, useSelector } from "react-redux";
-import { ChevronLeft, Bell, MessageSquare } from "lucide-react";
+import { ChevronLeft, MessageSquare } from "lucide-react";
 import axios from "axios";
 import toast from "react-hot-toast";
 import { getAuthHeaders } from "../../../lib/utils.js";
@@ -189,7 +189,6 @@ function StudentScenarioDetails({ onBack }) {
             Individual Scenario
           </h1>
           <div className="flex gap-4 text-gray-400">
-            <Bell className="w-5 h-5 cursor-pointer hover:text-gray-600 transition-colors" />
             <MessageSquare className="w-5 h-5 cursor-pointer hover:text-gray-600 transition-colors" />
           </div>
         </div>
@@ -230,7 +229,6 @@ function StudentScenarioDetails({ onBack }) {
           Individual Scenario
         </h1>
         <div className="flex gap-4 text-gray-400">
-          <Bell className="w-5 h-5 cursor-pointer hover:text-gray-600 transition-colors" />
           <MessageSquare className="w-5 h-5 cursor-pointer hover:text-gray-600 transition-colors" />
         </div>
       </div>

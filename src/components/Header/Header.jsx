@@ -4,7 +4,6 @@ import { useAuth } from "../../AuthContext";
 import { useLanguage } from "../../i18n/LanguageContext";
 
 import {
-  BellIcon,
   QuestionMarkCircleIcon,
   UserCircleIcon,
 } from "@heroicons/react/24/outline";
@@ -107,9 +106,6 @@ function Header() {
             日本語
           </button>
         </div>
-        <button className="text-gray-500 hover:text-gray-700 focus:outline-none">
-          <BellIcon className="h-6 w-6" />
-        </button>
         <button className="text-gray-500 hover:text-gray-700 focus:outline-none">
           <QuestionMarkCircleIcon className="h-6 w-6" />
         </button>

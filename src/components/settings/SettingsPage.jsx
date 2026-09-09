@@ -5,17 +5,14 @@ import { toast } from "react-hot-toast";
 import axios from "axios";
 
 /*
- * Placeholders for the avatar only. The name, email and phone were mock values
- * ("John Doe", "+123456789") shown whenever the account had none — so the phone
- * field arrived pre-filled with a number the user had never entered, and saving
- * the form wrote that fake number to their profile. Empty is honest, and an empty
- * field is what makes the placeholder text below visible.
+ * A placeholder for the avatar only. The name and email were mock values
+ * ("John Doe") shown whenever the account had none, so the form displayed
+ * details the user had never entered. Empty is honest.
  */
 const initialUserData = {
   profilePictureUrl: "https://via.placeholder.com/150/FF5733/FFFFFF?text=JD",
   fullName: "",
   email: "",
-  phoneNumber: "",
 };
 
 const EditIcon = () => (
@@ -102,14 +99,12 @@ function SettingsPage() {
     password: "",
   });
 
-  const canEditPersonalInfo = true;
 
   const {
     register,
-    handleSubmit,
     reset,
     watch,
-    formState: { errors, isDirty },
+    formState: { errors },
   } = useForm({
     defaultValues: userData,
   });
@@ -126,54 +121,16 @@ function SettingsPage() {
           : initialUserData.profilePictureUrl,
         fullName: user.name || initialUserData.fullName,
         email: user.email || initialUserData.email,
-        phoneNumber: user.phoneNumber || initialUserData.phoneNumber,
       });
-      /*
-       * reset, not setValue: setValue leaves the form's baseline at the mock
-       * defaults, so the form counted as dirty the moment the real account
-       * loaded and Save was enabled before anything had been edited. reset
-       * moves the baseline, so `isDirty` means "the user changed something".
-       */
+      // Both fields are display-only; reset just puts the account's real
+      // values into them once the user has loaded.
       reset({
         fullName: user.name || "",
         email: user.email || "",
-        phoneNumber: user.phoneNumber || "",
       });
     }
   }, [user, reset]);
 
-  const onSubmit = async (data) => {
-    try {
-      // No `name`: it is not editable here (see the Full Name field below).
-      const response = await axios.put("/api/auth/profile", {
-        phoneNumber: data.phoneNumber,
-      });
-      updateProfile({
-        name: response.data.name,
-        phoneNumber: response.data.phoneNumber,
-      });
-      /*
-       * The saved value becomes the new baseline, so Save goes back to disabled
-       * and a second click cannot re-send a save that already happened.
-       */
-      reset({ ...data, phoneNumber: response.data.phoneNumber ?? "" });
-      toast.success("Profile updated successfully");
-    } catch (error) {
-      console.error("Profile update error:", error);
-      /*
-       * express-validator answers a rejected field with { errors: [...] } and no
-       * `message`, so the old line fell through to "Failed to update profile" and
-       * the user was told nothing about why the number would not save.
-       */
-      const validation = error.response?.data?.errors?.[0]?.msg;
-      toast.error(
-        validation ||
-          error.response?.data?.message ||
-          error.message ||
-          "Failed to update profile",
-      );
-    }
-  };
 
   /*   const handleProfilePictureChange = async (e) => {
     const file = e.target.files[0];
@@ -286,7 +243,12 @@ function SettingsPage() {
       <div className="max-w-4xl mx-auto p-6 bg-white rounded-lg shadow-md">
         <h1 className="text-2xl font-bold text-gray-900 mb-6">Settings</h1>
 
-        <form onSubmit={handleSubmit(onSubmit)} className="space-y-8">
+        {/*
+          Not a form any more. Every field in it is read-only — the name is set
+          by whoever administers the account and the email is changed through the
+          modal below — so there is nothing to submit.
+        */}
+        <div className="space-y-8">
           {/* Profile Picture Section */}
           {/* <div className="flex items-center space-x-6">
             {user?.profilePicture ? (
@@ -397,56 +359,10 @@ function SettingsPage() {
                   </p>
                 )}
               </div>
-              <div>
-                <label className="block text-sm font-medium text-gray-700 mb-1">
-                  Phone Number
-                </label>
-                <div className="flex items-center">
-                  <input
-                    {...register("phoneNumber", {
-                      pattern: {
-                        // Digits, spaces and the punctuation a written number
-                        // uses. Deliberately loose: numbers are international and
-                        // a strict format rejects valid ones.
-                        value: /^[+()\-.\s\d]{6,20}$/,
-                        message:
-                          "Use digits, spaces and + ( ) - only, 6 to 20 characters.",
-                      },
-                    })}
-                    type="tel"
-                    placeholder="e.g. +44 7700 900123"
-                    disabled={!canEditPersonalInfo}
-                    className={`flex-1 px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500 ${
-                      !canEditPersonalInfo
-                        ? "bg-gray-100 cursor-not-allowed"
-                        : ""
-                    }`}
-                  />
-                  {canEditPersonalInfo && <EditIcon />}
-                </div>
-                {errors.phoneNumber && (
-                  <p className="text-sm text-red-600 mt-1">
-                    {errors.phoneNumber.message}
-                  </p>
-                )}
-              </div>
             </div>
           </div>
 
-          <div className="flex justify-end">
-            <button
-              type="submit"
-              disabled={!isDirty}
-              className={`px-6 py-2 text-white rounded-md ${
-                isDirty
-                  ? "bg-blue-600 hover:bg-blue-700"
-                  : "bg-gray-400 cursor-not-allowed"
-              }`}
-            >
-              Save Changes
-            </button>
-          </div>
-        </form>
+        </div>
       </div>
 
       <React.Fragment>
