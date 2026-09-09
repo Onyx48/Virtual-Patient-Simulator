@@ -19,6 +19,16 @@ const showDescription = (scenario) =>
   !!scenario.description &&
   normalise(scenario.description) !== normalise(scenario.scenarioName);
 
+/*
+ * Only scenarios the backend has enabled can be run in the simulator — see
+ * backend/utils/testableScenarios.js. A card whose caller did not carry the flag
+ * fails closed, because the alternative is a button that 403s on click. The card
+ * itself stays clickable either way: reading a case you cannot run is still useful.
+ */
+const canRun = (scenario) => scenario?.testable === true;
+const NOT_RUNNABLE =
+  "Not enabled for the simulator yet — only the enabled demo scenario can be run.";
+
 function ScenarioGridStudent({ data, onStartNow }) {
   const navigate = useNavigate();
 
@@ -156,7 +166,13 @@ function ScenarioGridStudent({ data, onStartNow }) {
                     event.stopPropagation();
                     handleStart(scenario.id);
                   }}
-                  className="flex-1 py-3 rounded-xl bg-gray-100 text-xs font-bold text-gray-600 hover:bg-gray-200 transition-colors"
+                  disabled={!canRun(scenario)}
+                  title={canRun(scenario) ? undefined : NOT_RUNNABLE}
+                  className={`flex-1 py-3 rounded-xl text-xs font-bold transition-colors ${
+                    canRun(scenario)
+                      ? "bg-gray-100 text-gray-600 hover:bg-gray-200"
+                      : "bg-gray-50 text-gray-300 cursor-not-allowed"
+                  }`}
                 >
                   Start Again
                 </button>
@@ -167,7 +183,13 @@ function ScenarioGridStudent({ data, onStartNow }) {
                   event.stopPropagation();
                   handleStart(scenario.id);
                 }}
-                className="w-full py-3.5 rounded-xl bg-black text-white text-xs font-bold hover:bg-gray-800 transition-colors shadow-md"
+                disabled={!canRun(scenario)}
+                title={canRun(scenario) ? undefined : NOT_RUNNABLE}
+                className={`w-full py-3.5 rounded-xl text-xs font-bold transition-colors ${
+                  canRun(scenario)
+                    ? "bg-black text-white hover:bg-gray-800 shadow-md"
+                    : "bg-gray-100 text-gray-400 cursor-not-allowed"
+                }`}
               >
                 Start Now
               </button>

@@ -95,9 +95,23 @@ function StudentScenarioDetails({ onBack }) {
   const currentFeedback = currentSession?.feedback ?? "";
   const totalAttempts = totalCount || sessions.length || 0;
 
+  /*
+   * Only scenarios the backend has enabled can be run in the simulator — see
+   * backend/utils/testableScenarios.js. Absent (an older response, or the scenario
+   * not loaded yet) counts as not startable, so the button fails closed instead of
+   * offering a run that POST /api/sessions/start will refuse.
+   */
+  const canStart = scenarioData?.testable === true;
+  const startBlockedReason =
+    "Not enabled for the simulator yet — only the enabled demo scenario can be run.";
+
   const handleStartSession = async () => {
     if (!scenarioId) {
       toast.error("Scenario ID is missing.");
+      return;
+    }
+    if (!canStart) {
+      toast.error(startBlockedReason);
       return;
     }
 
@@ -203,7 +217,14 @@ function StudentScenarioDetails({ onBack }) {
             </button>
             <button
               onClick={handleStartSession}
-              className="px-6 py-2.5 bg-[#F59E0B] hover:bg-amber-600 text-white text-sm font-bold rounded-lg shadow-md transition-colors"
+              disabled={!canStart}
+              // The title says why, so a grey button does not read as a bug.
+              title={canStart ? "Start a new session" : startBlockedReason}
+              className={`px-6 py-2.5 text-sm font-bold rounded-lg transition-colors ${
+                canStart
+                  ? "bg-[#F59E0B] hover:bg-amber-600 text-white shadow-md"
+                  : "bg-gray-100 text-gray-400 cursor-not-allowed"
+              }`}
             >
               Start Session
             </button>
@@ -243,7 +264,14 @@ function StudentScenarioDetails({ onBack }) {
           </button>
           <button
             onClick={handleStartSession}
-            className="px-6 py-2.5 bg-[#F59E0B] hover:bg-amber-600 text-white text-sm font-bold rounded-lg shadow-md transition-colors"
+            disabled={!canStart}
+            // The title says why, so a grey button does not read as a bug.
+            title={canStart ? "Start a new session" : startBlockedReason}
+            className={`px-6 py-2.5 text-sm font-bold rounded-lg transition-colors ${
+              canStart
+                ? "bg-[#F59E0B] hover:bg-amber-600 text-white shadow-md"
+                : "bg-gray-100 text-gray-400 cursor-not-allowed"
+            }`}
           >
             Start Session
           </button>

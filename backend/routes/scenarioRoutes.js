@@ -22,6 +22,13 @@ import {
 } from "../state/liveScenario.js";
 import { toBubbleScenarioJson } from "../utils/bubbleScenario.js";
 import { startTrace } from "../utils/routeTrace.js";
+// The educator Test button's destination, from the same place the student room
+// comes from.
+import { throwawayRoomUrl } from "../utils/roomUrl.js";
+import {
+  isScenarioTestable,
+  NOT_TESTABLE_MESSAGE,
+} from "../utils/testableScenarios.js";
 
 const router = express.Router();
 
@@ -85,6 +92,10 @@ router.get("/", protect, checkAccess("viewScenarios"), async (req, res) => {
         ...s.toObject(),
         avgScore: stat ? parseFloat((stat.avgScore * 100).toFixed(1)) : null,
         totalSessions: stat?.totalSessions ?? 0,
+        // So the Test and Start buttons can be greyed out up front rather than
+        // rejected on click. The 403s in POST /json and POST /sessions/start are
+        // the actual enforcement; this is only the label.
+        testable: isScenarioTestable(s._id),
       };
     });
 
@@ -239,10 +250,29 @@ router.post("/json", protect, async (req, res) => {
     if (!scenario)
       return res.status(404).json({ message: "Scenario not found." });
 
+    /*
+     * Checked here and not only in the UI: this is what publishes the scenario to
+     * the simulator's single live slot, so a disabled button alone would still let
+     * a direct POST displace whatever is running.
+     */
+    if (!isScenarioTestable(scenario._id)) {
+      return res.status(403).json({ message: NOT_TESTABLE_MESSAGE });
+    }
+
     // Educator pressing Test: no student and no session, so Id is the educator's
     // own id and StreamSessionId stays empty.
     setLiveScenario(scenario, { userId: req.user._id });
-    res.json({ message: "Scenario JSON set." });
+
+    /*
+     * The caller is told where to go rather than deciding for itself. The Test
+     * button used to hold its own copy of the simulator URL, so a new StreamPixel
+     * build left educators on the old app while students went to the new one, and
+     * moving it needed a frontend rebuild. Same helper as POST /sessions/start.
+     */
+    res.json({
+      message: "Scenario JSON set.",
+      simulatorUrl: throwawayRoomUrl(),
+    });
   } catch (err) {
     console.error("Set Scenario JSON Error:", err);
     res.status(500).json({ message: "Server error setting scenario JSON." });
@@ -285,7 +315,8 @@ router.get("/:id", protect, checkAccess("viewScenarios"), async (req, res) => {
         .json({ message: "Access denied: Scenario not in your school" });
     }
 
-    res.json(scenario);
+    // Same flag as the list, for the student's Start button.
+    res.json({ ...scenario.toObject(), testable: isScenarioTestable(scenario._id) });
   } catch (err) {
     console.error("Get Single Scenario Error:", err);
     res.status(500).json({ message: "Server error fetching scenario." });
@@ -678,6 +709,10 @@ router.put(
         ...scenario.toObject(),
         avgScore: stat ? parseFloat((stat.avgScore * 100).toFixed(1)) : null,
         totalSessions: stat?.totalSessions ?? 0,
+        // So the Test and Start buttons can be greyed out up front rather than
+        // rejected on click. The 403s in POST /json and POST /sessions/start are
+        // the actual enforcement; this is only the label.
+        testable: isScenarioTestable(scenario._id),
       };
 
       trace.log("attached session stats", {

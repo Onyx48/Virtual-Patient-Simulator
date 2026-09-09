@@ -11,6 +11,13 @@ import User from "../models/userModel.js";
 import { protect } from "../middleware/authMiddleware.js";
 import { checkAccess } from "../middleware/roleAccessMiddleware.js";
 import { isAssignedToStudent } from "../utils/scenarioAssignment.js";
+// Where a student is sent to run a scenario. Shared with the educator's Test
+// button so the two cannot point at different simulator builds.
+import { roomUrlFor } from "../utils/roomUrl.js";
+import {
+  isScenarioTestable,
+  NOT_TESTABLE_MESSAGE,
+} from "../utils/testableScenarios.js";
 
 const router = express.Router();
 
@@ -33,38 +40,6 @@ const getJweKey = () => {
   }
 
   return createSecretKey(keyBytes);
-};
-
-/*
- * Where a student is sent to run a scenario.
- *
- * The path is the StreamPixel app id and stays fixed — it identifies the
- * published simulator build, and it is the same link the educator's Test button
- * opens. The room rides on `?room=`, and it is this session's own id rather than
- * one fixed room for everybody: sharing a single room meant two students who
- * started at the same time were dropped into the same stream, each seeing the
- * other's consultation, with the second arrival displacing the first.
- *
- * The room is created implicitly by being visited, so nothing has to be
- * provisioned ahead of time; the id only has to be unique and unguessable, which
- * the session's ObjectId already is.
- *
- * ROOM_BASE_URL overrides the whole base without a redeploy — including the app
- * id, since a new StreamPixel build gets a new one.
- */
-const ROOM_BASE_URL = () =>
-  (
-    process.env.ROOM_BASE_URL ||
-    "https://share.streampixel.io/6aa14ef480d62d728d8ba6e8"
-  ).replace(/\/+$/, "");
-
-/*
- * Appended rather than assumed to be the first parameter, so a ROOM_BASE_URL that
- * already carries a query string is not silently broken by a second '?'.
- */
-const getRoomUrl = (sessionId) => {
-  const base = ROOM_BASE_URL();
-  return `${base}${base.includes("?") ? "&" : "?"}room=${encodeURIComponent(sessionId)}`;
 };
 
 router.post(
@@ -104,6 +79,16 @@ router.post(
           .json({ message: "Scenario not assigned to this student." });
       }
 
+      /*
+       * Checked after assignment so the more specific error wins, and checked here
+       * rather than only on the button because a start creates a Session row and
+       * displaces the live scenario — both real effects a disabled button does not
+       * prevent.
+       */
+      if (!isScenarioTestable(scenario._id)) {
+        return res.status(403).json({ message: NOT_TESTABLE_MESSAGE });
+      }
+
       const sessionId = new mongoose.Types.ObjectId().toString();
 
       /*
@@ -134,7 +119,7 @@ router.post(
       // session_id.
       setLiveScenario(scenario, { userId: req.user._id, sessionId });
 
-      const redirectUrl = getRoomUrl(sessionId);
+      const redirectUrl = roomUrlFor(sessionId);
       console.log(
         `[SESSION] started session=${sessionId} student=${req.user._id} ` +
           `scenario=${scenario._id} room=${redirectUrl}`,

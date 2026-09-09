@@ -3,11 +3,20 @@ import axios from "axios";
 import toast from "react-hot-toast";
 import { Target, Edit, Loader2 } from "lucide-react";
 
-// The hosted simulator the Test button opens. Baked in at build time; set
-// VITE_SIMULATOR_URL in .env to point at a different deployment.
-const SIMULATOR_URL =
-  import.meta.env.VITE_SIMULATOR_URL ||
-  "https://share.streampixel.io/6aa14ef480d62d728d8ba6e8";
+/*
+ * The simulator's URL is not defined here. It used to be, baked in at build time,
+ * while the backend held its own copy for the student's Start button — so a new
+ * StreamPixel build moved one and not the other, and educators tested against a
+ * different simulator than their students used. The backend now returns it (see
+ * backend/utils/roomUrl.js), and one ROOM_BASE_URL env var moves both.
+ */
+/*
+ * Only the scenarios the backend has enabled can be opened in the simulator —
+ * see backend/utils/testableScenarios.js for why. `testable` comes from
+ * GET /api/scenarios; a scenario from an older response has no such field, and is
+ * treated as not testable so the button fails closed rather than 403-ing on click.
+ */
+const isTestable = (scenario) => scenario?.testable === true;
 
 function ScenarioTable({ data, onEditClick, canEdit = true }) {
   // Which card's Test button is mid-publish, so only that one shows a spinner.
@@ -25,7 +34,7 @@ function ScenarioTable({ data, onEditClick, canEdit = true }) {
    */
   const handleTest = async (scenario) => {
     const scenarioId = scenario._id || scenario.id;
-    if (!scenarioId || publishingId) return;
+    if (!scenarioId || publishingId || !isTestable(scenario)) return;
 
     const tab = window.open("", "_blank");
     if (!tab) {
@@ -35,12 +44,21 @@ function ScenarioTable({ data, onEditClick, canEdit = true }) {
 
     setPublishingId(scenarioId);
     try {
-      await axios.post("/api/scenarios/json", { scenarioId });
-      tab.location = SIMULATOR_URL;
+      const { data } = await axios.post("/api/scenarios/json", { scenarioId });
+      /*
+       * No local fallback on purpose: a hardcoded one here is exactly what let the
+       * two destinations drift apart. If the response has no URL the backend is
+       * older than this build, and saying so beats silently opening the wrong app.
+       */
+      if (!data?.simulatorUrl) {
+        throw new Error("The server did not say where the simulator is.");
+      }
+      tab.location = data.simulatorUrl;
     } catch (error) {
       tab.close();
       toast.error(
         error.response?.data?.message ||
+          error.message ||
           "Could not hand this scenario to the simulator.",
       );
     } finally {
@@ -178,12 +196,24 @@ function ScenarioTable({ data, onEditClick, canEdit = true }) {
               )}
               <button
                 onClick={() => handleTest(scenario)}
-                disabled={publishingId === (scenario._id || scenario.id)}
-                className={`flex-1 flex items-center justify-center gap-2 py-2.5 rounded-lg text-sm font-semibold transition-colors disabled:opacity-60 ${
-                  canEdit
-                    ? "bg-black text-white hover:bg-gray-800"
-                    : "bg-black text-white hover:bg-gray-800 w-full"
-                }`}
+                disabled={
+                  publishingId === (scenario._id || scenario.id) ||
+                  !isTestable(scenario)
+                }
+                /*
+                 * The title carries the reason. A button that is simply grey with
+                 * no explanation reads as a bug, and this one is deliberate.
+                 */
+                title={
+                  isTestable(scenario)
+                    ? "Open this scenario in the simulator"
+                    : "Not enabled for the simulator — only the enabled demo scenario can be run."
+                }
+                className={`flex-1 flex items-center justify-center gap-2 py-2.5 rounded-lg text-sm font-semibold transition-colors ${
+                  isTestable(scenario)
+                    ? "bg-black text-white hover:bg-gray-800 disabled:opacity-60"
+                    : "bg-gray-100 text-gray-400 cursor-not-allowed"
+                } ${canEdit ? "" : "w-full"}`}
               >
                 {publishingId === (scenario._id || scenario.id) ? (
                   <>

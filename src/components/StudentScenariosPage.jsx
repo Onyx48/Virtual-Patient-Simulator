@@ -57,6 +57,10 @@ function StudentScenariosPage() {
                 ? Math.round(scenarioStat.bestScore * 100)
                 : null,
             status: scenarioStat?.isCompleted ? "Completed" : "Available",
+            // Carried through so the card can grey its own button. Only the
+            // scenarios the backend has enabled can be run — see
+            // backend/utils/testableScenarios.js.
+            testable: scenario.testable === true,
           };
         });
         setScenarios(mappedScenarios);
