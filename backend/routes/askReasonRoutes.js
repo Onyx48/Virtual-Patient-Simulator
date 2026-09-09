@@ -55,17 +55,16 @@ const standardResponseForced = () =>
  * Reached when both providers are down, or when the box is pinned to the script.
  * A student mid-consultation is better served by generic coaching than by a 503.
  */
+/*
+ * Kept to two sentences to match the length rule in ai/prompts/ask-reason.md. It
+ * was five paragraphs, which is a wall of text arriving mid-consultation — and it
+ * would have been odd for the scripted answer to be six times longer than the real
+ * coach's.
+ */
 const STANDARD_RESPONSE = [
-  "Work from what the patient has actually told you rather than from the diagnosis you expect.",
-  "",
-  "Start by laying out the history you have: where the pain is, how long it has been there, what brings it on and what settles it, and how it is affecting sleep, work and daily activities. Then ask what is still missing — most reasoning gaps at this stage are missing information, not faulty logic.",
-  "",
-  "Screen for red flags explicitly before you commit to a mechanical explanation: unexplained weight loss, night pain, trauma, neurological symptoms such as numbness, weakness or pins and needles, and any history of cancer or inflammatory disease. Say out loud which ones you have cleared.",
-  "",
-  "Then hold two or three explanations side by side rather than one. For each, name the finding that would support it and the finding that would argue against it, and decide which question or movement test would best tell them apart. That is the step that turns a guess into reasoning.",
-  "",
-  "Before you offer a diagnosis or a plan, summarise what you have heard back to the patient and check you have it right. It catches your own errors, and it tells the patient you were listening.",
-].join("\n");
+  "Work from what the patient has actually told you rather than from the diagnosis you expect: lay out the history you have, then name what is still missing — most gaps at this stage are missing information, not faulty logic.",
+  "Hold two or three explanations side by side rather than one, and for each decide which question or movement test would best tell them apart.",
+].join(" ");
 
 /**
  * Flatten a transcript into one readable block for the prompt.
