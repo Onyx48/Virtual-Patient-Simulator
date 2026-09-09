@@ -16,6 +16,24 @@ import { generateGroqText, GROQ_MODEL, isGroqConfigured } from "./groqClient.js"
 import { isProd } from "./appEnv.js";
 
 /**
+ * Gemini failed and there is no standby.
+ *
+ * Gemini's own error is what gets thrown — it is the actual reason the request
+ * failed, and a "Groq is not configured" would send an operator to the wrong
+ * place. But outside production the message says the fallback was skipped too,
+ * because a bare 429 makes it look as though no fallback exists at all.
+ */
+const noFallbackConfigured = (geminiError) => {
+  console.error(
+    "[AI] Gemini failed and GROQ_API_KEY is not set — no fallback was attempted",
+  );
+  if (!isProd) {
+    geminiError.message += " (Groq fallback skipped: GROQ_API_KEY is not set)";
+  }
+  return geminiError;
+};
+
+/**
  * @returns {Promise<{text: string, provider: string, model: string}>}
  *   The provider is reported so the caller can log which one answered — without
  *   it, a silent failover is invisible until someone wonders why replies changed
@@ -26,12 +44,7 @@ export const generateTextWithFallback = async ({ systemPrompt, userQuery }) => {
     const text = await generateText({ systemPrompt, userQuery });
     return { text, provider: "gemini", model: GEMINI_MODEL };
   } catch (geminiError) {
-    if (!isGroqConfigured()) {
-      // Nothing to fall back to, so surface Gemini's own error rather than a
-      // misleading "Groq is not configured".
-      console.error("[AI] Gemini failed and GROQ_API_KEY is not set");
-      throw geminiError;
-    }
+    if (!isGroqConfigured()) throw noFallbackConfigured(geminiError);
 
     console.warn(
       `[AI] Gemini failed (${geminiError.status || "no status"}: ${geminiError.message}); falling back to Groq ${GROQ_MODEL}`,
@@ -117,10 +130,7 @@ export const generateJsonWithFallback = async ({ systemPrompt, userQuery }) => {
     const json = await generateJsonFrom(generateText, { systemPrompt, userQuery }, "gemini");
     return { json, provider: "gemini", model: GEMINI_MODEL };
   } catch (geminiError) {
-    if (!isGroqConfigured()) {
-      console.error("[AI] Gemini failed and GROQ_API_KEY is not set");
-      throw geminiError;
-    }
+    if (!isGroqConfigured()) throw noFallbackConfigured(geminiError);
 
     console.warn(
       `[AI] Gemini failed (${geminiError.status || "no status"}: ${geminiError.message}); falling back to Groq ${GROQ_MODEL}`,

@@ -7,7 +7,7 @@ import { Target, Edit, TrendingUp, Loader2 } from "lucide-react";
 // VITE_SIMULATOR_URL in .env to point at a different deployment.
 const SIMULATOR_URL =
   import.meta.env.VITE_SIMULATOR_URL ||
-  "https://share.streampixel.io/6a9bdb0a635d17b54874e623";
+  "https://share.streampixel.io/6aa14ef480d62d728d8ba6e8";
 
 function ScenarioTable({ data, onEditClick, canEdit = true }) {
   // Which card's Test button is mid-publish, so only that one shows a spinner.

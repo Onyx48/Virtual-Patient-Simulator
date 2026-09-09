@@ -291,14 +291,20 @@ function ScenarioFormPage() {
     ? scenarios.find((s) => s._id === id || s.id === id)
     : null;
 
-  const { register, handleSubmit, setValue, control, watch } = useForm({
+  const { register, handleSubmit, setValue, control } = useForm({
     defaultValues: {
       scenarioName: "",
       difficulty: "Medium",
       status: "Draft",
       shortDescription: "",
       movements: emptyMovements(),
-      html: "",
+      /*
+       * No `html` key. The field was removed from the form, and the submit
+       * payload is a spread of these values — leaving an empty default here
+       * would send html:"" and wipe whatever an older scenario has stored,
+       * because PUT /api/scenarios/:id only skips the field when it is
+       * undefined. Omitting it preserves the existing value.
+       */
       scenarioPrompt: "",
       questionsForFeedback: "",
     },
@@ -348,9 +354,6 @@ function ScenarioFormPage() {
         );
       }
 
-      // Support both new "html" key and legacy "hdml" key from existing data
-      if (selectedScenario.html || selectedScenario.hdml)
-        setValue("html", selectedScenario.html || selectedScenario.hdml);
     }
   }, [isDbEdit, selectedScenario, setValue]);
 
@@ -672,31 +675,6 @@ function ScenarioFormPage() {
                   </div>
                 </div>
               ))}
-
-              <div>
-                <label className="block text-xs font-semibold text-gray-700 mb-1">
-                  HTML
-                </label>
-                <textarea
-                  {...register("html")}
-                  rows={4}
-                  className="w-full border border-gray-300 p-2.5 rounded-md text-sm outline-none focus:ring-1 focus:ring-blue-500"
-                ></textarea>
-
-                {watch("html") && (
-                  <div className="mt-2 border border-gray-200 rounded-md overflow-hidden">
-                    <p className="text-xs font-semibold text-gray-500 px-3 py-1 bg-gray-50 border-b border-gray-200">
-                      Preview
-                    </p>
-                    <iframe
-                      srcDoc={watch("html")}
-                      sandbox="allow-scripts"
-                      title="HTML Preview"
-                      className="w-full h-48 bg-white"
-                    />
-                  </div>
-                )}
-              </div>
 
               <div>
                 <label className="block text-xs font-semibold text-gray-700 mb-1">

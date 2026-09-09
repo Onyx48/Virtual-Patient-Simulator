@@ -48,7 +48,7 @@ const getJweKey = () => {
 const getSimulatorUrl = () =>
   process.env.SIMULATOR_URL ||
   process.env.VITE_SIMULATOR_URL ||
-  "https://share.streampixel.io/6a9bdb0a635d17b54874e623";
+  "https://share.streampixel.io/6aa14ef480d62d728d8ba6e8";
 
 router.post(
   "/start",
