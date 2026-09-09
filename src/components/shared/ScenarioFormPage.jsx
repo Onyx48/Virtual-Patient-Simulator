@@ -19,25 +19,52 @@ import ConfirmationModal from "../ui/ConfirmationModal";
 // so it goes through the shared axios instance and carries the auth header.
 // The old standalone :8888 FastAPI service is gone.
 
-const ErrorModal = ({ isOpen, message, onClose }) => {
+/*
+ * `tone` exists because this modal is also how the draft fallback reports
+ * itself, and that outcome is a save that succeeded — a red "Action Failed"
+ * banner over "it has been saved as a draft" reads as though nothing was kept.
+ */
+const MODAL_TONES = {
+  error: {
+    title: "Action Failed",
+    header: "bg-red-50 border-red-100",
+    text: "text-red-700",
+    close: "text-red-400 hover:text-red-700",
+  },
+  warning: {
+    title: "Saved as Draft",
+    header: "bg-amber-50 border-amber-100",
+    text: "text-amber-700",
+    close: "text-amber-500 hover:text-amber-700",
+  },
+};
+
+const ErrorModal = ({ isOpen, message, onClose, tone = "error" }) => {
   if (!isOpen) return null;
+  const style = MODAL_TONES[tone] || MODAL_TONES.error;
   return (
     <div className="fixed inset-0 z-[60] flex items-center justify-center p-4 bg-black/50 backdrop-blur-sm">
       <div className="bg-white rounded-xl shadow-2xl max-w-md w-full overflow-hidden animate-in fade-in zoom-in duration-200">
-        <div className="bg-red-50 px-6 py-4 border-b border-red-100 flex items-center justify-between">
-          <div className="flex items-center gap-2 text-red-700 font-bold">
+        <div
+          className={`px-6 py-4 border-b flex items-center justify-between ${style.header}`}
+        >
+          <div className={`flex items-center gap-2 font-bold ${style.text}`}>
             <AlertCircle className="w-5 h-5" />
-            <span>Action Failed</span>
+            <span>{style.title}</span>
           </div>
           <button
             onClick={onClose}
-            className="text-red-400 hover:text-red-700 transition-colors"
+            className={`transition-colors ${style.close}`}
           >
             <X className="w-5 h-5" />
           </button>
         </div>
         <div className="p-6">
-          <p className="text-gray-600 text-sm leading-relaxed">{message}</p>
+          {/* pre-line so the fallback message can separate the cause from the
+              reassurance instead of running them together. */}
+          <p className="text-gray-600 text-sm leading-relaxed whitespace-pre-line">
+            {message}
+          </p>
         </div>
         <div className="px-6 py-4 bg-gray-50 flex justify-end">
           <button
@@ -64,20 +91,14 @@ const ErrorModal = ({ isOpen, message, onClose }) => {
  *
  * Values are categorical, not degrees: "Full", "Ltd", or a graded limit like
  * "90_Ltd" where a threshold is clinically meaningful.
+ *
+ * Only shoulder and neck are offered. The avatar rig has clips for those two
+ * regions and nothing else, so a lower-back, hip, knee, ankle or foot
+ * restriction was recorded on the scenario and then never animated — the
+ * educator set a limitation the student could not see. They are gone from the
+ * form rather than shown and ignored. `processIncomingMovements` still tolerates
+ * an older scenario that has those keys stored; they are simply dropped.
  */
-const FULL_LTD = ["Full", "Ltd"];
-// Shoulder flexion only. The graded values name animations in the avatar rig, so
-// this list is a contract with the simulator and must not gain a value the rig
-// has no clip for.
-const GRADED = ["Full", "90_Ltd", "120_Ltd"];
-/*
- * Hip and knee flexion. Same grading, plus a plain "Ltd" for a case where no
- * threshold is clinically meaningful — the AI reaches for it often, and without
- * it the value matches no radio, so the restriction silently vanishes when the
- * educator saves. Safe to add here because these regions have no avatar rig yet.
- */
-const GRADED_OR_LTD = ["Full", "Ltd", "90_Ltd", "120_Ltd"];
-
 const SHOULDER_MOVEMENTS = [
   { id: "flexion", label: "Flexion", options: ["Full", "90_Ltd", "120_Ltd"] },
   { id: "extension", label: "Extension", options: ["Full", "Ltd"] },
@@ -128,60 +149,6 @@ const NECK_MOVEMENTS = [
   },
 ];
 
-const LOWER_BACK_MOVEMENTS = [
-  { id: "flexion", label: "Flexion", options: FULL_LTD },
-  { id: "extension", label: "Extension", options: FULL_LTD },
-  {
-    id: "left_lateral_flexion",
-    label: "Left_Lateral_Flexion",
-    options: FULL_LTD,
-  },
-  {
-    id: "right_lateral_flexion",
-    label: "Right_Lateral_Flexion",
-    options: FULL_LTD,
-  },
-  { id: "left_rotation", label: "Left_Rotation", options: FULL_LTD },
-  { id: "right_rotation", label: "Right_Rotation", options: FULL_LTD },
-];
-
-const HIP_MOVEMENTS = [
-  { id: "flexion", label: "Flexion", options: GRADED_OR_LTD },
-  { id: "extension", label: "Extension", options: FULL_LTD },
-  { id: "abduction", label: "Abduction", options: FULL_LTD },
-  { id: "adduction", label: "Adduction", options: FULL_LTD },
-  { id: "internal_rotation", label: "Internal_Rotation", options: FULL_LTD },
-  { id: "external_rotation", label: "External_Rotation", options: FULL_LTD },
-];
-
-const KNEE_MOVEMENTS = [
-  { id: "flexion", label: "Flexion", options: GRADED_OR_LTD },
-  // "Ltd" here means an extension lag or fixed flexion deformity.
-  { id: "extension", label: "Extension", options: FULL_LTD },
-];
-
-const ANKLE_MOVEMENTS = [
-  { id: "dorsiflexion", label: "Dorsiflexion", options: FULL_LTD },
-  { id: "plantarflexion", label: "Plantarflexion", options: FULL_LTD },
-  { id: "inversion", label: "Inversion", options: FULL_LTD },
-  { id: "eversion", label: "Eversion", options: FULL_LTD },
-];
-
-const FOOT_MOVEMENTS = [
-  {
-    id: "great_toe_extension",
-    label: "Great_Toe_Extension",
-    options: FULL_LTD,
-  },
-  { id: "great_toe_flexion", label: "Great_Toe_Flexion", options: FULL_LTD },
-  { id: "forefoot_pronation", label: "Forefoot_Pronation", options: FULL_LTD },
-  {
-    id: "forefoot_supination",
-    label: "Forefoot_Supination",
-    options: FULL_LTD,
-  },
-];
-
 /*
  * Order here is the order the sections appear in the form: head down to toe,
  * which is how a clinician reads a body chart.
@@ -189,11 +156,6 @@ const FOOT_MOVEMENTS = [
 const REGIONS = [
   { id: "shoulder", label: "Shoulder", movements: SHOULDER_MOVEMENTS },
   { id: "neck", label: "Neck", movements: NECK_MOVEMENTS },
-  { id: "lower_back", label: "Lower back", movements: LOWER_BACK_MOVEMENTS },
-  { id: "hip", label: "Hip", movements: HIP_MOVEMENTS },
-  { id: "knee", label: "Knee", movements: KNEE_MOVEMENTS },
-  { id: "ankle", label: "Ankle", movements: ANKLE_MOVEMENTS },
-  { id: "foot", label: "Foot", movements: FOOT_MOVEMENTS },
 ];
 
 const emptyMovements = () =>
@@ -421,9 +383,14 @@ function ScenarioFormPage() {
         setValue("questionsForFeedback", returnedJson.questions_for_feedback);
       }
 
-      if (returnedJson.movements) {
-        setValue("movements", processIncomingMovements(returnedJson.movements));
-      }
+      /*
+       * `returnedJson.movements` is deliberately ignored. The range-of-movement
+       * limits are the educator's clinical call and are now selected by hand:
+       * the AI guessed them from a one-line prompt, and a wrong guess is worse
+       * than a blank — it looks deliberate, and the student is examined against
+       * a limitation nobody intended. The AI still writes the name, prompt and
+       * feedback questions.
+       */
     } catch (error) {
       const msg =
         error.response?.data?.message ||
@@ -436,29 +403,72 @@ function ScenarioFormPage() {
 
   const onSubmit = async (data) => {
     setIsSaving(true);
-    try {
-      const formattedTriggers = formatMovementsForBackend(data.movements);
+
+    const save = (status) => {
       const payload = {
         ...data,
+        status,
         description: data.shortDescription,
-        animationTriggers: formattedTriggers,
+        animationTriggers: formatMovementsForBackend(data.movements),
         aiQuestions: data.questionsForFeedback,
         // Only send it when we have one, so a manual edit of an AI scenario
         // cannot blank out its existing key.
         ...(apiKey && { apiKey }),
       };
 
-      if (isDbEdit) {
-        await dispatch(updateScenario({ id, updates: payload })).unwrap();
-      } else {
-        await dispatch(addScenario(payload)).unwrap();
+      return isDbEdit
+        ? dispatch(updateScenario({ id, updates: payload })).unwrap()
+        : dispatch(addScenario(payload)).unwrap();
+    };
+
+    /*
+     * A published scenario has to be runnable, and a run needs the Voxio flow
+     * the AI creates — its key. Without one, "Published" is a label on something
+     * a student would open into nothing, so it is saved as a draft instead.
+     */
+    const hasSimulatorFlow = !!(apiKey || selectedScenario?.apiKey);
+    const wantsPublish = data.status === "Published";
+
+    try {
+      if (wantsPublish && !hasSimulatorFlow) {
+        await save("Draft");
+        setErrorPopup({
+          open: true,
+          leaveOnClose: true,
+          message:
+            "Saved as a draft. This scenario has no simulator flow yet, so it " +
+            "cannot be published — use the AI prompt at the top of the form to " +
+            "generate one, then publish.",
+        });
+        return;
       }
+
+      await save(data.status);
       navigate("/scenarios");
     } catch (err) {
-      setErrorPopup({
-        open: true,
-        message: err?.message || err || "Failed to save scenario.",
-      });
+      const message = err?.message || err || "Failed to save scenario.";
+
+      /*
+       * Publishing failed. Falling back to a draft rather than surfacing the
+       * error alone: the educator may have spent a minute in the rich-text
+       * fields, and the old behaviour left the modal open with the work only in
+       * the browser — one stray click and it was gone.
+       */
+      if (wantsPublish) {
+        try {
+          await save("Draft");
+          setErrorPopup({
+            open: true,
+            leaveOnClose: true,
+            message: `Could not publish this scenario: ${message}\n\nIt has been saved as a draft, so nothing is lost. Open it again to publish.`,
+          });
+          return;
+        } catch (draftErr) {
+          console.error("[SCENARIO] draft fallback also failed:", draftErr);
+        }
+      }
+
+      setErrorPopup({ open: true, message });
     } finally {
       setIsSaving(false);
     }
@@ -500,7 +510,13 @@ function ScenarioFormPage() {
       <ErrorModal
         isOpen={errorPopup.open}
         message={errorPopup.message}
-        onClose={() => setErrorPopup({ ...errorPopup, open: false })}
+        tone={errorPopup.leaveOnClose ? "warning" : "error"}
+        onClose={() => {
+          setErrorPopup({ ...errorPopup, open: false });
+          // The draft-fallback message reports a *save that happened*, so the
+          // form has to close afterwards or the educator can save it twice.
+          if (errorPopup.leaveOnClose) navigate("/scenarios");
+        }}
       />
 
       <div className="fixed inset-0 z-50 bg-black/60 backdrop-blur-sm flex justify-center items-start pt-10 pb-10 px-4 overflow-y-auto">
@@ -634,7 +650,7 @@ function ScenarioFormPage() {
               </div>
 
               {/*
-                One block per region. Every region is always shown: the form has
+                One block per region. Both regions are always shown: the form has
                 no way to know which one the case is about, and a limitation left
                 unset simply is not sent.
               */}
@@ -643,6 +659,11 @@ function ScenarioFormPage() {
                   <h3 className="text-sm font-bold text-gray-800 mb-2">
                     {`Animation triggers - ${region.label}`}
                   </h3>
+                  {index === 0 && (
+                    <p className="text-xs text-gray-500 mb-3">
+                      Select these yourself — the AI does not fill them in.
+                    </p>
+                  )}
                   <div className="grid grid-cols-1 md:grid-cols-2 gap-y-3">
                     {region.movements.map((movement) => (
                       <div
@@ -664,7 +685,7 @@ function ScenarioFormPage() {
                                   `movements.${region.id}.${movement.id}`,
                                 )}
                                 value={opt}
-                                className="mr-1.5 w-3.5 h-3.5 text-blue-600 border-gray-300 focus:ring-blue-500 cursor-pointer"
+                                className="mr-1.5 w-3.5 h-3.5 accent-orange-500 text-orange-500 border-gray-300 focus:ring-orange-500 cursor-pointer"
                               />
                               {`${movement.label}_${opt}`}
                             </label>

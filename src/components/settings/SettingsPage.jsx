@@ -129,8 +129,8 @@ function SettingsPage() {
 
   const onSubmit = async (data) => {
     try {
+      // No `name`: it is not editable here (see the Full Name field below).
       const response = await axios.put("/api/auth/profile", {
-        name: data.fullName,
         phoneNumber: data.phoneNumber,
       });
       updateProfile({
@@ -323,26 +323,23 @@ function SettingsPage() {
                 <label className="block text-sm font-medium text-gray-700 mb-1">
                   Full Name
                 </label>
+                {/*
+                  Read-only for every role, including superadmin. The name is how
+                  an educator identifies a student on a roster and how a session
+                  is attributed, so it is set at account creation and changed by
+                  whoever administers the account — not by its holder. `name` is
+                  no longer in the submitted payload either; disabling the input
+                  alone would still leave the field editable through the form
+                  state.
+                */}
                 <div className="flex items-center">
                   <input
-                    {...register("fullName", {
-                      required: "Full name is required",
-                    })}
+                    {...register("fullName")}
                     type="text"
-                    disabled={!canEditPersonalInfo}
-                    className={`flex-1 px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500 ${
-                      !canEditPersonalInfo
-                        ? "bg-gray-100 cursor-not-allowed"
-                        : ""
-                    }`}
+                    disabled={true}
+                    className="flex-1 px-3 py-2 border border-gray-300 rounded-md bg-gray-100 cursor-not-allowed"
                   />
-                  {canEditPersonalInfo && <EditIcon />}
                 </div>
-                {errors.fullName && (
-                  <p className="text-sm text-red-600 mt-1">
-                    {errors.fullName.message}
-                  </p>
-                )}
               </div>
               <div>
                 <label className="block text-sm font-medium text-gray-700 mb-1">

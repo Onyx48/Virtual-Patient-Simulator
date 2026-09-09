@@ -94,24 +94,35 @@ function ScenarioTable({ data, onEditClick, canEdit = true }) {
                 <Target className={`w-5 h-5 ${getIconColor(index)}`} />
               </div>
 
-              <div className="flex items-center gap-1.5">
-                <TrendingUp className="w-4 h-4 text-orange-400" />
-                <span className="text-xs font-bold text-gray-700">
-                  {scenario.avgScore != null
-                    ? `${scenario.avgScore}% avg`
-                    : "No sessions"}
-                </span>
-              </div>
+              {/*
+                Only shown once there is a score to show. "No sessions" on every
+                new scenario read as a fault rather than as a card nobody has run
+                yet, and it was the first thing on the card.
+              */}
+              {scenario.avgScore != null && (
+                <div className="flex items-center gap-1.5">
+                  <TrendingUp className="w-4 h-4 text-orange-400" />
+                  <span className="text-xs font-bold text-gray-700">
+                    {`${scenario.avgScore}% avg`}
+                  </span>
+                </div>
+              )}
             </div>
 
             <div className="mb-6">
               <h3 className="text-base font-bold text-gray-900 mb-2 truncate">
                 {scenario.scenarioName}
               </h3>
-              <p className="text-xs text-gray-500 line-clamp-2 mb-4 h-8 leading-relaxed">
-                {scenario.description ||
-                  "No description provided. Lorem ipsum dolor sit amet consectetur."}
-              </p>
+              {/*
+                No placeholder. A scenario with no description shows its title
+                and nothing else — filler text pretending to be a description is
+                worse than the gap.
+              */}
+              {scenario.description && (
+                <p className="text-xs text-gray-500 line-clamp-2 mb-4 h-8 leading-relaxed">
+                  {scenario.description}
+                </p>
+              )}
 
               <div className="flex items-center gap-2 text-[10px] font-bold uppercase tracking-wider">
                 <span className={getStatusStyle(scenario.status)}>
@@ -136,10 +147,16 @@ function ScenarioTable({ data, onEditClick, canEdit = true }) {
                     </span>
                   </>
                 )}
-                <span className="text-gray-300">•</span>
-                <span className="text-gray-500">
-                  {scenario.totalSessions || 0} sessions
-                </span>
+                {/* Hidden at zero, same reason as the avg-score badge above. */}
+                {scenario.totalSessions > 0 && (
+                  <>
+                    <span className="text-gray-300">•</span>
+                    <span className="text-gray-500">
+                      {scenario.totalSessions}{" "}
+                      {scenario.totalSessions === 1 ? "session" : "sessions"}
+                    </span>
+                  </>
+                )}
               </div>
             </div>
 

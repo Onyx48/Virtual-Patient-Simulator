@@ -367,17 +367,23 @@ router.post(
 router.put(
   "/profile",
   protect,
-  [
-    body("name", "Name is required").optional().notEmpty().trim(),
-    body("phoneNumber").optional().trim(),
-  ],
+  [body("phoneNumber").optional().trim()],
   async (req, res) => {
     const errors = validationResult(req);
     if (!errors.isEmpty()) {
       return res.status(400).json({ errors: errors.array() });
     }
 
-    const { name, phoneNumber } = req.body;
+    /*
+     * `name` is deliberately not read from the body. Nobody renames themselves:
+     * the name is what identifies a student on an educator's roster and what a
+     * recorded session is attributed to, so a self-service rename silently
+     * breaks the link a human uses to find their own students. An administrator
+     * renames an account through PUT /api/users/:id, which is scope-checked.
+     * A body carrying `name` is ignored rather than rejected, so an older
+     * frontend build still saves its phone number.
+     */
+    const { phoneNumber } = req.body;
     const userId = req.user.id;
 
     try {
@@ -386,7 +392,6 @@ router.put(
         return res.status(404).json({ message: "User not found" });
       }
 
-      if (name !== undefined) user.name = name;
       if (phoneNumber !== undefined) user.phoneNumber = phoneNumber;
 
       await user.save();

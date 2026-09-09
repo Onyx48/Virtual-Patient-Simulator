@@ -62,7 +62,7 @@ function InviteStatusCell({ student, canResend, isBusy, onResend }) {
         <button
           onClick={onResend}
           disabled={isBusy}
-          className="text-xs text-blue-600 hover:text-blue-800 underline decoration-blue-300 underline-offset-2 disabled:opacity-50 disabled:no-underline"
+          className="text-xs font-semibold text-orange-600 hover:text-orange-700 underline decoration-orange-300 underline-offset-2 disabled:opacity-50 disabled:no-underline"
         >
           {isBusy
             ? "Sending…"
@@ -435,9 +435,21 @@ function StudentPage({ role }) {
 
   const { sortedData, sortConfig, handleSort } = useSorting(filteredData);
 
+  /*
+   * The active column's arrow is orange and the idle ones are grey, so the
+   * column the table is actually sorted by is findable at a glance. Returns JSX
+   * rather than a string because the two need different colours.
+   */
   const getSortIcon = (key) => {
-    if (!sortConfig || sortConfig.key !== key) return " ↕";
-    return sortConfig.direction === "asc" ? " ↑" : " ↓";
+    const isActive = sortConfig && sortConfig.key === key;
+    return (
+      <span
+        className={`ml-1 ${isActive ? "text-orange-500" : "text-gray-300"}`}
+        aria-hidden="true"
+      >
+        {!isActive ? "↕" : sortConfig.direction === "asc" ? "↑" : "↓"}
+      </span>
+    );
   };
 
   const {

@@ -44,9 +44,17 @@ function ScenarioListTable({
   onDeleteClick,
   canManage = false,
 }) {
+  // Active column orange, idle columns grey — matches StudentPage.
   const getSortIcon = (key) => {
-    if (!sortConfig || sortConfig.key !== key) return " ↕";
-    return sortConfig.direction === "asc" ? " ↑" : " ↓";
+    const isActive = sortConfig && sortConfig.key === key;
+    return (
+      <span
+        className={`ml-1 ${isActive ? "text-orange-500" : "text-gray-300"}`}
+        aria-hidden="true"
+      >
+        {!isActive ? "↕" : sortConfig.direction === "asc" ? "↑" : "↓"}
+      </span>
+    );
   };
 
   const sortableHeader = (label, key) => (

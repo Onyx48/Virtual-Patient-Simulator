@@ -126,8 +126,47 @@ const readInput = (req) => {
   return { ...req.query };
 };
 
+/*
+ * Every line for one call carries the same short id.
+ *
+ * The coach is called by an external simulator, concurrently, for different
+ * students — so without a correlator the log is interleaved fragments and there
+ * is no way to tell which "answered by groq" belongs to which rejected request.
+ * Short and random rather than sequential: it only has to be unique among the
+ * requests in flight.
+ */
+const newRequestId = () => Math.random().toString(36).slice(2, 8);
+
+/*
+ * Transcripts and coach answers are patient-consultation material, so contents
+ * are off by default and only counts are logged. Set AI_DEBUG_LOG=true to get
+ * excerpts when diagnosing a bad answer — a deliberate, temporary choice on a
+ * specific box, not something to leave on in production.
+ */
+const logContent = () =>
+  ["true", "1", "yes"].includes(String(process.env.AI_DEBUG_LOG).toLowerCase());
+
+const excerpt = (value, limit = 400) => {
+  const text = String(value ?? "");
+  return text.length > limit ? `${text.slice(0, limit)}… (+${text.length - limit} chars)` : text;
+};
+
 const askReason = async (req, res) => {
+  const reqId = newRequestId();
+  const startedAt = Date.now();
   const input = readInput(req);
+
+  /*
+   * Logged before validation, because the failures worth diagnosing here are
+   * malformed requests — a caller sending the wrong Content-Type reached the
+   * handler with an empty body, and the access log showed only a 400 with no
+   * hint that the header was the cause.
+   */
+  console.log(
+    `[ask-reason ${reqId}] ${req.method} from ${req.ip} ` +
+      `content-type=${req.get("content-type") || "(none)"} ` +
+      `bodyType=${typeof req.body} keys=${Object.keys(input).sort().join(",") || "(none)"}`,
+  );
 
   const query = String(pick(input, "query") ?? "").trim();
   const scenarioId = String(pick(input, "scenarioId") ?? "").trim();
@@ -140,7 +179,7 @@ const askReason = async (req, res) => {
   if (missing.length) {
     // The access log shows only a bare 400, so record what the caller did send.
     console.warn(
-      `[ask-reason] rejected: missing ${missing.join(", ")}; got keys ${Object.keys(input).sort().join(", ") || "(none)"}`,
+      `[ask-reason ${reqId}] rejected: missing ${missing.join(", ")}`,
     );
     return res.status(400).json({
       message:
@@ -167,14 +206,14 @@ const askReason = async (req, res) => {
     const scenario = legacyScenario || (await Scenario.findById(scenarioId).lean());
 
     if (!scenario) {
-      console.warn(`[ask-reason] no scenario with _id ${scenarioId}`);
+      console.warn(`[ask-reason ${reqId}] no scenario with _id ${scenarioId}`);
       return res
         .status(404)
         .json({ message: `No scenario found with scenarioId: ${scenarioId}` });
     }
 
     if (legacyScenario) {
-      console.log(`[ask-reason] scenarioId ${scenarioId} resolved from the legacy table`);
+      console.log(`[ask-reason ${reqId}] scenarioId ${scenarioId} resolved from the legacy table`);
     }
 
     /*
@@ -213,16 +252,27 @@ const askReason = async (req, res) => {
        * means sessions have stopped being recorded.
        */
       console.warn(
-        `[ask-reason] no session stored for session_id ${sessionId}; ` +
+        `[ask-reason ${reqId}] no session stored for session_id ${sessionId}; ` +
           `continuing with the transcript from the request ` +
           `(${transcriptionText.length} chars)`,
       );
     }
 
     console.log(
-      `[ask-reason] scenarioId = ${scenarioId}, sessionId = ${sessionId}, ` +
-        `transcript chars = ${transcriptionText.length}, query chars = ${query.length}`,
+      `[ask-reason ${reqId}] resolved scenario=${scenarioId}` +
+        `${legacyScenario ? " (legacy)" : ""} session=${sessionId} ` +
+        `transcriptChars=${transcriptionText.length} ` +
+        `transcriptFrom=${
+          pick(input, "transcription") ? "request" : session ? "stored" : "none"
+        } queryChars=${query.length}`,
     );
+
+    if (logContent()) {
+      console.log(`[ask-reason ${reqId}] query: ${excerpt(query)}`);
+      console.log(
+        `[ask-reason ${reqId}] transcript: ${excerpt(transcriptionText, 1500)}`,
+      );
+    }
 
     /*
      * A legacy record already holds plain prose and a real array; a Mongo
@@ -247,18 +297,48 @@ const askReason = async (req, res) => {
       query,
     });
 
+    // Prompt size is logged because it is the usual cause of a slow or truncated
+    // answer, and it grows with the transcript rather than with anything visible
+    // in the request.
+    console.log(
+      `[ask-reason ${reqId}] calling AI: systemPromptChars=${ASK_REASON_PROMPT.length} ` +
+        `userQueryChars=${userQuery.length}`,
+    );
+
+    const aiStartedAt = Date.now();
     const { text, provider, model } = await generateTextWithFallback({
       systemPrompt: ASK_REASON_PROMPT,
       userQuery,
     });
+    const aiMs = Date.now() - aiStartedAt;
 
     console.log(
-      `[ask-reason] answered by ${provider} (${model}), ${text.length} chars`,
+      `[ask-reason ${reqId}] answered by ${provider} (${model}) ` +
+        `${text.length} chars in ${aiMs}ms (total ${Date.now() - startedAt}ms)`,
     );
+
+    // An empty answer still returns 200, so it would otherwise look like success
+    // while the student sees a blank coach.
+    if (!text.trim()) {
+      console.warn(
+        `[ask-reason ${reqId}] ${provider} returned an empty answer — the student will see nothing`,
+      );
+    }
+
+    if (logContent()) {
+      console.log(`[ask-reason ${reqId}] answer: ${excerpt(text, 1500)}`);
+    }
 
     res.json({ response: text });
   } catch (err) {
-    console.error("[ask-reason] failed:", err);
+    // Status and provider detail matter here: this is where a Gemini 429 with no
+    // Groq key configured surfaces, and the bare stack does not say which
+    // provider gave up or how long was spent before it did.
+    console.error(
+      `[ask-reason ${reqId}] failed after ${Date.now() - startedAt}ms ` +
+        `status=${err.status || err.statusCode || "none"}: ${err.message}`,
+    );
+    console.error(err);
     res.status(503).json({
       message: publicMessage(err, "The reasoning coach is unavailable right now."),
     });

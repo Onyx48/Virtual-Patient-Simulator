@@ -120,11 +120,12 @@ function Sidebar({ logo }) {
           ) : null,
         )}
 
+        {/*
+          The divider alone separates these from the main menu. The old "Help &
+          Support" heading sat above Create Room and Settings, neither of which is
+          help or support.
+        */}
         <div className="my-6 border-t border-gray-800 mx-3"></div>
-
-        <p className="px-3 text-xs font-semibold text-gray-500 uppercase tracking-wider mb-2">
-          {t("nav.helpSupport")}
-        </p>
 
         {supportItems.map((item) => {
           // 2. Check if the current user has access to this menu item

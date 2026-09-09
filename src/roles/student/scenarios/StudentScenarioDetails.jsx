@@ -333,7 +333,7 @@ function StudentScenarioDetails({ onBack }) {
                 <div className="relative w-full max-w-[20px] bg-gray-50 rounded-t-full h-full flex items-end overflow-hidden">
                   <div
                     style={{ height: `${score}%` }}
-                    className="w-full bg-[#10B981] rounded-t-full transition-all duration-500 group-hover:bg-[#059669]"
+                    className="w-full bg-orange-400 rounded-t-full transition-all duration-500 group-hover:bg-orange-500"
                   ></div>
                 </div>
                 <span className="text-[10px] text-gray-400 mt-3 font-medium">
