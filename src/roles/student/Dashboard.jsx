@@ -79,7 +79,7 @@ function StudentDashboard() {
             description: scenario.description || "",
             difficulty: scenario.difficulty || "Medium",
             highestScore:
-              scenarioStat?.bestScore !== null
+              scenarioStat?.bestScore != null
                 ? Math.round(scenarioStat.bestScore * 100)
                 : null,
             status: scenarioStat?.isCompleted ? "Completed" : "Available",
@@ -352,9 +352,14 @@ function StudentDashboard() {
                             </span>
                           </td>
                           <td className="p-3 pr-4 text-sm font-bold text-gray-800 text-right">
-                            {scenario.highestScore !== null
-                              ? `${scenario.highestScore}%`
-                              : "N/A"}
+                            {scenario.highestScore != null ? (
+                              `${scenario.highestScore}%`
+                            ) : (
+                              /* Not "N/A" and not "0%": nobody has run it yet. */
+                              <span className="font-normal text-gray-400">
+                                No sessions
+                              </span>
+                            )}
                           </td>
                         </tr>
                       ))

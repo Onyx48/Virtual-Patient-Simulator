@@ -79,6 +79,27 @@ function ScenarioTable({ data, onEditClick, canEdit = true }) {
   return (
     <div className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-4 gap-6">
       {data.map((scenario, index) => {
+        /*
+         * The description is dropped when it only repeats the title, which made
+         * the card show the same line twice — once as the bold heading and again
+         * underneath it. It is not a rendering bug: the AI writes the scenario
+         * name into the short description, and educators do the same by hand.
+         *
+         * Compared loosely (case, surrounding whitespace and any stray markup),
+         * because "Neck Pain - Alice" and "neck pain — alice" are the same
+         * duplicate to a reader.
+         */
+        const normalise = (text) =>
+          String(text || "")
+            .replace(/<[^>]*>/g, " ")
+            .replace(/\s+/g, " ")
+            .trim()
+            .toLowerCase();
+
+        const showDescription =
+          !!scenario.description &&
+          normalise(scenario.description) !== normalise(scenario.scenarioName);
+
         return (
           <div
             key={scenario.id || scenario._id}
@@ -118,7 +139,7 @@ function ScenarioTable({ data, onEditClick, canEdit = true }) {
                 and nothing else — filler text pretending to be a description is
                 worse than the gap.
               */}
-              {scenario.description && (
+              {showDescription && (
                 <p className="text-xs text-gray-500 line-clamp-2 mb-4 h-8 leading-relaxed">
                   {scenario.description}
                 </p>

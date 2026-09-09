@@ -2,6 +2,23 @@ import React from "react";
 import { Target } from "lucide-react";
 import { useNavigate } from "react-router-dom";
 
+/*
+ * Compared loosely — case, surrounding whitespace and any stray markup — because
+ * "Neck Pain - Alice" and "neck pain — alice" are the same duplicate to a reader.
+ * Kept in step with roles/educator/scenarios/ScenarioTable.jsx, which hides the
+ * same repetition on the educator's card.
+ */
+const normalise = (text) =>
+  String(text || "")
+    .replace(/<[^>]*>/g, " ")
+    .replace(/\s+/g, " ")
+    .trim()
+    .toLowerCase();
+
+const showDescription = (scenario) =>
+  !!scenario.description &&
+  normalise(scenario.description) !== normalise(scenario.scenarioName);
+
 function ScenarioGridStudent({ data, onStartNow }) {
   const navigate = useNavigate();
 
@@ -69,10 +86,22 @@ function ScenarioGridStudent({ data, onStartNow }) {
               <div className="w-10 h-10 rounded-full bg-red-50 flex items-center justify-center border border-red-100">
                 <Target className="w-5 h-5 text-red-500" />
               </div>
+              {/*
+                A scenario nobody has attempted has no score, and "0% Highest"
+                read as a failed attempt rather than as an untouched card — the
+                student saw a zero they had not earned. `highestScore` is null
+                until a session is scored, so the two cases are distinguishable.
+              */}
               <div>
-                <span className="block text-sm font-bold text-gray-900">
-                  {scenario.highestScore || "0"}% Highest
-                </span>
+                {scenario.highestScore == null ? (
+                  <span className="block text-sm font-semibold text-gray-400">
+                    No sessions
+                  </span>
+                ) : (
+                  <span className="block text-sm font-bold text-gray-900">
+                    {scenario.highestScore}% Highest
+                  </span>
+                )}
               </div>
             </div>
 
@@ -92,10 +121,18 @@ function ScenarioGridStudent({ data, onStartNow }) {
             <h3 className="text-lg font-bold text-gray-900 mb-2 leading-tight">
               {scenario.scenarioName}
             </h3>
-            <p className="text-xs text-gray-500 leading-relaxed line-clamp-3">
-              {scenario.description ||
-                "No description provided for this scenario."}
-            </p>
+            {/*
+              Dropped when it only repeats the title — the AI writes the scenario
+              name into the short description, so the card showed the same line
+              twice, once as the bold heading and again beneath it. Nothing is put
+              in its place: a title with no description below it reads fine, while
+              "No description provided" is a sentence about the absence of one.
+            */}
+            {showDescription(scenario) && (
+              <p className="text-xs text-gray-500 leading-relaxed line-clamp-3">
+                {scenario.description}
+              </p>
+            )}
           </div>
 
           <div className="mt-auto">

@@ -4,6 +4,7 @@ import { useNavigate, useParams } from "react-router-dom";
 import { useForm, Controller } from "react-hook-form";
 import { useAuth } from "../../AuthContext";
 import axios from "axios";
+import toast from "react-hot-toast";
 import {
   addScenario,
   updateScenario,
@@ -253,7 +254,7 @@ function ScenarioFormPage() {
     ? scenarios.find((s) => s._id === id || s.id === id)
     : null;
 
-  const { register, handleSubmit, setValue, control } = useForm({
+  const { register, handleSubmit, setValue, control, getValues } = useForm({
     defaultValues: {
       scenarioName: "",
       difficulty: "Medium",
@@ -474,6 +475,63 @@ function ScenarioFormPage() {
     }
   };
 
+  /*
+   * Closing the form keeps the work as a draft instead of discarding it.
+   *
+   * Educators were losing whole scenarios: the AI takes 20-60 seconds to write
+   * the name, prompt and questions, and closing the form before pressing Save as
+   * Draft threw all of it away with no warning. A draft is the safe default —
+   * it is invisible to students until published, so an unwanted one costs a
+   * delete, while the old behaviour cost the entire scenario.
+   *
+   * Only for a new scenario. On an edit the document already exists, and silently
+   * committing half-finished changes to a scenario students may be running is the
+   * opposite of safe.
+   *
+   * A form with no scenario name is treated as nothing to keep, so opening the
+   * page and closing it again does not litter the list with blank drafts.
+   */
+  const handleClose = async () => {
+    const values = getValues();
+    const hasContent = String(values.scenarioName || "").trim().length > 0;
+
+    if (isDbEdit || !hasContent || isSaving) {
+      navigate("/scenarios");
+      return;
+    }
+
+    setIsSaving(true);
+    try {
+      await dispatch(
+        addScenario({
+          ...values,
+          status: "Draft",
+          description: values.shortDescription,
+          animationTriggers: formatMovementsForBackend(values.movements),
+          aiQuestions: values.questionsForFeedback,
+          ...(apiKey && { apiKey }),
+        }),
+      ).unwrap();
+      toast.success("Saved as a draft.");
+    } catch (err) {
+      /*
+       * The save failed and the educator has already asked to leave. Navigating
+       * anyway would drop the work silently, so the form stays open with the
+       * reason — the fields are still filled in and Save as Draft can be retried.
+       */
+      setErrorPopup({
+        open: true,
+        message:
+          `Could not save this scenario as a draft: ${err?.message || err}\n\n` +
+          "Your work is still in the form. Try Save as Draft again.",
+      });
+      setIsSaving(false);
+      return;
+    }
+    setIsSaving(false);
+    navigate("/scenarios");
+  };
+
   const handleDelete = () => {
     setShowConfirmModal(true);
   };
@@ -523,7 +581,8 @@ function ScenarioFormPage() {
         <div className="bg-white w-full max-w-[800px] rounded-lg shadow-2xl flex flex-col relative my-auto isolate">
           <div className="absolute -top-4 right-1/2 transform translate-x-1/2 z-10">
             <button
-              onClick={() => navigate("/scenarios")}
+              onClick={handleClose}
+              disabled={isSaving}
               className="bg-gray-700 text-white p-2 rounded-full hover:bg-gray-900 shadow-md transition-colors"
             >
               <X size={24} />
@@ -537,7 +596,7 @@ function ScenarioFormPage() {
           </div>
 
           <div className="p-6 pt-0 overflow-y-auto max-h-[85vh]">
-            <div className="mb-6 p-1 rounded-lg border border-purple-300 bg-white shadow-sm flex items-center relative z-0">
+            <div className="mb-6 p-1 rounded-lg border border-orange-300 bg-white shadow-sm flex items-center relative z-0">
               <div className="pl-3 text-orange-400">
                 {isAiLoading ? (
                   <Loader className="w-5 h-5 animate-spin" />
@@ -569,9 +628,9 @@ function ScenarioFormPage() {
               would hide the thing being changed.
             */}
             {isAiLoading && (
-              <div className="mb-6 rounded-lg border border-purple-200 bg-purple-50/60 p-4 animate-in fade-in duration-200">
+              <div className="mb-6 rounded-lg border border-orange-200 bg-orange-50/60 p-4 animate-in fade-in duration-200">
                 <div className="flex items-center gap-3">
-                  <Loader className="w-4 h-4 shrink-0 animate-spin text-purple-600" />
+                  <Loader className="w-4 h-4 shrink-0 animate-spin text-orange-500" />
                   <p
                     className="flex-1 text-sm font-medium text-gray-700"
                     aria-live="polite"
@@ -586,8 +645,8 @@ function ScenarioFormPage() {
                   </span>
                 </div>
 
-                <div className="mt-3 h-1 w-full overflow-hidden rounded-full bg-purple-100">
-                  <div className="h-full w-1/4 rounded-full bg-purple-500 animate-indeterminate-bar" />
+                <div className="mt-3 h-1 w-full overflow-hidden rounded-full bg-orange-100">
+                  <div className="h-full w-1/4 rounded-full bg-orange-500 animate-indeterminate-bar" />
                 </div>
 
                 <p className="mt-3 text-xs text-gray-500">

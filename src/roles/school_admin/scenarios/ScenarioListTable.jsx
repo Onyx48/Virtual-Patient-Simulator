@@ -49,10 +49,12 @@ function ScenarioListTable({
     const isActive = sortConfig && sortConfig.key === key;
     return (
       <span
-        className={`ml-1 ${isActive ? "text-orange-500" : "text-gray-300"}`}
+        className={`ml-1.5 align-middle text-base font-bold leading-none ${
+          isActive ? "text-orange-500" : "text-gray-500"
+        }`}
         aria-hidden="true"
       >
-        {!isActive ? "↕" : sortConfig.direction === "asc" ? "↑" : "↓"}
+        {!isActive ? "⇅" : sortConfig.direction === "asc" ? "↑" : "↓"}
       </span>
     );
   };
