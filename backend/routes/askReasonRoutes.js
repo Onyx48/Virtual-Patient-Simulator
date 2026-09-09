@@ -36,29 +36,24 @@ const ASK_REASON_PROMPT = readFileSync(
 );
 
 /*
- * The coach answers from a fixed script — no Gemini, no Groq, no model call at
- * all. Deliberate: while the AI providers are unreliable (a spent Gemini free
- * tier returns 429 and this route then 503s), a student mid-consultation is
- * better served by generic coaching than by an error, and this costs nothing and
- * cannot rate-limit.
+ * The coach reasons about the real consultation. The fixed script below is the
+ * safety net, not the product.
  *
- * The live AI path below is left intact and is reached the moment this flag is
- * false, so restoring it is a one-line change rather than a rewrite. Set
- * ASK_REASON_USE_AI=true in the environment to turn it back on for one box
- * without editing code.
- *
- * Note what this gives up: the answer ignores `query`, the transcript and the
- * scenario entirely. A student asking "why did you rule out radiculopathy?"
- * gets the same paragraph as one asking "what should I do next?". It is a
- * holding pattern, not a working coach.
+ * This is opt-*out*: an unset ASK_REASON_USE_AI means AI. It was briefly the
+ * other way round while the providers were unreliable, which meant every student
+ * got the same paragraph — acceptable as a holding pattern, not as the endpoint.
+ * Set ASK_REASON_USE_AI=false to pin one box back to the script without a deploy.
  */
-const standardResponseEnabled = () =>
-  !["true", "1", "yes"].includes(String(process.env.ASK_REASON_USE_AI).toLowerCase());
+const standardResponseForced = () =>
+  ["false", "0", "no"].includes(String(process.env.ASK_REASON_USE_AI).toLowerCase());
 
 /*
- * Written to be true of any consultation and useful in most: it points at
- * method rather than at findings, since it cannot know the findings. Kept to the
- * shape a real coach answer takes so the simulator's rendering is unchanged.
+ * Written to be true of any consultation and useful in most: it points at method
+ * rather than at findings, since it cannot know the findings. Kept to the shape a
+ * real coach answer takes so the simulator's rendering is unchanged.
+ *
+ * Reached when both providers are down, or when the box is pinned to the script.
+ * A student mid-consultation is better served by generic coaching than by a 503.
  */
 const STANDARD_RESPONSE = [
   "Work from what the patient has actually told you rather than from the diagnosis you expect.",
@@ -96,6 +91,47 @@ const transcriptionToText = (transcription) => {
     .filter(Boolean)
     .join("\n")
     .trim();
+};
+
+/**
+ * Count the labelled turns in a transcript, for the log only.
+ *
+ * Deliberately does not try to say which speaker is the student. posta splits a
+ * transcript by assuming the first label is the student, but that is wrong here:
+ * live transcripts open with the avatar ("Farrukh: Hello! Lets start the
+ * session"), so ordering identifies nobody and a guess would attribute the
+ * patient's words to the student.
+ */
+const countTurns = (transcriptionText) =>
+  transcriptionText.split("\n").filter((line) => /^[^:]{1,40}?\s*:\s*\S/.test(line.trim())).length;
+
+/*
+ * A question with no letters or digits in it is not a question.
+ *
+ * The caller has been sending `query: ": Hello"` — a transcript line that lost
+ * its speaker label and kept the colon. Left alone, the model is asked to coach
+ * on punctuation.
+ */
+const isUsableQuery = (text) => /[\p{L}\p{N}]/u.test(text);
+
+/**
+ * The question to actually coach against.
+ *
+ * An unusable query becomes a general one rather than being guessed at from the
+ * transcript: the model is given the whole consultation either way, so it can
+ * still reason about the case, and a wrong guess about which line was the
+ * student's would send it off answering the patient. The reason is returned
+ * alongside the text so the log records the substitution instead of hiding it.
+ */
+const DEFAULT_QUERY = "What should I be reasoning about at this point in the consultation?";
+
+const resolveQuery = (query) => {
+  // Strip a leading speaker label the caller failed to strip: ": Hello" → "Hello".
+  const cleaned = query.replace(/^\s*[^:\p{L}\p{N}]*:\s*/u, "").trim();
+
+  if (isUsableQuery(cleaned)) return { text: cleaned, from: "request" };
+
+  return { text: DEFAULT_QUERY, from: "default" };
 };
 
 /**
@@ -227,31 +263,42 @@ const askReason = async (req, res) => {
    * sessionId is worth knowing about even while it is being tolerated — and it
    * has to be fixed before the AI path below is switched back on, which needs it.
    */
-  if (standardResponseEnabled()) {
-    const absent = Object.entries({ query, scenarioId, sessionId })
-      .filter(([, value]) => !value)
-      .map(([field]) => field);
-
-    trace.log("ASK_REASON_USE_AI is off — answering from the fixed script, no AI call", {
-      toleratedMissing: absent,
+  if (standardResponseForced()) {
+    trace.log("ASK_REASON_USE_AI=false — answering from the fixed script, no AI call", {
       responseChars: STANDARD_RESPONSE.length,
     });
     return trace.send(res, 200, { response: STANDARD_RESPONSE });
   }
 
-  const missing = Object.entries({ query, scenarioId, sessionId })
-    .filter(([, value]) => !value)
-    .map(([field]) => field);
-
-  if (missing.length) {
+  /*
+   * `scenarioId` is the only hard requirement: without it there is no case to
+   * reason about and the answer could only be generic, which is what the script
+   * already does for free.
+   *
+   * `sessionId` is deliberately *not* required. The simulator sends it empty, and
+   * it was only ever used to look up a stored transcript as a fallback — the
+   * caller's own transcript is the authoritative one. Requiring it rejected every
+   * live request for a field the answer does not depend on.
+   *
+   * `query` is not required either: resolveQuery derives one below.
+   */
+  if (!scenarioId) {
     // The access log shows only a bare 400, so record what the caller did send.
-    trace.warn("rejected: the AI path needs these fields", { missing });
+    trace.warn("rejected: no scenarioId", { received: Object.keys(input).sort() });
     return trace.send(res, 400, {
       message:
-        `Missing ${missing.map((f) => `'${f}' (or '${FIELD_ALIASES[f][1]}')`).join(", ")} ` +
-        `in request body or query string. Received: ${Object.keys(input).sort().join(", ") || "nothing"}. ` +
+        `Missing 'scenarioId' (or 'scenario_id') in request body or query string. ` +
+        `Received: ${Object.keys(input).sort().join(", ") || "nothing"}. ` +
         `If the body was JSON, check the request sent Content-Type: application/json.`,
     });
+  }
+
+  if (!sessionId) {
+    /*
+     * Tolerated, but worth seeing: the same empty id makes posta lose scores, and
+     * it is one bug in the simulator handoff rather than two here.
+     */
+    trace.warn("no sessionId was sent — continuing on the request transcript alone");
   }
 
   /*
@@ -291,9 +338,9 @@ const askReason = async (req, res) => {
      * the caller is the external simulator, which holds no JWT. A shared secret
      * header is the fix if AI spend from unknown callers becomes a problem.
      */
-    const session = await Session.findOne({ session_id: sessionId })
-      .select("transcription")
-      .lean();
+    const session = sessionId
+      ? await Session.findOne({ session_id: sessionId }).select("transcription").lean()
+      : null;
 
     /*
      * The caller's transcript wins. The simulator owns the conversation and is
@@ -305,7 +352,7 @@ const askReason = async (req, res) => {
       transcriptionToText(pick(input, "transcription")) ||
       transcriptionToText(session?.transcription);
 
-    if (!session) {
+    if (sessionId && !session) {
       /*
        * An unknown session id is not fatal. Old clients send a Bubble
        * StreamSessionId for a run we never recorded, so the lookup can only
@@ -324,6 +371,19 @@ const askReason = async (req, res) => {
       });
     }
 
+    /*
+     * The question the model is actually given, which is not always the one that
+     * arrived — the caller has been sending label-only fragments such as ": Hello".
+     */
+    const resolved = resolveQuery(query);
+
+    if (resolved.from !== "request") {
+      trace.warn("the query as sent was unusable, substituted one", {
+        sent: query,
+        usedFrom: resolved.from,
+      });
+    }
+
     trace.log("assembled the coach input", {
       transcriptFrom: pick(input, "transcription")
         ? "request"
@@ -331,7 +391,9 @@ const askReason = async (req, res) => {
           ? "stored"
           : "none",
       transcriptChars: transcriptionText.length,
-      queryChars: query.length,
+      transcriptTurns: countTurns(transcriptionText),
+      queryFrom: resolved.from,
+      queryChars: resolved.text.length,
     });
 
     /*
@@ -341,7 +403,7 @@ const askReason = async (req, res) => {
      * temporarily.
      */
     if (logContent()) {
-      trace.log("query text", excerpt(query));
+      trace.log("query text", excerpt(resolved.text));
       trace.log("transcript text", excerpt(transcriptionText, 1500));
     }
 
@@ -365,7 +427,7 @@ const askReason = async (req, res) => {
       difficulty: scenarioFields.difficulty,
       movements: scenarioFields.movements,
       transcription: transcriptionText,
-      query,
+      query: resolved.text,
     });
 
     // Prompt size is logged because it is the usual cause of a slow or truncated
@@ -392,23 +454,40 @@ const askReason = async (req, res) => {
       aiMs,
     });
 
-    // An empty answer still returns 200, so it would otherwise look like success
-    // while the student sees a blank coach.
+    /*
+     * An empty answer is a 200 with nothing in it, so it looks like success while
+     * the student sees a blank coach. Send the script rather than the blank.
+     */
     if (!text.trim()) {
-      trace.warn(`${provider} returned an empty answer — the student will see nothing`);
+      trace.warn(`${provider} returned an empty answer — falling back to the fixed script`);
+      return trace.send(res, 200, { response: STANDARD_RESPONSE });
     }
 
     if (logContent()) trace.log("answer text", excerpt(text, 1500));
 
     return trace.send(res, 200, { response: text });
   } catch (err) {
-    // trace.fail carries the status and provider detail the bare stack does not:
-    // this is where a Gemini 429 with no Groq key configured surfaces, and it does
-    // not otherwise say which provider gave up or how long was spent first.
+    /*
+     * trace.fail carries the status and provider detail the bare stack does not:
+     * this is where a Gemini 429 with no Groq key configured surfaces, and it does
+     * not otherwise say which provider gave up or how long was spent first.
+     */
     trace.fail(err);
-    return trace.send(res, 503, {
-      message: publicMessage(err, "The reasoning coach is unavailable right now."),
+
+    /*
+     * 200 with the script, not a 503. A student mid-consultation who asks "why?"
+     * and gets an error banner has lost the exercise; generic coaching still moves
+     * them forward. The failure is loud in the log above, where it belongs — the
+     * operator sees it, the student does not.
+     *
+     * `publicMessage` is still called so the reason is recorded next to the
+     * substitution, since a 200 would otherwise hide a spent quota entirely.
+     */
+    trace.warn("both providers failed — answering from the fixed script", {
+      reason: publicMessage(err, "The reasoning coach is unavailable right now."),
     });
+
+    return trace.send(res, 200, { response: STANDARD_RESPONSE });
   }
 };
 
