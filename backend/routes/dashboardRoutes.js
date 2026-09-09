@@ -106,11 +106,22 @@ router.get(
 
       const sessions = await Session.find({ student_id: studentId });
 
+      /*
+       * Only sessions on scenarios still assigned to this student count. They used
+       * to all count, so a student who had run a scenario that was later
+       * unassigned, deleted, or reassigned had completedCount > totalAssigned —
+       * and "Available Scenarios" rendered the difference as -1.
+       */
+      const assignedIds = new Set(
+        assignedScenarios.map((scenario) => scenario._id.toString()),
+      );
+
       const scenarioBestScores = {};
       const completedScenarioIds = new Set();
 
       sessions.forEach((session) => {
         const scenarioId = session.scenario_id.toString();
+        if (!assignedIds.has(scenarioId)) return;
         if (
           !scenarioBestScores[scenarioId] ||
           session.score > scenarioBestScores[scenarioId].score
@@ -134,7 +145,9 @@ router.get(
       });
 
       const completedCount = completedScenarioIds.size;
-      const availableCount = totalAssigned - completedCount;
+      // Clamped as a backstop: a count of scenarios can never be negative, whatever
+      // the two inputs do.
+      const availableCount = Math.max(0, totalAssigned - completedCount);
 
       const scores = Object.values(scenarioBestScores).map((s) => s.score);
       const averageScore =

@@ -99,7 +99,10 @@ function StudentDashboard() {
   }, [user]);
 
   const filteredScenarios = useMemo(() => {
-    let filtered = scenariosList;
+    // Copied up front: the sort below is in place, and sorting the state array
+    // itself mutates it without a re-render (and throws outright if the array
+    // ever arrives frozen, as Redux/Immer state does).
+    let filtered = [...scenariosList];
     if (searchTerm) {
       filtered = filtered.filter((s) =>
         s.scenarioName.toLowerCase().includes(searchTerm.toLowerCase()),
@@ -454,7 +457,9 @@ function StatCard({ title, value, sub, subValue }) {
       <div className="text-3xl font-bold text-gray-900 mb-2">{value}</div>
       <div className="text-xs text-gray-400">
         {sub}
-        {subValue !== null && (
+        {/* `!=` on purpose: a card that passes no subValue at all was rendering
+            an empty " ()" because undefined is not null. */}
+        {subValue != null && (
           <span className="font-medium text-gray-600"> ({subValue})</span>
         )}
       </div>

@@ -70,7 +70,14 @@ function StudentScenarioDetails({ onBack }) {
 
   const attemptsData = useMemo(() => {
     if (sessions.length === 0) return [];
-    return sessions
+    /*
+     * Copied before sorting. `sessions` comes straight from the Redux store, which
+     * Immer freezes, so an in-place sort throws "Cannot assign to read only
+     * property '0'" — and only sometimes, because V8's sort writes nothing when
+     * the array already happens to be in order. Same reason the currentSession
+     * memo above spreads first.
+     */
+    return [...sessions]
       .sort((a, b) => new Date(a.createdAt) - new Date(b.createdAt))
       .map((s) => toPercent(s.score));
   }, [sessions]);
