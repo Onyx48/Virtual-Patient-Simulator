@@ -1,7 +1,7 @@
 import React, { useState } from "react";
 import axios from "axios";
 import toast from "react-hot-toast";
-import { Target, Edit, TrendingUp, Loader2 } from "lucide-react";
+import { Target, Edit, Loader2 } from "lucide-react";
 
 // The hosted simulator the Test button opens. Baked in at build time; set
 // VITE_SIMULATOR_URL in .env to point at a different deployment.
@@ -105,29 +105,12 @@ function ScenarioTable({ data, onEditClick, canEdit = true }) {
             key={scenario.id || scenario._id}
             className="bg-white rounded-2xl border border-gray-100 shadow-sm hover:shadow-md transition-shadow p-5 flex flex-col justify-between h-full"
           >
-            <div className="flex justify-between items-start mb-4">
-              {/* Icon */}
-              <div
-                className={`w-10 h-10 rounded-full flex items-center justify-center ${getIconBg(
-                  index,
-                )}`}
-              >
-                <Target className={`w-5 h-5 ${getIconColor(index)}`} />
-              </div>
-
-              {/*
-                Only shown once there is a score to show. "No sessions" on every
-                new scenario read as a fault rather than as a card nobody has run
-                yet, and it was the first thing on the card.
-              */}
-              {scenario.avgScore != null && (
-                <div className="flex items-center gap-1.5">
-                  <TrendingUp className="w-4 h-4 text-orange-400" />
-                  <span className="text-xs font-bold text-gray-700">
-                    {`${scenario.avgScore}% avg`}
-                  </span>
-                </div>
-              )}
+            <div
+              className={`w-10 h-10 rounded-full flex items-center justify-center mb-4 ${getIconBg(
+                index,
+              )}`}
+            >
+              <Target className={`w-5 h-5 ${getIconColor(index)}`} />
             </div>
 
             <div className="mb-6">
@@ -168,7 +151,10 @@ function ScenarioTable({ data, onEditClick, canEdit = true }) {
                     </span>
                   </>
                 )}
-                {/* Hidden at zero, same reason as the avg-score badge above. */}
+                {/*
+                  Hidden at zero: a scenario nobody has run yet should say
+                  nothing about sessions rather than report "0 sessions".
+                */}
                 {scenario.totalSessions > 0 && (
                   <>
                     <span className="text-gray-300">•</span>

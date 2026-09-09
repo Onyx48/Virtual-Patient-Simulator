@@ -87,10 +87,11 @@ export const generateTextWithFallback = async ({ systemPrompt, userQuery }) => {
 /**
  * Pull a JSON object out of a model reply.
  *
- * Gemini is asked for the JSON mime type and so returns a bare object, but Groq
- * has no equivalent for every model and a reasoning model in particular likes to
- * introduce its answer. Slicing between the outermost braces recovers the object
- * from either, and costs nothing when the reply was already clean.
+ * Both providers are asked for JSON — Gemini by mime type, Groq by
+ * response_format — but Groq's is not supported by every model and is dropped
+ * when refused, and a reasoning model left to itself likes to introduce its
+ * answer. Slicing between the outermost braces recovers the object from either,
+ * and costs nothing when the reply was already clean.
  */
 const parseJsonReply = (text) => {
   try {
