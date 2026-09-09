@@ -263,6 +263,22 @@ const processIncomingMovements = (incoming) => {
   return result;
 };
 
+/*
+ * Shown one after another while the AI works. Generation takes tens of seconds
+ * and the backend reports nothing until it finishes, so these are the stages the
+ * request goes through rather than measured progress — worded as work underway,
+ * never as work completed. The elapsed counter beside them is the honest signal.
+ */
+const AI_STAGES = [
+  "Reading your case description",
+  "Writing the patient history",
+  "Mapping the range of movement limits",
+  "Drafting the feedback questions",
+  "Publishing the simulator flow",
+];
+
+const STAGE_SECONDS = 6;
+
 function ScenarioFormPage() {
   const navigate = useNavigate();
   const { id } = useParams();
@@ -292,6 +308,8 @@ function ScenarioFormPage() {
   // Voxio flow key. Returned by the AI endpoints, saved onto the scenario.
   const [apiKey, setApiKey] = useState("");
   const [isAiLoading, setIsAiLoading] = useState(false);
+  // Seconds the current AI request has been running; drives the stage caption.
+  const [aiElapsed, setAiElapsed] = useState(0);
   const [isSaving, setIsSaving] = useState(false);
   const [errorPopup, setErrorPopup] = useState({ open: false, message: "" });
   const [showConfirmModal, setShowConfirmModal] = useState(false);
@@ -336,9 +354,25 @@ function ScenarioFormPage() {
     }
   }, [isDbEdit, selectedScenario, setValue]);
 
+  // Ticks once a second only while a request is in flight, and is torn down when
+  // it finishes so nothing keeps running behind a closed form.
+  useEffect(() => {
+    if (!isAiLoading) return undefined;
+    const timer = setInterval(() => setAiElapsed((s) => s + 1), 1000);
+    return () => clearInterval(timer);
+  }, [isAiLoading]);
+
+  // Holds on the last stage rather than looping, so a slow request does not look
+  // like it has restarted.
+  const aiStage =
+    AI_STAGES[
+      Math.min(Math.floor(aiElapsed / STAGE_SECONDS), AI_STAGES.length - 1)
+    ];
+
   const handleAskAI = async (e) => {
     e.preventDefault();
     if (!aiInput) return;
+    setAiElapsed(0);
     setIsAiLoading(true);
 
     try {
@@ -509,6 +543,39 @@ function ScenarioFormPage() {
                 <ArrowUp className="w-4 h-4" />
               </button>
             </div>
+
+            {/*
+              Progress panel. Sits between the prompt bar and the form so the
+              fields the AI is about to fill stay visible underneath — an overlay
+              would hide the thing being changed.
+            */}
+            {isAiLoading && (
+              <div className="mb-6 rounded-lg border border-purple-200 bg-purple-50/60 p-4 animate-in fade-in duration-200">
+                <div className="flex items-center gap-3">
+                  <Loader className="w-4 h-4 shrink-0 animate-spin text-purple-600" />
+                  <p
+                    className="flex-1 text-sm font-medium text-gray-700"
+                    aria-live="polite"
+                  >
+                    {aiStage}
+                    <span className="inline-block w-6 text-left">
+                      <span className="animate-pulse">…</span>
+                    </span>
+                  </p>
+                  <span className="shrink-0 font-mono text-xs text-gray-500 tabular-nums">
+                    {aiElapsed}s
+                  </span>
+                </div>
+
+                <div className="mt-3 h-1 w-full overflow-hidden rounded-full bg-purple-100">
+                  <div className="h-full w-1/4 rounded-full bg-purple-500 animate-indeterminate-bar" />
+                </div>
+
+                <p className="mt-3 text-xs text-gray-500">
+                  This usually takes 20–60 seconds. Please keep this form open.
+                </p>
+              </div>
+            )}
 
             <form id="scenario-form" className="space-y-6">
               <div className="grid grid-cols-1 md:grid-cols-2 gap-4">

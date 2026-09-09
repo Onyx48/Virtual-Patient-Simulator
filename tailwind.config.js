@@ -67,6 +67,21 @@ export default {
           5: "hsl(var(--chart-5))",
         },
       },
+      keyframes: {
+        /*
+         * Indeterminate progress bar: a short block sweeping left to right.
+         * Used while the AI generates a scenario, which takes tens of seconds
+         * with no intermediate progress to report — the point is only to show
+         * the request is still alive.
+         */
+        "indeterminate-bar": {
+          "0%": { transform: "translateX(-100%)" },
+          "100%": { transform: "translateX(400%)" },
+        },
+      },
+      animation: {
+        "indeterminate-bar": "indeterminate-bar 1.4s ease-in-out infinite",
+      },
     },
   },
   plugins: [require("tailwindcss-animate")],

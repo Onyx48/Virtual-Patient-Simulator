@@ -38,7 +38,6 @@ function LoginPage() {
   const navigate = useNavigate();
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
-  const [rememberMe, setRememberMe] = useState(false);
 
   const [emailError, setEmailError] = useState("");
   const [passwordError, setPasswordError] = useState("");
@@ -177,27 +176,12 @@ function LoginPage() {
               )}
             </div>
 
-            <div className="flex justify-between items-center mt-2 mb-6">
-              <div className="flex items-center">
-                <input
-                  id="remember-me"
-                  name="remember-me"
-                  type="checkbox"
-                  checked={rememberMe}
-                  onChange={(e) => setRememberMe(e.target.checked)}
-                  className="h-4 w-4 text-custom-orange bg-gray-800 border-gray-600 rounded focus:ring-custom-orange"
-                />
-                <label
-                  htmlFor="remember-me"
-                  className="ml-2 block text-sm text-gray-300"
-                >
-                  Remember Me
-                </label>
-              </div>
-              {/* <Link to="/forgot-password" className="text-sm text-gray-400 hover:underline hover:text-gray-100">Forgot Password?</Link> */}
-            </div>
+            {/* <div className="flex justify-end items-center mt-2 mb-6">
+              <Link to="/forgot-password" className="text-sm text-gray-400 hover:underline hover:text-gray-100">Forgot Password?</Link>
+            </div> */}
 
-            <div className="px-4 pb-2 pt-4">
+            {/* Absorbs the margin the removed Remember Me row used to contribute. */}
+            <div className="px-4 pb-2 pt-8">
               <button
                 type="submit"
                 disabled={isLoading}

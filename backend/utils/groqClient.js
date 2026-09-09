@@ -17,7 +17,10 @@ export const isGroqConfigured = () => Boolean(process.env.GROQ_API_KEY);
  * Run a prompt and return the reply as prose.
  *
  * The system prompt and user turn map onto the two messages, so a caller can
- * swap this in for the Gemini text call without reshaping anything.
+ * swap this in for the Gemini text call without reshaping anything. That
+ * includes the Gemini call's `json` flag, which is accepted and ignored — there
+ * is no response_format that every Groq model supports, so a JSON caller parses
+ * the reply leniently instead (see aiText.js).
  */
 export const generateGroqText = async ({
   systemPrompt,

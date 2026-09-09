@@ -313,6 +313,16 @@ export const ja = {
     "AIがシナリオを作成するための入力を提供",
   "My School Logo": "私の学校のロゴ",
 
+  // AI generation progress. Each stage is one whole phrase, so it is matched and
+  // replaced as a unit rather than word by word.
+  "Reading your case description": "症例の記述を読み取っています",
+  "Writing the patient history": "患者の病歴を作成しています",
+  "Mapping the range of movement limits": "関節可動域の制限を設定しています",
+  "Drafting the feedback questions": "フィードバック質問を作成しています",
+  "Publishing the simulator flow": "シミュレーターのフローを公開しています",
+  "This usually takes 20–60 seconds. Please keep this form open.":
+    "通常20〜60秒かかります。このフォームを開いたままにしてください。",
+
   // Durations
   "1 Year": "1年",
   "6 Months": "6か月",

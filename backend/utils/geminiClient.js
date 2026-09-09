@@ -98,29 +98,32 @@ const callGemini = async ({ systemPrompt, userQuery, model, json = true }) => {
 const sleep = (ms) => new Promise((resolve) => setTimeout(resolve, ms));
 
 /**
- * Run a prompt and return the reply as prose.
+ * Run a prompt and return the reply as text.
  *
- * No JSON parse — there is nothing to validate, so a reply that arrives is
- * usable. Any leftover markdown fence is stripped in case the prompt pushes the
- * model toward a code block.
+ * No JSON parse — validating the payload is the caller's job, so a reply that
+ * arrives is returned as-is. Any leftover markdown fence is stripped in case the
+ * prompt pushes the model toward a code block.
  *
  * Retries up to three times on a server-side overload, backing off 1s then 1.5s.
  * "gemini-2.5-flash is experiencing high demand" is common enough that a single
  * attempt turns a routine spike into a user-visible failure. A quota error or a
  * bad key/model is thrown on the first try instead, so the caller's fallback
  * takes over immediately.
+ *
+ * @param {boolean} json  Request the JSON mime type. See callGemini.
  */
 export const generateText = async ({
   systemPrompt,
   userQuery,
   model = GEMINI_MODEL,
   attempts = 3,
+  json = false,
 }) => {
   assertGeminiConfigured();
 
   for (let attempt = 1; ; attempt += 1) {
     try {
-      const text = await callGemini({ systemPrompt, userQuery, model, json: false });
+      const text = await callGemini({ systemPrompt, userQuery, model, json });
       return stripFence(text);
     } catch (err) {
       if (!err.retryable || attempt >= attempts) throw err;
@@ -130,41 +133,4 @@ export const generateText = async ({
       await sleep(attempt * 500 + 500);
     }
   }
-};
-
-/**
- * Run a prompt and parse the reply as JSON, retrying once.
- *
- * The retry exists because a single bad generation is common and cheap to redo.
- * Unlike the Python original this throws on a second failure instead of
- * returning a fake success document — a caller that gets a 200 back can trust
- * the payload.
- */
-export const generateScenarioJson = async ({
-  systemPrompt,
-  userQuery,
-  model = GEMINI_MODEL,
-}) => {
-  assertGeminiConfigured();
-
-  let lastError = null;
-
-  for (let attempt = 1; attempt <= 2; attempt += 1) {
-    const text = await callGemini({ systemPrompt, userQuery, model });
-    try {
-      return JSON.parse(stripFence(text));
-    } catch (err) {
-      lastError = err;
-      console.error(
-        `[AI] Attempt ${attempt}: reply was not valid JSON —`,
-        text.slice(0, 300),
-      );
-    }
-  }
-
-  throw new Error(
-    isProd
-      ? "The AI could not produce a usable scenario. Please try again."
-      : `AI reply was not valid JSON after 2 attempts: ${lastError?.message}`,
-  );
 };
