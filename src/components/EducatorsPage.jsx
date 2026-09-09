@@ -1,13 +1,22 @@
 import React, { useState, useEffect, useMemo, useRef } from "react";
 import axios from "axios";
-import Papa from "papaparse";
+import * as XLSX from "xlsx";
 import {
   MagnifyingGlassIcon,
   PlusIcon,
   PencilSquareIcon,
   TrashIcon,
   ArrowUpTrayIcon,
+  ArrowDownTrayIcon,
 } from "@heroicons/react/24/outline";
+
+import {
+  ACCEPTED_EXTENSIONS,
+  buildTemplateWorkbook,
+  buildUserPayload,
+  readRows,
+  templateFilename,
+} from "../lib/bulkUsers";
 
 import EducatorModal from "./EducatorModal";
 import ConfirmationModal from "./ui/ConfirmationModal.jsx";
@@ -69,94 +78,109 @@ function EducatorsPage() {
     fileInputRef.current.click();
   };
 
-  const handleFileChange = (event) => {
+  /*
+   * Hands the user the exact file the importer wants rather than describing it.
+   * Shares every rule with the student importer — see lib/bulkUsers.js — so the
+   * two cannot drift apart.
+   */
+  const handleDownloadTemplate = () => {
+    XLSX.writeFile(buildTemplateWorkbook("educator"), templateFilename("educator"));
+  };
+
+  const handleFileChange = async (event) => {
     const file = event.target.files[0];
     if (!file) return;
 
+    const clearInput = () => {
+      // Reset so picking the same file again re-fires onChange.
+      if (fileInputRef.current) fileInputRef.current.value = "";
+    };
+
     setIsUploading(true);
-    const uploadToast = toast.loading("Parsing CSV file...");
+    const uploadToast = toast.loading(`Reading ${file.name}...`);
 
-    Papa.parse(file, {
-      header: true,
-      skipEmptyLines: true,
-      complete: async (results) => {
-        const nameAliases = ["name", "full name", "fullname"];
-        const emailAliases = ["email", "email address"];
-        const departmentAliases = ["department", "subject"];
+    let parsed;
+    try {
+      parsed = buildUserPayload(await readRows(file), "educator");
+    } catch (error) {
+      toast.error(error.message, { id: uploadToast, duration: 6000 });
+      setIsUploading(false);
+      clearInput();
+      return;
+    }
 
-        const firstRow = results.data[0] || {};
-        const actualHeaders = Object.keys(firstRow).map((h) => h.toLowerCase());
+    const { users, errors, missing } = parsed;
 
-        const hasHeader = (aliases) =>
-          aliases.some((alias) => actualHeaders.includes(alias));
+    if (missing.length > 0) {
+      toast.error(
+        `That file is missing the ${missing.join(" and ")} column. Download the template to see the expected layout.`,
+        { id: uploadToast, duration: 8000 },
+      );
+      setIsUploading(false);
+      clearInput();
+      return;
+    }
 
-        let missingHeaders = [];
-        if (!hasHeader(nameAliases))
-          missingHeaders.push("'name' or 'full name'");
-        if (!hasHeader(emailAliases))
-          missingHeaders.push("'email' or 'email address'");
+    /*
+     * Bad rows are shown to the user, not just logged. The old version put them
+     * in the console and said "Check console", which nobody outside this team is
+     * going to do — so a failed import looked like a partial success with no
+     * explanation.
+     */
+    const describe = (list) =>
+      list
+        .slice(0, 5)
+        .map((e) => `Row ${e.row}: ${e.reason}`)
+        .join("\n") + (list.length > 5 ? `\n...and ${list.length - 5} more.` : "");
 
-        if (missingHeaders.length > 0) {
-          toast.error(
-            `CSV is missing required columns: ${missingHeaders.join(", ")}`,
-            { id: uploadToast, duration: 6000 },
-          );
-          setIsUploading(false);
-          if (fileInputRef.current) fileInputRef.current.value = "";
-          return;
-        }
+    if (users.length === 0) {
+      toast.error(
+        errors.length > 0
+          ? `Nothing could be imported.\n${describe(errors)}`
+          : "That file has the right columns but no educator rows.",
+        { id: uploadToast, duration: 10000, style: { whiteSpace: "pre-line" } },
+      );
+      setIsUploading(false);
+      clearInput();
+      return;
+    }
 
-        const findValue = (row, aliases) => {
-          for (const key in row) {
-            if (aliases.includes(key.toLowerCase())) {
-              return row[key];
-            }
-          }
-          return undefined;
-        };
+    toast.loading(`Uploading ${users.length} educators...`, { id: uploadToast });
+    try {
+      const response = await axios.post(
+        "/api/users/bulk",
+        { users, role: "educator" },
+        getAuthHeaders(),
+      );
+      toast.success(`Upload complete! ${response.data.successCount} created.`, {
+        id: uploadToast,
+        duration: 5000,
+      });
 
-        const processedData = results.data.map((row) => ({
-          name: findValue(row, nameAliases),
-          email: findValue(row, emailAliases),
-          department: findValue(row, departmentAliases),
-        }));
-
-        toast.loading("Uploading educators...", { id: uploadToast });
-        try {
-          const response = await axios.post(
-            "/api/users/bulk",
-            { users: processedData, role: "educator" },
-            getAuthHeaders(),
-          );
-          toast.success(
-            `Upload complete! ${response.data.successCount} created.`,
-            { id: uploadToast, duration: 5000 },
-          );
-          if (response.data.failureCount > 0) {
-            console.error("Bulk upload failures:", response.data.errors);
-            toast.error(
-              `${response.data.failureCount} educators failed to upload. Check console.`,
-            );
-          }
-          await fetchEducators();
-        } catch (error) {
-          toast.error(
-            "Bulk upload failed: " +
-              (error.response?.data?.message || "Server error"),
-            { id: uploadToast },
-          );
-        } finally {
-          setIsUploading(false);
-          if (fileInputRef.current) fileInputRef.current.value = "";
-        }
-      },
-      error: (error) => {
-        toast.error("Failed to parse CSV: " + error.message, {
-          id: uploadToast,
+      // Rows the server rejected — an address already in use, most often — are
+      // reported the same way as the ones this file failed on.
+      const serverErrors = (response.data.errors || []).map((e) => ({
+        row: "—",
+        reason: `${e.email}: ${e.reason}`,
+      }));
+      const allErrors = [...errors, ...serverErrors];
+      if (allErrors.length > 0) {
+        console.error("Bulk upload failures:", allErrors);
+        toast.error(`${allErrors.length} row(s) were skipped.\n${describe(allErrors)}`, {
+          duration: 10000,
+          style: { whiteSpace: "pre-line" },
         });
-        setIsUploading(false);
-      },
-    });
+      }
+      await fetchEducators();
+    } catch (error) {
+      toast.error(
+        "Bulk upload failed: " + (error.response?.data?.message || "Server error"),
+        { id: uploadToast },
+      );
+    } finally {
+      setIsUploading(false);
+      clearInput();
+    }
   };
 
   const handleEdit = (educator) => {
@@ -307,10 +331,18 @@ function EducatorsPage() {
             type="file"
             ref={fileInputRef}
             onChange={handleFileChange}
-            accept=".csv"
+            accept={ACCEPTED_EXTENSIONS.join(",")}
             style={{ display: "none" }}
             disabled={isUploading}
           />
+          <button
+            onClick={handleDownloadTemplate}
+            title="Download the .xlsx template for bulk upload"
+            className="flex items-center gap-2 px-5 py-2.5 bg-white border border-gray-200 text-gray-700 hover:bg-gray-50 text-sm font-bold rounded-lg transition-colors shadow-sm"
+          >
+            <ArrowDownTrayIcon className="h-5 w-5" />
+            Template
+          </button>
           <button
             onClick={handleBulkUploadClick}
             disabled={isUploading}

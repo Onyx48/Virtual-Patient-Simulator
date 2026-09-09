@@ -8,6 +8,7 @@ import crypto from "crypto";
 import redisClient from "../utils/redisClient.js";
 import { invalidateStudentsCache } from "../utils/studentsCache.js";
 import { publicMessage } from "../utils/appEnv.js";
+import { groupNameMatcher } from "../utils/groupName.js";
 
 const router = express.Router();
 const USERS_CACHE_TTL = 120; // seconds
@@ -346,9 +347,42 @@ router.post("/bulk", protect, checkAccess("manageUsers"), async (req, res) => {
 
   const results = { successCount: 0, failureCount: 0, errors: [] };
 
+  const Group = (await import("../models/groupModel.js")).default;
+
+  /*
+   * Groups are matched by name and created on first sight, so a whole cohort can
+   * be imported in one file without the educator creating the group by hand first.
+   *
+   * Cached by lowercased name for the length of the request: a 40-row file where
+   * every student is in "Year 2 Group A" must end up in one group, not forty
+   * groups with the same name. Scoped to the creator, because two educators are
+   * entitled to their own "Group A".
+   */
+  const groupCache = new Map();
+  const resolveGroup = async (rawName) => {
+    const groupName = String(rawName).trim();
+    const key = groupName.toLowerCase();
+    if (groupCache.has(key)) return groupCache.get(key);
+
+    let group = await Group.findOne({
+      name: groupNameMatcher(groupName),
+      educatorId: creator._id,
+    });
+    if (!group) {
+      group = await Group.create({
+        name: groupName,
+        educatorId: creator._id,
+        schoolId: creator.schoolId || null,
+      });
+      console.log(`[BULK] created group "${groupName}" for educator ${creator._id}`);
+    }
+    groupCache.set(key, group._id);
+    return group._id;
+  };
+
   for (const user of users) {
     try {
-      const { name, email, department } = user;
+      const { name, email, department, group } = user;
       if (!name || !email) {
         results.failureCount++;
         results.errors.push({
@@ -380,16 +414,28 @@ router.post("/bulk", protect, checkAccess("manageUsers"), async (req, res) => {
       }
 
       if (role === "educator") {
-        const allowedDepartments = [
-          "Science",
-          "History",
-          "English",
-          "Mathematics",
-        ];
-        const finalDepartment = allowedDepartments.includes(department)
-          ? department
-          : "Science";
-        newUserData.department = finalDepartment;
+        /*
+         * An unrecognised department is refused rather than quietly replaced with
+         * Science, which is what this did before — an educator ended up filed
+         * under a subject nobody had chosen and nothing said so. Blank still
+         * defaults, because the column is optional.
+         */
+        const allowed = ["Science", "History", "English", "Mathematics"];
+        if (department && !allowed.includes(department)) {
+          results.failureCount++;
+          results.errors.push({
+            email,
+            reason: `"${department}" is not a department. Use one of: ${allowed.join(", ")}.`,
+          });
+          continue;
+        }
+        newUserData.department = department || "Science";
+      }
+
+      // Resolved before the user is saved so a bad group name fails the row
+      // rather than leaving an account behind with no group.
+      if (role === "student" && group && String(group).trim()) {
+        newUserData.groupId = await resolveGroup(group);
       }
 
       const newUser = new User(newUserData);
