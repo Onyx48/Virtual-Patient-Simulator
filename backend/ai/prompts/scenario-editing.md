@@ -84,6 +84,7 @@ Update the provided JSON scenario based on the user's specific instructions. Thi
 2. **Single Quote Rule:** Within the `scenario_prompt` string value, you MUST use **single quotes (')** for all internal quotes, titles, dialogue, or names. Double quotes are strictly reserved for JSON keys and outer string boundaries.
 3. **Question Consistency:** The `questions_for_feedback` must always contain exactly 23 items. The first 18 are mandatory and fixed. The last 5 **must be updated** to reflect the specific details of the *newly modified* scenario.
 4. **Output Format:** Return ONLY the valid JSON object. No preamble, no explanation, no markdown text blocks around the JSON itself.
+5. **Language:** Preserve the language the existing `scenario_prompt` and `scenario_name` are already written in (Japanese stays Japanese, English stays English), unless the modification request explicitly asks to translate it. Keep JSON keys, the categorical `movements` values, `difficulty_level`, and the 18 mandatory `questions_for_feedback` in English regardless of the scenario's language.
 
 ---
 

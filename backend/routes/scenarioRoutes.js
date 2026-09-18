@@ -8,7 +8,6 @@ import Session from "../models/sessionModel.js";
 import User from "../models/userModel.js";
 import { protect } from "../middleware/authMiddleware.js";
 import { checkAccess } from "../middleware/roleAccessMiddleware.js";
-import defaultScenarioJson from "../data/defaultScenarioJson.js";
 import { generateJsonWithFallback } from "../utils/aiText.js";
 import { emptyMovements, emptyTriggers } from "../utils/bodyRegions.js";
 import { withStudentScope } from "../utils/scenarioAssignment.js";
@@ -20,11 +19,10 @@ import {
   getLiveScenario,
   getLiveMeta,
 } from "../state/liveScenario.js";
-import { toBubbleScenarioJson } from "../utils/bubbleScenario.js";
 import { startTrace } from "../utils/routeTrace.js";
 // The educator Test button's destination, from the same place the student room
 // comes from.
-import { throwawayRoomUrl } from "../utils/roomUrl.js";
+import { roomUrlFor } from "../utils/roomUrl.js";
 import {
   isScenarioTestable,
   NOT_TESTABLE_MESSAGE,
@@ -259,9 +257,11 @@ router.post("/json", protect, async (req, res) => {
       return res.status(403).json({ message: NOT_TESTABLE_MESSAGE });
     }
 
-    // Educator pressing Test: no student and no session, so Id is the educator's
-    // own id and StreamSessionId stays empty.
-    setLiveScenario(scenario, { userId: req.user._id });
+    // Educator pressing Test: no student and no enrolled attempt, but the
+    // simulator still needs a session_id to tag this run's Voxio state, so one
+    // is minted here the same way a student's Start would.
+    const sessionId = new mongoose.Types.ObjectId().toString();
+    setLiveScenario(scenario, { userId: req.user._id, sessionId });
 
     /*
      * The caller is told where to go rather than deciding for itself. The Test
@@ -271,7 +271,7 @@ router.post("/json", protect, async (req, res) => {
      */
     res.json({
       message: "Scenario JSON set.",
-      simulatorUrl: throwawayRoomUrl(),
+      simulatorUrl: roomUrlFor(sessionId),
     });
   } catch (err) {
     console.error("Set Scenario JSON Error:", err);
@@ -279,14 +279,20 @@ router.post("/json", protect, async (req, res) => {
   }
 });
 
+/*
+ * The simulator no longer needs the scenario's content from us: the persona,
+ * movements and rubric are already baked into the Voxio flow behind api_key at
+ * publish time (buildWorkflow/createFlow). All it needs to run and later be
+ * looked up is which flow to run and which session to tag the result with.
+ */
 router.get("/json", (req, res) => {
   const liveScenario = getLiveScenario();
-  if (!liveScenario) return res.json({ response: defaultScenarioJson });
+  const meta = getLiveMeta();
 
-  // Reshaped into the same Bubble payload the fallback above serves. Serving the
-  // raw document here is what made the simulator read missing keys and post
-  // empty ids to posta.
-  res.json({ response: toBubbleScenarioJson(liveScenario, getLiveMeta()) });
+  res.json({
+    api_key: liveScenario?.apiKey || null,
+    session_id: meta.sessionId ? String(meta.sessionId) : null,
+  });
 });
 
 router.get("/:id", protect, checkAccess("viewScenarios"), async (req, res) => {

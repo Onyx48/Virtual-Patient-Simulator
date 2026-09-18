@@ -542,9 +542,6 @@ router.get(
         });
 
         if (sessions.length > 0) {
-          const totalScore = sessions.reduce((sum, s) => sum + s.score, 0);
-          avgProgress = Math.round((totalScore / sessions.length) * 100);
-
           avgTimeSpent = Math.round(((sessions.length * 5) / 60) * 10) / 10;
 
           const recentSessions = sessions.filter(
@@ -553,6 +550,17 @@ router.get(
           const prevSessions = sessions.filter(
             (s) =>
               s.createdAt >= startOfLastMonth && s.createdAt < startOfMonth,
+          );
+
+          // Scoped to this month so the headline matches its own
+          // "vs last month" delta below, instead of mixing an all-time
+          // average with a month-over-month change.
+          const progressSessions =
+            recentSessions.length > 0 ? recentSessions : sessions;
+          avgProgress = Math.round(
+            (progressSessions.reduce((sum, s) => sum + s.score, 0) /
+              progressSessions.length) *
+              100,
           );
 
           if (prevSessions.length > 0 && recentSessions.length > 0) {

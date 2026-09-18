@@ -214,3 +214,62 @@ export const updateFlow = async ({ apiKey, flowName, workflow }) => {
     },
   });
 };
+
+/**
+ * One turn of /agents/process_input, left as a raw unconsumed fetch Response
+ * so the caller can pipe response.body straight through to its own client
+ * rather than buffering a payload that is deliberately streamed.
+ *
+ * Shared by streamEndSession (fixed user_input, ends the diagnosis phase) and
+ * streamReasoningTurn (free-text user_input, drives the reasoning phase) —
+ * both are just a turn on the same running flow, identified by session_id.
+ */
+const streamProcessInput = async (sessionId, userInput) => {
+  const response = await fetch(`${VOXIO_CHAT_BASE_URL}/agents/process_input`, {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify({
+      user_input: { user_input: userInput },
+      session_id: sessionId,
+    }),
+  });
+
+  if (!response.ok || !response.body) {
+    const raw = await response.text().catch(() => "");
+    console.error(
+      `[SESSION] Voxio process_input failed session=${sessionId}`,
+      response.status,
+      raw.slice(0, 500),
+    );
+    throw Object.assign(
+      new Error(
+        isProd
+          ? "The simulator could not process this input."
+          : `Voxio process_input responded ${response.status}: ${raw.slice(0, 300)}`,
+      ),
+      { statusCode: 502 },
+    );
+  }
+
+  return response;
+};
+
+/**
+ * Push the running flow straight to its feedback/reasoning phase and stream
+ * back whatever Voxio says as it says it.
+ *
+ * "Let's end the session" is sent as the turn's `user_input` — the same
+ * channel a spoken turn would use — because there is no other lever exposed by
+ * /agents/process_input to skip ahead; the flow's own
+ * judge_if_diagnosis_is_ended node is what actually reacts to it.
+ */
+export const streamEndSession = (sessionId) =>
+  streamProcessInput(sessionId, "Let's end the session");
+
+/**
+ * One turn of the clinical-reasoning conversation: the student's free-text
+ * input, streamed straight to Voxio's `reasoning` node and its reply streamed
+ * straight back — no separate askReasonRoutes-style LLM call of our own.
+ */
+export const streamReasoningTurn = (sessionId, input) =>
+  streamProcessInput(sessionId, input);

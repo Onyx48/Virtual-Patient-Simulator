@@ -752,9 +752,14 @@ function StudentPage({ role }) {
                   {showScenariosColumn && (
                     <td className="px-6 py-4 whitespace-nowrap text-sm">
                       {student.isAssigned ? (
-                        <span className="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium bg-green-100 text-green-800">
+                        <button
+                          onClick={() =>
+                            setSelectedStudent(student.originalData || student)
+                          }
+                          className="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium bg-green-100 text-green-800 hover:bg-green-200 transition-colors"
+                        >
                           {student.assignedScenariosCount} scenario{student.assignedScenariosCount !== 1 ? "s" : ""}
-                        </span>
+                        </button>
                       ) : (
                         <span className="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium bg-gray-100 text-gray-800">
                           Not Assigned

@@ -12,8 +12,6 @@ import {
   CartesianGrid,
   Tooltip,
   ResponsiveContainer,
-  PieChart,
-  Pie,
   Cell,
 } from "recharts";
 import {
@@ -114,7 +112,10 @@ function EducatorDashboard() {
           <div className="lg:col-span-4 bg-[#f59e0b] rounded-2xl p-6 text-white relative overflow-hidden shadow-sm flex flex-col justify-between min-h-[220px]">
             <div className="absolute -right-10 -top-10 w-40 h-40 bg-white opacity-10 rounded-full blur-2xl"></div>
             <div className="relative z-10">
-              <h3 className="text-base font-medium text-white/90">
+              <h3
+                className="text-base font-medium text-white/90"
+                title="Share of assigned scenarios completed by your students"
+              >
                 Teaching Effectiveness
               </h3>
               <div className="mt-6 flex items-center gap-5">
@@ -172,10 +173,10 @@ function EducatorDashboard() {
 
           {/* Small Stats Cards (2x2 Grid) */}
           <div className="lg:col-span-8 grid grid-cols-1 sm:grid-cols-2 gap-6">
-            {/* Card 1: Active Students */}
+            {/* Card 1: Total Students */}
             <div className="bg-white p-6 rounded-2xl shadow-sm border border-gray-100 flex flex-col justify-between">
               <p className="text-gray-500 text-sm font-medium">
-                Active Students
+                Total Students
               </p>
               <div className="mt-2">
                 <div className="text-3xl font-bold text-gray-900">
@@ -274,8 +275,8 @@ function EducatorDashboard() {
               </p>
               <div className="mt-2">
                 <div className="text-3xl font-bold text-gray-900">
-                  {educatorStats?.avgTimeSpent || 0}h{" "}
-                  {Math.round((educatorStats?.avgTimeSpent % 1) * 60) || 0}m
+                  {Math.floor(educatorStats?.avgTimeSpent || 0)}h{" "}
+                  {Math.round(((educatorStats?.avgTimeSpent || 0) % 1) * 60)}m
                 </div>
                 <div className="flex items-center gap-1.5 text-xs font-medium text-green-500 mt-2">
                   <ArrowUpRight size={16} /> <span>Based on sessions</span>
@@ -352,63 +353,42 @@ function EducatorDashboard() {
             </div>
           </div>
 
-          {/* Pie Chart */}
+          {/* Bar Chart: sessions per scenario */}
           <div className="lg:col-span-1 bg-white p-6 rounded-2xl shadow-sm border border-gray-100 flex flex-col">
             <h3 className="font-bold text-gray-800 text-sm mb-4">
-              Scenario Popularity
+              Sessions per Scenario
             </h3>
-            <div className="flex-1 relative flex items-center justify-center">
-              <div className="w-full h-[200px]">
-                <ResponsiveContainer
-                  width="100%"
-                  height="100%"
-                  minWidth={200}
-                  minHeight={200}
+            <div className="flex-1" style={{ height: 200 }}>
+              <ResponsiveContainer
+                width="100%"
+                height="100%"
+                minWidth={200}
+                minHeight={200}
+              >
+                <BarChart
+                  data={popularityData.slice(0, 6)}
+                  layout="vertical"
+                  margin={{ top: 0, right: 10, left: 0, bottom: 0 }}
                 >
-                  <PieChart>
-                    <Pie
-                      data={popularityData}
-                      cx="50%"
-                      cy="50%"
-                      innerRadius={60}
-                      outerRadius={80}
-                      dataKey="value"
-                      stroke="none"
-                      paddingAngle={2}
-                    >
-                      {popularityData.map((entry, index) => (
-                        <Cell key={`cell-${index}`} fill={entry.color} />
-                      ))}
-                    </Pie>
-                    <Tooltip
-                      contentStyle={{ borderRadius: "8px", fontSize: "12px" }}
-                    />
-                  </PieChart>
-                </ResponsiveContainer>
-                <div className="absolute inset-0 flex items-center justify-center pointer-events-none">
-                  <div className="bg-white shadow-sm border border-gray-100 rounded-full w-10 h-10 flex items-center justify-center">
-                    <span className="text-xs font-bold text-gray-800">
-                      {popularityData.reduce(
-                        (sum, item) => sum + item.value,
-                        0,
-                      )}
-                    </span>
-                  </div>
-                </div>
-              </div>
-            </div>
-            <div className="grid grid-cols-2 gap-y-2 gap-x-1 mt-4">
-              {popularityData.slice(0, 4).map((item) => (
-                <div key={item.name} className="flex items-center gap-1.5">
-                  <span
-                    className="w-2 h-2 rounded-full flex-shrink-0"
-                    style={{ backgroundColor: item.color }}
-                  ></span>
-                  <span className="text-[10px] text-gray-500 font-medium truncate">
-                    {item.name}
-                  </span>
-                </div>
-              ))}
+                  <XAxis type="number" hide allowDecimals={false} />
+                  <YAxis
+                    type="category"
+                    dataKey="name"
+                    axisLine={false}
+                    tickLine={false}
+                    width={90}
+                    tick={{ fontSize: 10, fill: "#6b7280" }}
+                  />
+                  <Tooltip
+                    contentStyle={{ borderRadius: "8px", fontSize: "12px" }}
+                  />
+                  <Bar dataKey="sessionCount" name="Sessions" radius={[0, 3, 3, 0]} barSize={14}>
+                    {popularityData.slice(0, 6).map((entry, index) => (
+                      <Cell key={`cell-${index}`} fill={entry.color} />
+                    ))}
+                  </Bar>
+                </BarChart>
+              </ResponsiveContainer>
             </div>
           </div>
         </div>

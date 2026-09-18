@@ -11,7 +11,6 @@
  * POST /api/scenarios/json response, so both roles resolve the same base from the
  * same environment variable.
  */
-import mongoose from "mongoose";
 
 /*
  * ROOM_BASE_URL overrides the whole base without a redeploy — including the app
@@ -39,11 +38,3 @@ export const roomUrlFor = (roomId) => {
   const base = simulatorBaseUrl();
   return `${base}${base.includes("?") ? "&" : "?"}room=${encodeURIComponent(roomId)}`;
 };
-
-/*
- * An educator pressing Test has no session, so there is no session id to use as
- * the room. A throwaway one is minted instead — for the same reason as above: two
- * educators testing at once would otherwise share a stream.
- */
-export const throwawayRoomUrl = () =>
-  roomUrlFor(new mongoose.Types.ObjectId().toString());

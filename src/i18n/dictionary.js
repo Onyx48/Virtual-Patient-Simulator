@@ -769,6 +769,30 @@ export const ja = {
     "シナリオ人気度の取得中にサーバーエラーが発生しました",
   "Server error fetching teaching effectiveness":
     "指導効果の取得中にサーバーエラーが発生しました",
+
+  // --- Educator dashboard ---
+  "Sessions Started per Month": "月間セッション開始数",
+  "Sessions per Scenario": "シナリオ別セッション数",
+  "Total Students": "総学生数",
+  "Student engagement rose": "学生の参加度が",
+  "% this month, great improvement!": "%上昇しました。素晴らしい改善です！",
+
+  // --- Scenario form (educator) ---
+  "e.g. _MVA_1": "例：_MVA_1",
+  "Select these yourself — the AI does not fill them in.":
+    "これらは自分で選択してください — AIは入力しません。",
+  "Publish Scenario": "シナリオを公開",
+  "Saved as a draft.": "ドラフトとして保存しました。",
+  "Saved as Draft": "ドラフトとして保存",
+  "Saved as a draft. This scenario has no simulator flow yet, so it cannot be published — use the AI prompt at the top of the form to generate one, then publish.":
+    "ドラフトとして保存しました。このシナリオにはまだシミュレーターフローがないため公開できません — フォーム上部のAIプロンプトを使ってフローを生成してから公開してください。",
+
+  // --- Student management table ---
+  avg: "平均",
+  "best ·": "最高 ·",
+  sessions: "セッション",
+  "No sessions yet": "セッションはまだありません",
+  "Not Assigned": "未割り当て",
 };
 
 export default ja;

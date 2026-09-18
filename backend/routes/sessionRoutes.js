@@ -2,7 +2,12 @@ import express from "express";
 import mongoose from "mongoose";
 import { jwtDecrypt } from "jose";
 import { createSecretKey } from "crypto";
-import { fetchSessionState } from "../utils/voxioClient.js";
+import { Readable } from "stream";
+import {
+  fetchSessionState,
+  streamEndSession,
+  streamReasoningTurn,
+} from "../utils/voxioClient.js";
 import { publicMessage } from "../utils/appEnv.js";
 import { setLiveScenario } from "../state/liveScenario.js";
 import Scenario from "../models/scenarioModel.js";
@@ -189,6 +194,67 @@ const normaliseTranscription = (history, sessionId) => {
 
   return normalised;
 };
+
+/**
+ * Ends a running Voxio session and streams its feedback/summary/score back
+ * as they arrive, instead of waiting for the whole flow to finish and
+ * polling for it afterward.
+ *
+ * Client sends only `session_id` — everything else (the flow's api_key,
+ * conversation state) already lives on Voxio's side, keyed by that id.
+ */
+router.post("/feedback", protect, async (req, res) => {
+  const sessionId = String(req.body?.session_id || "").trim();
+  if (!sessionId) {
+    return res.status(400).json({ message: "session_id is required." });
+  }
+
+  try {
+    const upstream = await streamEndSession(sessionId);
+    res.status(200);
+    res.setHeader(
+      "Content-Type",
+      upstream.headers.get("content-type") || "application/json",
+    );
+    Readable.fromWeb(upstream.body).pipe(res);
+  } catch (err) {
+    console.error(`[SESSION] feedback stream failed session=${sessionId}:`, err);
+    res
+      .status(err.statusCode || 502)
+      .json({ message: err.message || "Could not stream feedback." });
+  }
+});
+
+/**
+ * One turn of clinical reasoning: student sends `session_id` + their `input`,
+ * Voxio's `reasoning` node replies, and that reply is streamed back as it
+ * arrives — same shape as /feedback, just with a caller-supplied message
+ * instead of a fixed end-of-session one.
+ */
+router.post("/reasoning", protect, async (req, res) => {
+  const sessionId = String(req.body?.session_id || "").trim();
+  const input = String(req.body?.input || "").trim();
+  if (!sessionId || !input) {
+    return res
+      .status(400)
+      .json({ message: "session_id and input are required." });
+  }
+
+  try {
+    const upstream = await streamReasoningTurn(sessionId, input);
+    res.status(200);
+    res.setHeader(
+      "Content-Type",
+      upstream.headers.get("content-type") || "application/json",
+    );
+    Readable.fromWeb(upstream.body).pipe(res);
+  } catch (err) {
+    console.error(`[SESSION] reasoning stream failed session=${sessionId}:`, err);
+    res
+      .status(err.statusCode || 502)
+      .json({ message: err.message || "Could not stream reasoning response." });
+  }
+});
 
 router.post("/complete", async (req, res) => {
   // Header first (how the Python service received it); body is accepted too so
