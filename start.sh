@@ -36,6 +36,7 @@ Mode (default: dev):
       --preview          vite build, then serve the build with vite preview
       --prod             --preview with APP_ENV/NODE_ENV=production for the API
       --lint             eslint . , then exit
+      --pm2              pm2 start ecosystem.config.cjs (vps-backend + vps-frontend), then exit
 
 Dependencies:
   -i, --install          Force `pnpm install` before starting
@@ -69,6 +70,7 @@ while [ $# -gt 0 ]; do
     --preview)           MODE="preview" ;;
     --prod)              PROD=1; MODE="preview" ;;
     --lint)              MODE="lint" ;;
+    --pm2)               MODE="pm2" ;;
     -i|--install)        INSTALL="always" ;;
     --no-install)        INSTALL="never" ;;
     -p|--port)           BACKEND_PORT="${2:-}"; shift ;;
@@ -105,6 +107,16 @@ fi
 case "$MODE" in
   lint)  echo "==> eslint ."; exec $PM lint ;;
   build) echo "==> vite build"; exec $PM build ;;
+  pm2)
+    command -v pm2 >/dev/null 2>&1 || { echo "start.sh: pm2 not found on PATH" >&2; exit 1; }
+    [ -f ecosystem.config.cjs ] || { echo "start.sh: ecosystem.config.cjs not found in $(pwd)" >&2; exit 1; }
+    # vps-frontend serves the static dist/ build via `serve`; pm2 does not build it.
+    [ -d dist ] || echo "!! no dist/ -- vps-frontend will serve an empty/stale build until you run \`$PM build\`" >&2
+    echo "==> pm2 start ecosystem.config.cjs"
+    pm2 start ecosystem.config.cjs || exit 1
+    pm2 save || exit 1
+    exec pm2 ls
+    ;;
 esac
 
 # ---- process bookkeeping --------------------------------------------------
