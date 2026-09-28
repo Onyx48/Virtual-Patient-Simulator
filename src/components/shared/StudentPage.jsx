@@ -758,7 +758,10 @@ function StudentPage({ role }) {
                           }
                           className="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium bg-green-100 text-green-800 hover:bg-green-200 transition-colors"
                         >
-                          {student.assignedScenariosCount} scenario{student.assignedScenariosCount !== 1 ? "s" : ""}
+                          {/* One string, not three text nodes: the translator
+                              handles whole nodes, and a lone "s" node stayed
+                              English ("3 シナリオs"). */}
+                          {`${student.assignedScenariosCount} scenario${student.assignedScenariosCount !== 1 ? "s" : ""}`}
                         </button>
                       ) : (
                         <span className="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium bg-gray-100 text-gray-800">

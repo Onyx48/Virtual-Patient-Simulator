@@ -63,7 +63,6 @@ export const ja = {
   "Highest Score": "最高スコア",
   "Lowest Score": "最低スコア",
   "Recently Added": "最近追加",
-  "Total Students": "学生の合計",
   "Total Educators": "教育者の合計",
   "Total Schools": "学校の合計",
   "Total Scenarios": "シナリオの合計",
@@ -183,7 +182,6 @@ export const ja = {
   "No schools to display.": "表示する学校がありません。",
   "No students available.": "利用可能な学生がいません。",
   "No sessions found": "セッションが見つかりません",
-  "No sessions yet": "まだセッションがありません",
   "No transcript available": "文字起こしがありません",
   "Has assigned scenarios": "割り当て済みシナリオあり",
   "Has sessions": "セッションあり",
@@ -456,7 +454,21 @@ export const ja = {
     "このセッションのフィードバックはありません。",
   "No feedback for this session.": "このセッションのフィードバックはありません。",
   "+ Load More": "+ さらに読み込む",
+  // Tail of "+ Load More (5 more)" once "+ Load More" has been replaced.
+  more: "件",
+  "− Show Less": "− 表示を減らす",
   "Go Back": "戻る",
+  // "Scenario 1" (chart axis) and "Attempt 2" (tabs) keep their number.
+  Scenario: "シナリオ",
+  Attempt: "試行",
+  "Assistant:": "アシスタント：",
+  "Start a new session": "新しいセッションを開始",
+  "Failed to start session.": "セッションの開始に失敗しました。",
+  "Not enabled for the simulator yet — only the enabled demo scenario can be run.":
+    "まだシミュレーターで有効になっていません — 有効化されたデモシナリオのみ実行できます。",
+  Highest: "最高",
+  Lowest: "最低",
+  Recent: "最近",
 
   // --- Educator dashboard ---
   "Here is what's happening with your scenarios today.":
@@ -464,6 +476,9 @@ export const ja = {
   "Monthly Student Activity": "月別学生アクティビティ",
   "Teaching Effectiveness": "指導効果",
   "Scenario Popularity": "シナリオの人気度",
+  "Share of assigned scenarios completed by your students":
+    "学生が完了した割り当て済みシナリオの割合",
+  "Unnamed Student": "名前のない学生",
   "Completion Rate": "完了率",
   "Avg. Score": "平均スコア",
   "Avg. Time Spent": "平均所要時間",
@@ -483,6 +498,12 @@ export const ja = {
   "No scenarios assigned yet": "割り当てられたシナリオはまだありません",
   "No scores available yet": "スコアはまだありません",
   Remaining: "残り",
+  "Here's an overview of your learning progress.":
+    "学習の進捗状況の概要です。",
+  "Start a scenario to begin your learning journey.":
+    "シナリオを開始して学習を始めましょう。",
+  // Rendered as its own text node; the " (3)" after it is a separate node.
+  "Total assigned": "割り当て合計",
 
   // --- Lists: educators / students / schools ---
   "Educators Management": "教育者管理",
@@ -501,6 +522,35 @@ export const ja = {
   "Subscription Type": "サブスクリプション種別",
   Unassigned: "未割り当て",
   Showing: "表示中",
+  Group: "グループ",
+  Unknown: "不明",
+  Template: "テンプレート",
+  "Download the .xlsx template for bulk upload":
+    "一括アップロード用の.xlsxテンプレートをダウンロード",
+  "Upload Bulk Students": "学生を一括アップロード",
+  "Upload Bulk Educators": "教育者を一括アップロード",
+  "Uploading...": "アップロード中...",
+
+  // Login / invite status column (shared/StudentPage.jsx)
+  Invited: "招待済み",
+  "Send login": "ログイン情報を送信",
+  Resend: "再送信",
+  "Sending…": "送信中…",
+  "Send new login details": "新しいログイン情報を送信",
+  "This student has logged in successfully.":
+    "この学生は正常にログインしました。",
+  "No login details have ever reached this student. Click to send them.":
+    "この学生にはまだログイン情報が届いていません。クリックして送信してください。",
+  // "Login details were emailed on 9/28/2026, but the account has not been
+  // used yet." — the date sits between these two, so they are matched as parts.
+  "Login details were emailed on": "ログイン情報の送信日：",
+  "but the account has not been used yet.":
+    "ただし、アカウントはまだ使用されていません。",
+  "Login details sent.": "ログイン情報を送信しました。",
+  "Could not send the login details. Nothing was changed.":
+    "ログイン情報を送信できませんでした。変更は行われていません。",
+  "Student created and login details emailed.":
+    "学生を作成し、ログイン情報をメールで送信しました。",
 
   // --- School form (superadmin) ---
   "School Details": "学校の詳細",
@@ -568,6 +618,13 @@ export const ja = {
   "Parsing CSV file...": "CSVファイルを解析中...",
   "Uploading students...": "学生をアップロード中...",
   "Uploading educators...": "教育者をアップロード中...",
+  // "Uploading 12 students..." / "Upload complete! 12 created."
+  Uploading: "アップロード中：",
+  "students...": "人の学生...",
+  "Upload complete!": "アップロード完了！",
+  "created.": "件作成しました。",
+  "That file has the right columns but no student rows.":
+    "ファイルの列は正しいですが、学生の行がありません。",
   "Bulk upload failed:": "一括アップロードに失敗しました：",
   "Error saving:": "保存中にエラーが発生しました：",
   "Error saving student:": "学生の保存中にエラーが発生しました：",
@@ -776,12 +833,20 @@ export const ja = {
   "Total Students": "総学生数",
   "Student engagement rose": "学生の参加度が",
   "% this month, great improvement!": "%上昇しました。素晴らしい改善です！",
+  // Shown instead of the line above when engagement did not rise.
+  "Engagement change:": "参加度の変化：",
 
   // --- Scenario form (educator) ---
   "e.g. _MVA_1": "例：_MVA_1",
   "Select these yourself — the AI does not fill them in.":
     "これらは自分で選択してください — AIは入力しません。",
   "Publish Scenario": "シナリオを公開",
+  // The same button when editing an existing scenario.
+  "Publish Changes": "変更を公開",
+  // "Animation triggers - Shoulder"
+  "Animation triggers -": "アニメーショントリガー -",
+  Shoulder: "肩",
+  Neck: "首",
   "Saved as a draft.": "ドラフトとして保存しました。",
   "Saved as Draft": "ドラフトとして保存",
   "Saved as a draft. This scenario has no simulator flow yet, so it cannot be published — use the AI prompt at the top of the form to generate one, then publish.":

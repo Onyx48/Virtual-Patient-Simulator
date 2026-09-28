@@ -304,39 +304,47 @@ router.get(
       const scenarios = await Scenario.find(scenarioMatch).select(
         "_id assignedTo assignedGroups",
       );
-      let totalAssigned = 0;
-      let totalCompleted = 0;
 
       // Group members count as assigned, so the total is taken from the unioned
       // student set rather than the assignedTo array alone.
       const assignedIdsByScenario = await assignedStudentIdsByScenario(scenarios);
       const inScope = new Set(studentIds.map((id) => id.toString()));
 
+      const assignedPairs = new Set();
       scenarios.forEach((scenario) => {
-        const ids = assignedIdsByScenario.get(scenario._id.toString());
-        totalAssigned += [...ids].filter((id) => inScope.has(id)).length;
+        const scenarioId = scenario._id.toString();
+        assignedIdsByScenario.get(scenarioId).forEach((id) => {
+          if (inScope.has(id)) assignedPairs.add(`${id}::${scenarioId}`);
+        });
       });
+      const totalAssigned = assignedPairs.size;
 
-      const sessionMatch = {};
-      if (studentIds.length > 0) {
-        sessionMatch.student_id = {
-          $in: studentIds.map((id) => id.toString()),
-        };
-      }
+      /*
+       * Only sessions on the scenarios in scope. This used to take every session
+       * by any student in the school, so an educator's rate — and its
+       * engagement trend — counted runs of other educators' scenarios.
+       */
+      const sessionMatch = {
+        scenario_id: { $in: scenarios.map((s) => s._id.toString()) },
+        student_id: { $in: [...inScope] },
+      };
 
       const sessions = await Session.find(sessionMatch);
 
-      // Count unique (student_id, scenario_id) pairs that have at least one session
+      // An assignment counts as completed once it has at least one session. A
+      // session on a scenario the student was never assigned (e.g. assigned and
+      // later removed) is not part of the denominator, so it is not counted in
+      // the numerator either.
       const completedPairs = new Set();
       sessions.forEach((session) => {
-        completedPairs.add(`${session.student_id}::${session.scenario_id}`);
+        const pair = `${session.student_id}::${session.scenario_id}`;
+        if (assignedPairs.has(pair)) completedPairs.add(pair);
       });
-
-      totalCompleted = completedPairs.size;
+      const totalCompleted = completedPairs.size;
 
       const completionRate =
         totalAssigned > 0
-          ? Math.min(100, Math.round((totalCompleted / totalAssigned) * 100))
+          ? Math.round((totalCompleted / totalAssigned) * 100)
           : 0;
 
       const scores = sessions.map((s) => s.score);
@@ -352,12 +360,12 @@ router.get(
       const sixtyDaysAgo = new Date(now.getTime() - 60 * 24 * 60 * 60 * 1000);
 
       const recentSessions = await Session.countDocuments({
-        student_id: { $in: studentIds.map((id) => id.toString()) },
+        ...sessionMatch,
         createdAt: { $gte: thirtyDaysAgo },
       });
 
       const previousSessions = await Session.countDocuments({
-        student_id: { $in: studentIds.map((id) => id.toString()) },
+        ...sessionMatch,
         createdAt: { $gte: sixtyDaysAgo, $lt: thirtyDaysAgo },
       });
 

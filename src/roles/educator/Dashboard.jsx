@@ -20,6 +20,27 @@ import {
   ArrowDownRight,
 } from "lucide-react";
 
+// "Farukh, a 55-year-old with…" -> "Farukh…". A name that is already one word
+// is left alone.
+const shortScenarioLabel = (name) => {
+  const words = String(name ?? "").trim().split(/\s+/);
+  if (words.length <= 1) return words[0] || "";
+  return `${words[0].replace(/[,.:;-]+$/, "")}…`;
+};
+
+// 0.9 -> "54m", 1.5 -> "1h 30m", 2 -> "2h". An hours-only reading of a
+// sub-hour value ("0h 54m") reads as nothing happened.
+const formatHours = (hours) => {
+  const totalMinutes = Math.round((hours || 0) * 60);
+  const h = Math.floor(totalMinutes / 60);
+  const m = totalMinutes % 60;
+  if (h === 0) return `${m}m`;
+  return m === 0 ? `${h}h` : `${h}h ${m}m`;
+};
+
+// Circumference of the Teaching Effectiveness ring (r = 28).
+const RING_CIRCUMFERENCE = 2 * Math.PI * 28;
+
 function EducatorDashboard() {
   const { user } = useAuth();
   const navigate = useNavigate();
@@ -137,8 +158,17 @@ function EducatorDashboard() {
                       stroke="currentColor"
                       strokeWidth="4"
                       fill="transparent"
-                      strokeDasharray="175.9"
-                      strokeDashoffset="17.59"
+                      // Was a fixed 17.59 (a 90% ring) whatever the rate was.
+                      strokeDasharray={RING_CIRCUMFERENCE}
+                      strokeDashoffset={
+                        RING_CIRCUMFERENCE *
+                        (1 -
+                          Math.min(
+                            100,
+                            Math.max(0, teachingEffectiveness?.effectiveness || 0),
+                          ) /
+                            100)
+                      }
                       className="text-white"
                     />
                   </svg>
@@ -275,8 +305,7 @@ function EducatorDashboard() {
               </p>
               <div className="mt-2">
                 <div className="text-3xl font-bold text-gray-900">
-                  {Math.floor(educatorStats?.avgTimeSpent || 0)}h{" "}
-                  {Math.round(((educatorStats?.avgTimeSpent || 0) % 1) * 60)}m
+                  {formatHours(educatorStats?.avgTimeSpent)}
                 </div>
                 <div className="flex items-center gap-1.5 text-xs font-medium text-green-500 mt-2">
                   <ArrowUpRight size={16} /> <span>Based on sessions</span>
@@ -378,6 +407,9 @@ function EducatorDashboard() {
                     tickLine={false}
                     width={90}
                     tick={{ fontSize: 10, fill: "#6b7280" }}
+                    // Full scenario names wrap into a tall stack in a 90px
+                    // column; the tooltip still shows the whole name.
+                    tickFormatter={shortScenarioLabel}
                   />
                   <Tooltip
                     contentStyle={{ borderRadius: "8px", fontSize: "12px" }}
