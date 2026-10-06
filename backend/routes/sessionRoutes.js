@@ -2,7 +2,7 @@ import express from "express";
 import mongoose from "mongoose";
 import { jwtDecrypt } from "jose";
 import { createSecretKey } from "crypto";
-import { Readable } from "stream";
+import { startTrace } from "../utils/routeTrace.js";
 import {
   fetchSessionState,
   streamEndSession,
@@ -204,24 +204,23 @@ const normaliseTranscription = (history, sessionId) => {
  * conversation state) already lives on Voxio's side, keyed by that id.
  */
 router.post("/feedback", protect, async (req, res) => {
+  const trace = startTrace("feedback", req);
   const sessionId = String(req.body?.session_id || "").trim();
   if (!sessionId) {
-    return res.status(400).json({ message: "session_id is required." });
+    trace.warn("rejected: no session_id", { received: Object.keys(req.body || {}) });
+    return trace.send(res, 400, { message: "session_id is required." });
   }
 
   try {
+    trace.log("calling Voxio end-session", { sessionId });
     const upstream = await streamEndSession(sessionId);
-    res.status(200);
-    res.setHeader(
-      "Content-Type",
-      upstream.headers.get("content-type") || "application/json",
-    );
-    Readable.fromWeb(upstream.body).pipe(res);
+    await trace.pipe(res, upstream);
   } catch (err) {
-    console.error(`[SESSION] feedback stream failed session=${sessionId}:`, err);
-    res
-      .status(err.statusCode || 502)
-      .json({ message: err.message || "Could not stream feedback." });
+    trace.fail(err);
+    if (res.headersSent) return;
+    trace.send(res, err.statusCode || 502, {
+      message: err.message || "Could not stream feedback.",
+    });
   }
 });
 
@@ -232,37 +231,42 @@ router.post("/feedback", protect, async (req, res) => {
  * instead of a fixed end-of-session one.
  */
 router.post("/reasoning", protect, async (req, res) => {
+  const trace = startTrace("reasoning", req);
   const sessionId = String(req.body?.session_id || "").trim();
   const input = String(req.body?.input || "").trim();
   if (!sessionId || !input) {
-    return res
-      .status(400)
-      .json({ message: "session_id and input are required." });
+    trace.warn("rejected: session_id or input missing", {
+      hasSessionId: !!sessionId,
+      hasInput: !!input,
+      received: Object.keys(req.body || {}),
+    });
+    return trace.send(res, 400, {
+      message: "session_id and input are required.",
+    });
   }
 
   try {
+    trace.log("calling Voxio reasoning turn", { sessionId, input });
     const upstream = await streamReasoningTurn(sessionId, input);
-    res.status(200);
-    res.setHeader(
-      "Content-Type",
-      upstream.headers.get("content-type") || "application/json",
-    );
-    Readable.fromWeb(upstream.body).pipe(res);
+    await trace.pipe(res, upstream);
   } catch (err) {
-    console.error(`[SESSION] reasoning stream failed session=${sessionId}:`, err);
-    res
-      .status(err.statusCode || 502)
-      .json({ message: err.message || "Could not stream reasoning response." });
+    trace.fail(err);
+    if (res.headersSent) return;
+    trace.send(res, err.statusCode || 502, {
+      message: err.message || "Could not stream reasoning response.",
+    });
   }
 });
 
 router.post("/complete", async (req, res) => {
+  const trace = startTrace("complete", req);
   // Header first (how the Python service received it); body is accepted too so
   // the simulator can post it either way.
   const token = req.get("token") || req.body?.token;
 
   if (!token) {
-    return res.status(401).json({ status: "error", message: "Missing token." });
+    trace.warn("rejected: no token in header or body");
+    return trace.send(res, 401, { status: "error", message: "Missing token." });
   }
 
   let payload;
@@ -271,16 +275,18 @@ router.post("/complete", async (req, res) => {
     // request. Decrypting it proves the caller holds a token this server minted.
     ({ payload } = await jwtDecrypt(token, getJweKey()));
   } catch (err) {
-    console.error("[SESSION] Rejected callback token:", err.message);
-    return res
-      .status(401)
-      .json({ status: "error", message: "Invalid or expired token." });
+    trace.warn("rejected: token did not decrypt", err.message);
+    return trace.send(res, 401, {
+      status: "error",
+      message: "Invalid or expired token.",
+    });
   }
 
+  trace.log("token decrypted", payload);
   const { session_id, student_id, scenario_id } = payload;
 
   if (!session_id || !student_id || !scenario_id) {
-    return res.status(400).json({
+    return trace.send(res, 400, {
       status: "error",
       message: "Token is missing session_id, student_id or scenario_id.",
     });
@@ -290,18 +296,22 @@ router.post("/complete", async (req, res) => {
     // A replayed callback returns the stored result instead of duplicating it.
     const existing = await Session.findOne({ session_id });
     if (existing) {
-      return res.json({
+      trace.log("already recorded — replayed callback", { _id: existing._id });
+      return trace.send(res, 200, {
         status: "success",
         message: "Session was already recorded.",
         session_id: existing._id,
       });
     }
 
-    const { transcription, feedback, score } = await fetchSessionState(session_id);
+    trace.log("fetching session state from Voxio", { session_id });
+    const state = await fetchSessionState(session_id);
+    trace.log("Voxio session state", state);
+    const { transcription, feedback, score } = state;
 
     if (!Number.isFinite(Number(score))) {
-      console.warn(
-        `[SESSION] score was ${JSON.stringify(score)} session=${session_id} — storing 0, ` +
+      trace.warn(
+        `score was ${JSON.stringify(score)} — storing 0, ` +
           "which is indistinguishable from a genuinely bad consultation on the dashboard",
       );
     }
@@ -315,13 +325,12 @@ router.post("/complete", async (req, res) => {
       score: Number.isFinite(Number(score)) ? Number(score) : 0,
     });
 
-    console.log(
-      `[SESSION] recorded session=${session_id} _id=${session._id} ` +
-        `student=${student_id} scenario=${scenario_id} ` +
+    trace.log(
+      `recorded _id=${session._id} student=${student_id} scenario=${scenario_id} ` +
         `turns=${session.transcription.length} score=${session.score}`,
     );
 
-    res.status(201).json({
+    trace.send(res, 201, {
       status: "success",
       message: "Details updated succesfully at dashboard",
       session_id: session._id,
@@ -329,16 +338,17 @@ router.post("/complete", async (req, res) => {
   } catch (err) {
     // A racing duplicate loses to the unique index rather than double-inserting.
     if (err.code === 11000) {
+      trace.warn("duplicate insert lost the race — returning the stored session");
       const existing = await Session.findOne({ session_id });
-      return res.json({
+      return trace.send(res, 200, {
         status: "success",
         message: "Session was already recorded.",
         session_id: existing?._id,
       });
     }
 
-    console.error("[SESSION] complete failed:", err);
-    res.status(err.statusCode || 500).json({
+    trace.fail(err);
+    trace.send(res, err.statusCode || 500, {
       status: "error",
       message: publicMessage(err, "Could not record this session."),
     });

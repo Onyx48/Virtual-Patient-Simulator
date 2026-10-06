@@ -12,11 +12,14 @@
  * person's patient. Restricting it to one known-good case keeps the runs
  * predictable while that handoff is still single-slot.
  *
- * TESTABLE_SCENARIO_IDS is a comma-separated list, so widening this is an env
- * change and a restart rather than a deploy. Setting it to `*` allows everything
- * again, which is how this gate gets removed once the handoff is per-session.
+ * The gate is now open by default: every scenario is runnable. The single-slot
+ * risk above still applies — two runs started at the same moment can load the
+ * second one's patient for both.
+ *
+ * To restrict again without a deploy, set TESTABLE_SCENARIO_IDS to a
+ * comma-separated list of scenario ids and restart.
  */
-const DEFAULT_TESTABLE_IDS = ["6a9c857f8df9099b1edea1cd"];
+const DEFAULT_TESTABLE_IDS = ["*"];
 
 const configured = () => {
   const raw = process.env.TESTABLE_SCENARIO_IDS;

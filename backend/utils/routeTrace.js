@@ -101,6 +101,9 @@ export const startTrace = (tag, req) => {
       `user=${req.user?._id || "(unauthenticated)"} role=${req.user?.role || "-"} ` +
       `school=${req.user?.schoolId?._id || req.user?.schoolId || "-"}`,
   );
+  // Every header, so a caller (the simulator, Voxio, a browser) can be told
+  // apart; Authorization / cookie / token values are masked by redact().
+  console.log(`${prefix()} headers=${dump(req.headers)}`);
   console.log(`${prefix()} params=${dump(req.params)} query=${dump(req.query)}`);
   console.log(`${prefix()} body=${dump(req.body)}`);
 
@@ -144,6 +147,52 @@ export const startTrace = (tag, req) => {
         `${prefix()} ── ${status} in ${elapsed()} response=${dump(payload)}`,
       );
       return res.status(status).json(payload);
+    },
+
+    /**
+     * Pipe an upstream fetch Response (a stream) to the client, logging every
+     * chunk as it passes through and the whole body once it ends — so a
+     * streamed answer is as visible in the log as a res.json() one.
+     */
+    async pipe(res, upstream) {
+      const contentType = upstream.headers.get("content-type") || "application/json";
+      console.log(
+        `${prefix()} ── upstream ${upstream.status} content-type=${contentType} ` +
+          `headers=${dump(Object.fromEntries(upstream.headers))} (+${elapsed()})`,
+      );
+      res.status(200);
+      res.setHeader("Content-Type", contentType);
+
+      const decoder = new TextDecoder();
+      const reader = upstream.body.getReader();
+      let full = "";
+      let chunks = 0;
+      let bytes = 0;
+      try {
+        for (;;) {
+          const { done, value } = await reader.read();
+          if (done) break;
+          chunks += 1;
+          bytes += value.byteLength;
+          const text = decoder.decode(value, { stream: true });
+          full += text;
+          console.log(`${prefix()} chunk ${chunks} (${value.byteLength}B, +${elapsed()}): ${dump(text)}`);
+          res.write(value);
+        }
+        full += decoder.decode();
+        res.end();
+        console.log(
+          `${prefix()} ── stream ended: ${chunks} chunks, ${bytes} bytes in ${elapsed()}`,
+        );
+        console.log(`${prefix()} full response=${dump(full)}`);
+      } catch (err) {
+        console.error(
+          `${prefix()} ✗ stream broke after ${chunks} chunks / ${bytes} bytes (+${elapsed()}): ${err.message}`,
+        );
+        console.log(`${prefix()} partial response=${dump(full)}`);
+        // Headers are already sent, so the client can only see a cut-off body.
+        res.destroy(err);
+      }
     },
 
     /** Failure detail the stack alone does not carry. */

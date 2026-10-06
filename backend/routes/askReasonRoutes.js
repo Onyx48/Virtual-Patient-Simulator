@@ -205,10 +205,13 @@ const readInput = (req) => {
  * excerpts when diagnosing a bad answer — a deliberate, temporary choice on a
  * specific box, not something to leave on in production.
  */
+// On unless AI_DEBUG_LOG is explicitly false: the query, transcript and answer
+// text are exactly what is needed to debug the coach.
 const logContent = () =>
-  ["true", "1", "yes"].includes(String(process.env.AI_DEBUG_LOG).toLowerCase());
+  !["false", "0", "no"].includes(String(process.env.AI_DEBUG_LOG).toLowerCase());
 
-const excerpt = (value, limit = 400) => {
+// Generous by default; dump() still caps any single value at 20,000 chars.
+const excerpt = (value, limit = 20000) => {
   const text = String(value ?? "");
   return text.length > limit ? `${text.slice(0, limit)}… (+${text.length - limit} chars)` : text;
 };
@@ -403,7 +406,7 @@ const askReason = async (req, res) => {
      */
     if (logContent()) {
       trace.log("query text", excerpt(resolved.text));
-      trace.log("transcript text", excerpt(transcriptionText, 1500));
+      trace.log("transcript text", excerpt(transcriptionText));
     }
 
     /*
@@ -462,7 +465,7 @@ const askReason = async (req, res) => {
       return trace.send(res, 200, { response: STANDARD_RESPONSE });
     }
 
-    if (logContent()) trace.log("answer text", excerpt(text, 1500));
+    if (logContent()) trace.log("answer text", excerpt(text));
 
     return trace.send(res, 200, { response: text });
   } catch (err) {
