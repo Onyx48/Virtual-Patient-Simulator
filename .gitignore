@@ -24,3 +24,6 @@ dist-ssr
 *.sw?
 .env
 .env
+
+# Flow-key backups from scripts/rebuildVoxioFlows.mjs (credentials)
+backups/
