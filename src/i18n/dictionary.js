@@ -437,6 +437,29 @@ export const ja = {
   Forefoot_Pronation: "前足部回内",
   Forefoot_Supination: "前足部回外",
   Full: "全可動域",
+
+  // --- Movement restrictions picker (shared/MovementRestrictions.jsx) ---
+  "Movement restrictions": "可動域制限",
+  "Every movement is full range unless you limit it here. Select these yourself — the AI does not fill them in.":
+    "ここで制限しない限り、すべての動きは全可動域です。これらは自分で選択してください — AIは入力しません。",
+  "All movements full range": "すべての動きが全可動域",
+  "Search movements or regions...": "動きや部位を検索...",
+  "Restricted only": "制限のみ表示",
+  "No restrictions set.": "制限は設定されていません。",
+  "No movements match your search.": "検索に一致する動きはありません。",
+  Reset: "リセット",
+  // "Limited" / "Limited 90°" and the "2 limited" badge (case-insensitive).
+  Limited: "制限あり",
+  // Labels as the picker shows them ("External_Rotation" -> "External rotation").
+  "External rotation": "外旋",
+  "Internal rotation": "内旋",
+  "Horizontal adduction": "水平内転",
+  "Hand behind back": "結帯動作",
+  "Hand behind neck": "結髪動作",
+  "Left rotation": "左回旋",
+  "Right rotation": "右回旋",
+  "Left lateral flexion": "左側屈",
+  "Right lateral flexion": "右側屈",
   Ltd: "制限あり",
 
   // --- Student: scenario detail & session history ---

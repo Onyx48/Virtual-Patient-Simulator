@@ -1,7 +1,21 @@
 import mongoose from "mongoose";
 import dotenv from "dotenv";
+import dns from "dns";
 
 dotenv.config();
+
+/*
+ * Optional DNS override, e.g. DNS_SERVERS=8.8.8.8,1.1.1.1.
+ *
+ * A mongodb+srv:// URI needs an SRV lookup, and on some Windows machines Node's
+ * resolver is refused by the local DNS (querySrv ECONNREFUSED) even though
+ * nslookup works. Unset — as on the server — Node keeps the system resolver.
+ */
+if (process.env.DNS_SERVERS) {
+  const servers = process.env.DNS_SERVERS.split(",").map((s) => s.trim()).filter(Boolean);
+  dns.setServers(servers);
+  console.log(`DNS servers overridden: ${servers.join(", ")}`);
+}
 
 const connectDB = async () => {
   try {

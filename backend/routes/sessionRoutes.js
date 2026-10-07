@@ -203,7 +203,10 @@ const normaliseTranscription = (history, sessionId) => {
  * Client sends only `session_id` — everything else (the flow's api_key,
  * conversation state) already lives on Voxio's side, keyed by that id.
  */
-router.post("/feedback", protect, async (req, res) => {
+// Unauthenticated on purpose: the Unreal simulator calls this with no dashboard
+// login token. Anyone holding a session_id can end that session and read its
+// feedback.
+router.post("/feedback", async (req, res) => {
   const trace = startTrace("feedback", req);
   const sessionId = String(req.body?.session_id || "").trim();
   if (!sessionId) {
@@ -230,7 +233,8 @@ router.post("/feedback", protect, async (req, res) => {
  * arrives — same shape as /feedback, just with a caller-supplied message
  * instead of a fixed end-of-session one.
  */
-router.post("/reasoning", protect, async (req, res) => {
+// Unauthenticated on purpose, same as /feedback: called by the simulator.
+router.post("/reasoning", async (req, res) => {
   const trace = startTrace("reasoning", req);
   const sessionId = String(req.body?.session_id || "").trim();
   const input = String(req.body?.input || "").trim();

@@ -15,6 +15,7 @@ import { Sparkles, ArrowUp, Loader, X, AlertCircle } from "lucide-react";
 import ReactQuill from "react-quill-new";
 import "react-quill-new/dist/quill.snow.css";
 import ConfirmationModal from "../ui/ConfirmationModal";
+import MovementRestrictions from "./MovementRestrictions";
 
 // AI generation now runs inside this backend (backend/routes/scenarioRoutes.js),
 // so it goes through the shared axios instance and carries the auth header.
@@ -708,53 +709,7 @@ function ScenarioFormPage() {
                 />
               </div>
 
-              {/*
-                One block per region. Both regions are always shown: the form has
-                no way to know which one the case is about, and a limitation left
-                unset simply is not sent.
-              */}
-              {REGIONS.map((region, index) => (
-                <div key={region.id} className={index === 0 ? undefined : "pt-2"}>
-                  <h3 className="text-sm font-bold text-gray-800 mb-2">
-                    {`Animation triggers - ${region.label}`}
-                  </h3>
-                  {index === 0 && (
-                    <p className="text-xs text-gray-500 mb-3">
-                      Select these yourself — the AI does not fill them in.
-                    </p>
-                  )}
-                  <div className="grid grid-cols-1 md:grid-cols-2 gap-y-3">
-                    {region.movements.map((movement) => (
-                      <div
-                        key={`${region.id}-${movement.id}`}
-                        className="space-y-1"
-                      >
-                        <label className="text-xs font-semibold text-gray-600 block">
-                          {movement.label}
-                        </label>
-                        <div className="flex flex-wrap gap-4 items-center">
-                          {movement.options.map((opt) => (
-                            <label
-                              key={opt}
-                              className="flex items-center text-xs text-gray-700 cursor-pointer"
-                            >
-                              <input
-                                type="radio"
-                                {...register(
-                                  `movements.${region.id}.${movement.id}`,
-                                )}
-                                value={opt}
-                                className="mr-1.5 w-3.5 h-3.5 accent-orange-500 text-orange-500 border-gray-300 focus:ring-orange-500 cursor-pointer"
-                              />
-                              {`${movement.label}_${opt}`}
-                            </label>
-                          ))}
-                        </div>
-                      </div>
-                    ))}
-                  </div>
-                </div>
-              ))}
+              <MovementRestrictions control={control} regions={REGIONS} />
 
               <div>
                 <label className="block text-xs font-semibold text-gray-700 mb-1">
