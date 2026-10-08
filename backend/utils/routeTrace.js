@@ -195,6 +195,98 @@ export const startTrace = (tag, req) => {
       }
     },
 
+    /**
+     * Pipe and filter an upstream NDJSON stream from Voxio, extracting only
+     * the "out" content and omitting metadata chunks (tokens, session state).
+     * Returns only the meaningful output to the client.
+     */
+    async pipeFiltered(res, upstream) {
+      const contentType = upstream.headers.get("content-type") || "application/json";
+      console.log(
+        `${prefix()} ── upstream ${upstream.status} (filtered mode) content-type=${contentType} (+${elapsed()})`,
+      );
+      res.status(200);
+      res.setHeader("Content-Type", "application/json");
+
+      const decoder = new TextDecoder();
+      const reader = upstream.body.getReader();
+      let buffer = "";
+      let chunks = 0;
+      let result = {};
+
+      try {
+        for (;;) {
+          const { done, value } = await reader.read();
+          if (done) break;
+
+          chunks += 1;
+          const text = decoder.decode(value, { stream: true });
+          buffer += text;
+
+          // Process complete JSON lines (NDJSON format)
+          const lines = buffer.split("\n");
+          buffer = lines.pop() || ""; // Keep incomplete line in buffer
+
+          for (const line of lines) {
+            const trimmed = line.trim();
+            if (!trimmed) continue;
+
+            try {
+              const parsed = JSON.parse(trimmed);
+              console.log(`${prefix()} raw chunk: ${dump(parsed)}`);
+
+              // Extract feedback from "out.speak"
+              if (parsed.out?.speak) {
+                result.feedback = parsed.out.speak;
+              }
+
+              // Extract score if present (might be in various places)
+              if (parsed.score !== undefined && parsed.score !== null) {
+                result.score = parsed.score;
+              }
+              if (parsed.out?.score !== undefined && parsed.out?.score !== null) {
+                result.score = parsed.out.score;
+              }
+            } catch (parseErr) {
+              console.warn(`${prefix()} failed to parse line: ${trimmed.slice(0, 100)}`);
+            }
+          }
+        }
+
+        // Process any remaining buffer
+        buffer += decoder.decode();
+        if (buffer.trim()) {
+          try {
+            const parsed = JSON.parse(buffer.trim());
+            if (parsed.out?.speak) {
+              result.feedback = parsed.out.speak;
+            }
+            if (parsed.score !== undefined && parsed.score !== null) {
+              result.score = parsed.score;
+            }
+            if (parsed.out?.score !== undefined && parsed.out?.score !== null) {
+              result.score = parsed.out.score;
+            }
+          } catch (parseErr) {
+            console.warn(`${prefix()} failed to parse final buffer`);
+          }
+        }
+
+        // Send single consolidated response
+        res.json(result);
+        console.log(
+          `${prefix()} ── filtered stream ended: ${chunks} chunks processed, returning: ${dump(result)} in ${elapsed()}`,
+        );
+      } catch (err) {
+        console.error(
+          `${prefix()} ✗ filtered stream broke after ${chunks} chunks (+${elapsed()}): ${err.message}`,
+        );
+        if (!res.headersSent) {
+          res.status(500).json({ message: "Stream processing failed" });
+        }
+      }
+    },
+
     /** Failure detail the stack alone does not carry. */
     fail(err) {
       console.error(

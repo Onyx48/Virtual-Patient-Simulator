@@ -217,7 +217,7 @@ router.post("/feedback", async (req, res) => {
   try {
     trace.log("calling Voxio end-session", { sessionId });
     const upstream = await streamEndSession(sessionId);
-    await trace.pipe(res, upstream);
+    await trace.pipeFiltered(res, upstream);
   } catch (err) {
     trace.fail(err);
     if (res.headersSent) return;
@@ -252,7 +252,7 @@ router.post("/reasoning", async (req, res) => {
   try {
     trace.log("calling Voxio reasoning turn", { sessionId, input });
     const upstream = await streamReasoningTurn(sessionId, input);
-    await trace.pipe(res, upstream);
+    await trace.pipeFiltered(res, upstream);
   } catch (err) {
     trace.fail(err);
     if (res.headersSent) return;
