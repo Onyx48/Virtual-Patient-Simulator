@@ -212,7 +212,8 @@ export const startTrace = (tag, req) => {
       const reader = upstream.body.getReader();
       let buffer = "";
       let chunks = 0;
-      let result = {};
+      let feedbackText = null;
+      let scoreValue = null;
 
       try {
         for (;;) {
@@ -235,17 +236,42 @@ export const startTrace = (tag, req) => {
               const parsed = JSON.parse(trimmed);
               console.log(`${prefix()} raw chunk: ${dump(parsed)}`);
 
-              // Extract feedback from "out.speak"
-              if (parsed.out?.speak) {
-                result.feedback = parsed.out.speak;
+              // Skip user input echo chunks
+              if (parsed.out?.user_input) {
+                console.log(`${prefix()} skipping user input echo`);
+                continue;
               }
 
-              // Extract score if present (might be in various places)
+              // Extract feedback from "out.speak" - only if it looks like feedback (long text)
+              if (parsed.out?.speak && typeof parsed.out.speak === "string") {
+                const speakContent = parsed.out.speak.trim();
+                // If speak content is long (>20 chars), treat it as feedback
+                // If it's short and numeric-looking, it might be a score
+                if (speakContent.length > 20) {
+                  feedbackText = speakContent;
+                  console.log(`${prefix()} extracted feedback (${speakContent.length} chars)`);
+                } else {
+                  // Short content might be score or other metadata
+                  const asNumber = Number(speakContent);
+                  if (!isNaN(asNumber) && speakContent.length < 10) {
+                    scoreValue = asNumber;
+                    console.log(`${prefix()} extracted score from speak: ${scoreValue}`);
+                  } else {
+                    // Short non-numeric text, might still be feedback
+                    feedbackText = speakContent;
+                    console.log(`${prefix()} extracted short feedback: ${speakContent}`);
+                  }
+                }
+              }
+
+              // Extract score from explicit score fields
               if (parsed.score !== undefined && parsed.score !== null) {
-                result.score = parsed.score;
+                scoreValue = Number(parsed.score);
+                console.log(`${prefix()} extracted score from top-level: ${scoreValue}`);
               }
               if (parsed.out?.score !== undefined && parsed.out?.score !== null) {
-                result.score = parsed.out.score;
+                scoreValue = Number(parsed.out.score);
+                console.log(`${prefix()} extracted score from out.score: ${scoreValue}`);
               }
             } catch (parseErr) {
               console.warn(`${prefix()} failed to parse line: ${trimmed.slice(0, 100)}`);
@@ -258,24 +284,43 @@ export const startTrace = (tag, req) => {
         if (buffer.trim()) {
           try {
             const parsed = JSON.parse(buffer.trim());
-            if (parsed.out?.speak) {
-              result.feedback = parsed.out.speak;
+            if (parsed.out?.speak && typeof parsed.out.speak === "string") {
+              const speakContent = parsed.out.speak.trim();
+              if (speakContent.length > 20) {
+                feedbackText = speakContent;
+              } else {
+                const asNumber = Number(speakContent);
+                if (!isNaN(asNumber) && speakContent.length < 10) {
+                  scoreValue = asNumber;
+                } else {
+                  feedbackText = speakContent;
+                }
+              }
             }
             if (parsed.score !== undefined && parsed.score !== null) {
-              result.score = parsed.score;
+              scoreValue = Number(parsed.score);
             }
             if (parsed.out?.score !== undefined && parsed.out?.score !== null) {
-              result.score = parsed.out.score;
+              scoreValue = Number(parsed.out.score);
             }
           } catch (parseErr) {
             console.warn(`${prefix()} failed to parse final buffer`);
           }
         }
 
+        // Build result with only non-null values
+        const result = {};
+        if (feedbackText !== null) {
+          result.feedback = feedbackText;
+        }
+        if (scoreValue !== null) {
+          result.score = scoreValue;
+        }
+
         // Send single consolidated response
         res.json(result);
         console.log(
-          `${prefix()} ── filtered stream ended: ${chunks} chunks processed, returning: ${dump(result)} in ${elapsed()}`,
+          `${prefix()} ── filtered stream ended: ${chunks} chunks, feedback=${feedbackText ? "present" : "absent"}, score=${scoreValue ?? "absent"} in ${elapsed()}`,
         );
       } catch (err) {
         console.error(
