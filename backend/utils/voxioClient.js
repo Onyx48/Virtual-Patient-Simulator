@@ -34,6 +34,27 @@ const workflowTemplate = JSON.parse(
  * Parsed from the raw JSON each time rather than shared, so one request cannot
  * leak its system prompt into the next.
  */
+/*
+ * The exact turn POST /api/sessions/feedback sends to end the consultation.
+ * The patient prompt below keys end_diagnosis off this string, so the two must
+ * stay identical.
+ */
+export const END_SESSION_INPUT = "Let's end the session";
+
+/*
+ * Appended to every scenario's patient prompt. The scenario text replaces the
+ * template's system_prompt wholesale, which used to drop the only instruction
+ * for end_diagnosis — so whether /feedback actually reached the feedback node
+ * was left to the model's guess, and a "no" sent back a patient reply instead
+ * of feedback.
+ */
+const PATIENT_OUTPUT_FIELDS = `
+
+# OUTPUT FIELDS
+- speak: exactly what you say out loud as the patient.
+- movement: always an empty list [].
+- end_diagnosis: "yes" only if the input is exactly "${END_SESSION_INPUT}" or the student clearly ends the visit (says goodbye, "that's all for today", "we're done"). Otherwise "no". Always lowercase, never anything else. When it is "yes", speak a brief, natural goodbye.`;
+
 export const buildWorkflow = ({ scenarioPrompt, feedbackQuestions }) => {
   const workflow = structuredClone(workflowTemplate);
 
@@ -43,7 +64,12 @@ export const buildWorkflow = ({ scenarioPrompt, feedbackQuestions }) => {
         .join(" ")
     : feedbackQuestions || "";
 
-  workflow.nodes.llm.parameters.system_prompt = scenarioPrompt || "";
+  // The template's patient prompt holds only the JSON-output protocol; the
+  // scenario and the field rules go in front of it rather than replacing it.
+  workflow.nodes.llm.parameters.system_prompt =
+    (scenarioPrompt || "") +
+    PATIENT_OUTPUT_FIELDS +
+    workflowTemplate.nodes.llm.parameters.system_prompt;
 
   return workflow;
 };
@@ -106,6 +132,88 @@ export const createFlow = async ({ flowName, workflow }) => {
  * feedback and the score. No api_key is required — the session id is the
  * credential, exactly as the Python service called it.
  */
+/**
+ * The flow's raw state for a session (every workflow variable), or null when
+ * Voxio has no such session. Used to tell which phase a run is in — feedback
+ * already produced or not — before sending it another turn.
+ */
+export const fetchRawSessionState = async (sessionId) => {
+  const url = `${VOXIO_CHAT_BASE_URL}/agents/session?session_id=${encodeURIComponent(sessionId)}`;
+  const response = await fetch(url);
+  const raw = await response.text();
+  if (!response.ok) {
+    console.error(
+      `[SESSION] Voxio state read failed session=${sessionId} status=${response.status}`,
+      raw.slice(0, 500),
+    );
+    throw Object.assign(new Error(`Voxio session lookup responded ${response.status}`), {
+      statusCode: 502,
+    });
+  }
+  try {
+    return JSON.parse(raw)?.["session-data"]?.state ?? null;
+  } catch {
+    throw Object.assign(new Error("Voxio returned an unreadable session payload."), {
+      statusCode: 502,
+    });
+  }
+};
+
+/**
+ * A process_input stream body (NDJSON, one `{"out": {...}}` per emitting node)
+ * -> the list of `out` objects in order. Lines that are not JSON or carry no
+ * `out` are skipped.
+ */
+export const parseStreamOutputs = (text) =>
+  String(text || "")
+    .split("\n")
+    .map((line) => line.trim())
+    .filter(Boolean)
+    .flatMap((line) => {
+      try {
+        const parsed = JSON.parse(line);
+        return parsed && typeof parsed.out === "object" && parsed.out ? [parsed.out] : [];
+      } catch {
+        return [];
+      }
+    });
+
+/** A score as a number in [0, 1], or null when it is missing or not numeric. */
+export const normaliseScore = (value) => {
+  const n = Number(value);
+  return value === null || value === undefined || value === "" || !Number.isFinite(n)
+    ? null
+    : n;
+};
+
+/** True once the feedback node has written its result into the state. */
+export const hasFeedback = (state) =>
+  typeof state?.feedback === "string" && state.feedback.trim() !== "";
+
+/**
+ * The latest coach reply from the reasoning phase: the last assistant entry in
+ * its history, else the `speak` the reasoning node last wrote.
+ */
+export const latestReasoningReply = (state) => {
+  const history = Array.isArray(state?.reasoning_conversation_history)
+    ? state.reasoning_conversation_history
+    : [];
+  for (let i = history.length - 1; i >= 0; i -= 1) {
+    const entry = history[i];
+    if (entry?.role === "assistant" && entry.content) {
+      // The node's raw output is the JSON it was told to return.
+      try {
+        const parsed = JSON.parse(entry.content);
+        if (parsed?.speak) return String(parsed.speak);
+      } catch {
+        // Plain text, use as-is.
+      }
+      return String(entry.content);
+    }
+  }
+  return typeof state?.speak === "string" ? state.speak : "";
+};
+
 export const fetchSessionState = async (sessionId) => {
   const url = `${VOXIO_CHAT_BASE_URL}/agents/session?session_id=${encodeURIComponent(sessionId)}`;
 
@@ -264,7 +372,7 @@ const streamProcessInput = async (sessionId, userInput) => {
  * judge_if_diagnosis_is_ended node is what actually reacts to it.
  */
 export const streamEndSession = (sessionId) =>
-  streamProcessInput(sessionId, "Let's end the session");
+  streamProcessInput(sessionId, END_SESSION_INPUT);
 
 /**
  * One turn of the clinical-reasoning conversation: the student's free-text

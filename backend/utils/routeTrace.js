@@ -196,140 +196,29 @@ export const startTrace = (tag, req) => {
     },
 
     /**
-     * Pipe and filter an upstream NDJSON stream from Voxio, extracting only
-     * the "out" content and omitting metadata chunks (tokens, session state).
-     * Returns only the meaningful output to the client.
+     * Read an upstream fetch Response (a stream) to the end without forwarding
+     * it, logging each chunk and the whole body. Resolves to the full text.
      */
-    async pipeFiltered(res, upstream) {
-      const contentType = upstream.headers.get("content-type") || "application/json";
+    async consume(upstream) {
       console.log(
-        `${prefix()} ── upstream ${upstream.status} (filtered mode) content-type=${contentType} (+${elapsed()})`,
+        `${prefix()} ── upstream ${upstream.status} ` +
+          `content-type=${upstream.headers.get("content-type") || "-"} (+${elapsed()})`,
       );
-      res.status(200);
-      res.setHeader("Content-Type", "application/json");
-
       const decoder = new TextDecoder();
       const reader = upstream.body.getReader();
-      let buffer = "";
+      let full = "";
       let chunks = 0;
-      let feedbackText = null;
-      let scoreValue = null;
-
-      try {
-        for (;;) {
-          const { done, value } = await reader.read();
-          if (done) break;
-
-          chunks += 1;
-          const text = decoder.decode(value, { stream: true });
-          buffer += text;
-
-          // Process complete JSON lines (NDJSON format)
-          const lines = buffer.split("\n");
-          buffer = lines.pop() || ""; // Keep incomplete line in buffer
-
-          for (const line of lines) {
-            const trimmed = line.trim();
-            if (!trimmed) continue;
-
-            try {
-              const parsed = JSON.parse(trimmed);
-              console.log(`${prefix()} raw chunk: ${dump(parsed)}`);
-
-              // Skip user input echo chunks
-              if (parsed.out?.user_input) {
-                console.log(`${prefix()} skipping user input echo`);
-                continue;
-              }
-
-              // Extract feedback from "out.speak" - only if it looks like feedback (long text)
-              if (parsed.out?.speak && typeof parsed.out.speak === "string") {
-                const speakContent = parsed.out.speak.trim();
-                // If speak content is long (>20 chars), treat it as feedback
-                // If it's short and numeric-looking, it might be a score
-                if (speakContent.length > 20) {
-                  feedbackText = speakContent;
-                  console.log(`${prefix()} extracted feedback (${speakContent.length} chars)`);
-                } else {
-                  // Short content might be score or other metadata
-                  const asNumber = Number(speakContent);
-                  if (!isNaN(asNumber) && speakContent.length < 10) {
-                    scoreValue = asNumber;
-                    console.log(`${prefix()} extracted score from speak: ${scoreValue}`);
-                  } else {
-                    // Short non-numeric text, might still be feedback
-                    feedbackText = speakContent;
-                    console.log(`${prefix()} extracted short feedback: ${speakContent}`);
-                  }
-                }
-              }
-
-              // Extract score from explicit score fields
-              if (parsed.score !== undefined && parsed.score !== null) {
-                scoreValue = Number(parsed.score);
-                console.log(`${prefix()} extracted score from top-level: ${scoreValue}`);
-              }
-              if (parsed.out?.score !== undefined && parsed.out?.score !== null) {
-                scoreValue = Number(parsed.out.score);
-                console.log(`${prefix()} extracted score from out.score: ${scoreValue}`);
-              }
-            } catch (parseErr) {
-              console.warn(`${prefix()} failed to parse line: ${trimmed.slice(0, 100)}`);
-            }
-          }
-        }
-
-        // Process any remaining buffer
-        buffer += decoder.decode();
-        if (buffer.trim()) {
-          try {
-            const parsed = JSON.parse(buffer.trim());
-            if (parsed.out?.speak && typeof parsed.out.speak === "string") {
-              const speakContent = parsed.out.speak.trim();
-              if (speakContent.length > 20) {
-                feedbackText = speakContent;
-              } else {
-                const asNumber = Number(speakContent);
-                if (!isNaN(asNumber) && speakContent.length < 10) {
-                  scoreValue = asNumber;
-                } else {
-                  feedbackText = speakContent;
-                }
-              }
-            }
-            if (parsed.score !== undefined && parsed.score !== null) {
-              scoreValue = Number(parsed.score);
-            }
-            if (parsed.out?.score !== undefined && parsed.out?.score !== null) {
-              scoreValue = Number(parsed.out.score);
-            }
-          } catch (parseErr) {
-            console.warn(`${prefix()} failed to parse final buffer`);
-          }
-        }
-
-        // Build result with only non-null values
-        const result = {};
-        if (feedbackText !== null) {
-          result.feedback = feedbackText;
-        }
-        if (scoreValue !== null) {
-          result.score = scoreValue;
-        }
-
-        // Send single consolidated response
-        res.json(result);
-        console.log(
-          `${prefix()} ── filtered stream ended: ${chunks} chunks, feedback=${feedbackText ? "present" : "absent"}, score=${scoreValue ?? "absent"} in ${elapsed()}`,
-        );
-      } catch (err) {
-        console.error(
-          `${prefix()} ✗ filtered stream broke after ${chunks} chunks (+${elapsed()}): ${err.message}`,
-        );
-        if (!res.headersSent) {
-          res.status(500).json({ message: "Stream processing failed" });
-        }
+      for (;;) {
+        const { done, value } = await reader.read();
+        if (done) break;
+        chunks += 1;
+        const text = decoder.decode(value, { stream: true });
+        full += text;
+        console.log(`${prefix()} upstream chunk ${chunks} (+${elapsed()}): ${dump(text)}`);
       }
+      full += decoder.decode();
+      console.log(`${prefix()} upstream ended: ${chunks} chunks in ${elapsed()}`);
+      return full;
     },
 
     /** Failure detail the stack alone does not carry. */

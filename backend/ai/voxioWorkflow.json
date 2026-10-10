@@ -56,9 +56,12 @@
                     "user_input": "str"
                 }
             },
-            "next": ["llm" , "transcription1"]
+            "next": [
+                "llm",
+                "transcription1"
+            ]
         },
-        "transcription1" : {
+        "transcription1": {
             "type": "out",
             "parameters": {
                 "variables": [
@@ -76,7 +79,7 @@
                     }
                 },
                 "prompt_template": "base_llm",
-                "system_prompt": "Physiotherapy Case: Right Shoulder Pain and Neck Pain with Numbness\\n\\nPatient Profile: Name: Janice Wong... (Rest of your prompt)... return small cased 'yes' or 'no' depending on the situation.\n\n***\n\n# SYSTEM KERNEL: OUTPUT SERIALIZATION PROTOCOL\n\n**CRITICAL DIRECTIVE: SILENT EXECUTION**\nYou are a headless data processing engine. You have NO console, NO stdout, and NO chat interface.\nYou must not output your thinking process, steps, analysis, or 'Here is the answer'.\n**Outputting anything other than the raw JSON string is a system failure.**\n\n**Payload vs. Container:**\n1.  **The Payload (Content):** This is the content requested by the user (e.g., Markdown tables, paragraphs). Generate this internally based on the User Prompt and Persona.\n2.  **The Container (Format):** You must package that Payload into the specific JSON format defined below.\n\n**Strict Constraints:**\n1.  **JSON ONLY:** Start immediately with `{`. End immediately with `}`.\n2.  **No Markdown Fences:** Do NOT wrap the JSON in ```json ... ```.\n3.  **No Thinking Logs:** Do NOT output 'Step 1...', 'Analyzing...', or 'The final answer is...'.\n4.  **Escaping:** If the content contains newlines (like a Markdown table), you must escape them (`\\n`).\n\n---\n\n### TARGET JSON TEMPLATE\n(This defines the keys you must populate. Do not copy the 'type' or 'description' fields into your output; use them only to understand what to generate.)\n\n```json\n{json.dumps(return_type, indent=4)}\n```\n\n**Generate the raw JSON string now:**",
+                "system_prompt": "\n\n***\n\n# SYSTEM KERNEL: OUTPUT SERIALIZATION PROTOCOL\n\n**CRITICAL DIRECTIVE: SILENT EXECUTION**\nYou are a headless data processing engine. You have NO console, NO stdout, and NO chat interface.\nYou must not output your thinking process, steps, analysis, or 'Here is the answer'.\n**Outputting anything other than the raw JSON string is a system failure.**\n\n**Payload vs. Container:**\n1.  **The Payload (Content):** This is the content requested by the user (e.g., Markdown tables, paragraphs). Generate this internally based on the User Prompt and Persona.\n2.  **The Container (Format):** You must package that Payload into the specific JSON format defined below.\n\n**Strict Constraints:**\n1.  **JSON ONLY:** Start immediately with `{`. End immediately with `}`.\n2.  **No Markdown Fences:** Do NOT wrap the JSON in ```json ... ```.\n3.  **No Thinking Logs:** Do NOT output 'Step 1...', 'Analyzing...', or 'The final answer is...'.\n4.  **Escaping:** If the content contains newlines (like a Markdown table), you must escape them (`\\n`).\n\n---\n\n### TARGET JSON TEMPLATE\n(This defines the keys you must populate. Do not copy the 'type' or 'description' fields into your output; use them only to understand what to generate.)\n\n```json\n{json.dumps(return_type, indent=4)}\n```\n\n**Generate the raw JSON string now:**",
                 "service": "groq",
                 "model": "openai/gpt-oss-120b",
                 "history_key": "diagnosis_conversation_history",
@@ -136,7 +139,7 @@
                     }
                 },
                 "prompt_template": "base_llm",
-                "system_prompt": "You are an AI assistant designed to evaluate a medical student's performance... (Rest of your prompt)...\n\n***\n\n# SYSTEM KERNEL: OUTPUT SERIALIZATION PROTOCOL\n\n**CRITICAL DIRECTIVE: SILENT EXECUTION**\nYou are a headless data processing engine. You have NO console, NO stdout, and NO chat interface.\nYou must not output your thinking process, steps, analysis, or 'Here is the answer'.\n**Outputting anything other than the raw JSON string is a system failure.**\n\n**Payload vs. Container:**\n1.  **The Payload (Content):** This is the content requested by the user (e.g., Markdown tables, paragraphs). Generate this internally based on the User Prompt and Persona.\n2.  **The Container (Format):** You must package that Payload into the specific JSON format defined below.\n\n**Strict Constraints:**\n1.  **JSON ONLY:** Start immediately with `{`. End immediately with `}`.\n2.  **No Markdown Fences:** Do NOT wrap the JSON in ```json ... ```.\n3.  **No Thinking Logs:** Do NOT output 'Step 1...', 'Analyzing...', or 'The final answer is...'.\n4.  **Escaping:** If the content contains newlines (like a Markdown table), you must escape them (`\\n`).\n\n---\n\n### TARGET JSON TEMPLATE\n(This defines the keys you must populate. Do not copy the 'type' or 'description' fields into your output; use them only to understand what to generate.)\n\n```json\n{json.dumps(return_type, indent=4)}\n```\n\n**Generate the raw JSON string now:**",
+                "system_prompt": "You are a clinical educator assessing a physiotherapy student's subjective assessment (history taking) of a simulated patient.\n\n# INPUTS\n- diagnosis_conversation_history: the full consultation. \"user\" turns are the student, \"assistant\" turns are the patient.\n- feedback_questions: the numbered grading questions for this case.\n\n# RULES\n- Judge only what is in the transcript. Never assume the student said something they did not. Quote or paraphrase specific moments as evidence.\n- Answer every grading question with \"Yes\", \"Partly\" or \"No\" and one line of evidence.\n- If the transcript is very short or the student did not meaningfully engage, say so plainly and give a low score.\n- Address the student directly as \"you\". Be specific, constructive and concise.\n\n# FEEDBACK FORMAT (the \"feedback\" field)\nPlain text with short headed sections:\nOverall summary (2-3 sentences).\nWhat you did well (bullets with evidence).\nWhat to improve (bullets with evidence, and what to ask or say instead).\nAnswers to the grading questions (numbered; each \"Yes\", \"Partly\" or \"No\" plus one line of evidence).\nOne key takeaway for the next consultation.\n\n# SCORE (the \"score\" field)\nA number strictly between 0 and 1: the share of grading questions met, counting \"Yes\" as 1, \"Partly\" as 0.5 and \"No\" as 0, divided by the number of questions. Return only the number.\n\n***\n\n# SYSTEM KERNEL: OUTPUT SERIALIZATION PROTOCOL\n\n**CRITICAL DIRECTIVE: SILENT EXECUTION**\nYou are a headless data processing engine. You have NO console, NO stdout, and NO chat interface.\nYou must not output your thinking process, steps, analysis, or 'Here is the answer'.\n**Outputting anything other than the raw JSON string is a system failure.**\n\n**Payload vs. Container:**\n1.  **The Payload (Content):** This is the content requested by the user (e.g., Markdown tables, paragraphs). Generate this internally based on the User Prompt and Persona.\n2.  **The Container (Format):** You must package that Payload into the specific JSON format defined below.\n\n**Strict Constraints:**\n1.  **JSON ONLY:** Start immediately with `{`. End immediately with `}`.\n2.  **No Markdown Fences:** Do NOT wrap the JSON in ```json ... ```.\n3.  **No Thinking Logs:** Do NOT output 'Step 1...', 'Analyzing...', or 'The final answer is...'.\n4.  **Escaping:** If the content contains newlines (like a Markdown table), you must escape them (`\\n`).\n\n---\n\n### TARGET JSON TEMPLATE\n(This defines the keys you must populate. Do not copy the 'type' or 'description' fields into your output; use them only to understand what to generate.)\n\n```json\n{json.dumps(return_type, indent=4)}\n```\n\n**Generate the raw JSON string now:**",
                 "service": "groq",
                 "model": "openai/gpt-oss-120b",
                 "history_key": "feedback_conversation_history",
@@ -153,7 +156,7 @@
             },
             "next": [
                 "feedbacko",
-                "greeting2"
+                "input2"
             ]
         },
         "feedbacko": {
@@ -165,15 +168,6 @@
                 ]
             }
         },
-        "greeting2": {
-            "type": "out",
-            "parameters": {
-                "out_dict": {
-                    "speak": "Hello! Lets start the reasoning session"
-                }
-            },
-            "next": "input2"
-        },
         "input2": {
             "type": "input",
             "parameters": {
@@ -181,9 +175,12 @@
                     "user_input": "str"
                 }
             },
-            "next": ["reasoning" , "transcription2"]
+            "next": [
+                "reasoning",
+                "transcription2"
+            ]
         },
-        "transcription2" : {
+        "transcription2": {
             "type": "out",
             "parameters": {
                 "variables": [
@@ -195,28 +192,32 @@
             "type": "llm",
             "parameters": {
                 "input_variables": {
-                    "conversation_history": {
+                    "user_input": {
+                        "type": "str",
+                        "description": "The student's question or reasoning."
+                    },
+                    "diagnosis_conversation_history": {
                         "type": "list",
-                        "description": "the conversation hsitory of the diagnosis"
+                        "description": "The consultation the student just had."
+                    },
+                    "feedback": {
+                        "type": "str",
+                        "description": "The feedback the student received."
                     },
                     "feedback_questions": {
                         "type": "str",
-                        "description": "The feedback questions"
+                        "description": "The grading questions for this case."
                     }
                 },
                 "prompt_template": "base_llm",
-                "system_prompt": "You are an AI assistant designed to evaluate a medical student's performance... (Rest of your prompt)...\n\n***\n\n# SYSTEM KERNEL: OUTPUT SERIALIZATION PROTOCOL\n\n**CRITICAL DIRECTIVE: SILENT EXECUTION**\nYou are a headless data processing engine. You have NO console, NO stdout, and NO chat interface.\nYou must not output your thinking process, steps, analysis, or 'Here is the answer'.\n**Outputting anything other than the raw JSON string is a system failure.**\n\n**Payload vs. Container:**\n1.  **The Payload (Content):** This is the content requested by the user (e.g., Markdown tables, paragraphs). Generate this internally based on the User Prompt and Persona.\n2.  **The Container (Format):** You must package that Payload into the specific JSON format defined below.\n\n**Strict Constraints:**\n1.  **JSON ONLY:** Start immediately with `{`. End immediately with `}`.\n2.  **No Markdown Fences:** Do NOT wrap the JSON in ```json ... ```.\n3.  **No Thinking Logs:** Do NOT output 'Step 1...', 'Analyzing...', or 'The final answer is...'.\n4.  **Escaping:** If the content contains newlines (like a Markdown table), you must escape them (`\\n`).\n\n---\n\n### TARGET JSON TEMPLATE\n(This defines the keys you must populate. Do not copy the 'type' or 'description' fields into your output; use them only to understand what to generate.)\n\n```json\n{json.dumps(return_type, indent=4)}\n```\n\n**Generate the raw JSON string now:**",
+                "system_prompt": "You are a clinical reasoning tutor for a physiotherapy student who has just finished a simulated consultation and received feedback on it.\n\n# INPUTS\n- user_input: the student's latest question or reasoning.\n- diagnosis_conversation_history: the consultation they just had (\"user\" = student, \"assistant\" = patient).\n- feedback: the assessment they were given.\n- feedback_questions: the grading questions for the case.\n\n# HOW TO RESPOND\n- Discuss clinical reasoning about this case: likely diagnoses and differentials, which findings support or argue against them, what further questions or tests would help, and management ideas.\n- Ground every point in what the patient actually said in the consultation. Do not invent findings.\n- Ask the student a guiding question when it helps them reason, rather than only giving answers.\n- You are a tutor in a conversation. Do NOT grade, score or re-write the feedback. Never output a score.\n- This may be spoken aloud: keep each reply to a short paragraph, plain text, no markdown.\n\n# OUTPUT FIELD\n- speak: your reply to the student.\n\n***\n\n# SYSTEM KERNEL: OUTPUT SERIALIZATION PROTOCOL\n\n**CRITICAL DIRECTIVE: SILENT EXECUTION**\nYou are a headless data processing engine. You have NO console, NO stdout, and NO chat interface.\nYou must not output your thinking process, steps, analysis, or 'Here is the answer'.\n**Outputting anything other than the raw JSON string is a system failure.**\n\n**Payload vs. Container:**\n1.  **The Payload (Content):** This is the content requested by the user (e.g., Markdown tables, paragraphs). Generate this internally based on the User Prompt and Persona.\n2.  **The Container (Format):** You must package that Payload into the specific JSON format defined below.\n\n**Strict Constraints:**\n1.  **JSON ONLY:** Start immediately with `{`. End immediately with `}`.\n2.  **No Markdown Fences:** Do NOT wrap the JSON in ```json ... ```.\n3.  **No Thinking Logs:** Do NOT output 'Step 1...', 'Analyzing...', or 'The final answer is...'.\n4.  **Escaping:** If the content contains newlines (like a Markdown table), you must escape them (`\\n`).\n\n---\n\n### TARGET JSON TEMPLATE\n(This defines the keys you must populate. Do not copy the 'type' or 'description' fields into your output; use them only to understand what to generate.)\n\n```json\n{json.dumps(return_type, indent=4)}\n```\n\n**Generate the raw JSON string now:**",
                 "service": "groq",
                 "model": "openai/gpt-oss-120b",
                 "history_key": "reasoning_conversation_history",
                 "llm_return_type": {
                     "speak": {
                         "type": "str",
-                        "description": "The feedback score"
-                    },
-                    "score": {
-                        "type": "str",
-                        "description": "The feedback score after evaluation"
+                        "description": "The tutor's reply to the student."
                     }
                 }
             },

@@ -5,6 +5,11 @@ import { createSecretKey } from "crypto";
 import { startTrace } from "../utils/routeTrace.js";
 import {
   fetchSessionState,
+  fetchRawSessionState,
+  hasFeedback,
+  latestReasoningReply,
+  normaliseScore,
+  parseStreamOutputs,
   streamEndSession,
   streamReasoningTurn,
 } from "../utils/voxioClient.js";
@@ -214,15 +219,67 @@ router.post("/feedback", async (req, res) => {
     return trace.send(res, 400, { message: "session_id is required." });
   }
 
+  /*
+   * Phases are tracked by Voxio, not here, so read its state first. Feedback
+   * already produced means this is a repeat call: answering from the state,
+   * rather than sending "end the session" again, keeps a second call from
+   * landing in the reasoning phase and coming back as a reasoning reply.
+   */
+  const fromState = (state) => ({
+    feedback: state.feedback,
+    score: normaliseScore(state.score),
+  });
+
   try {
-    trace.log("calling Voxio end-session", { sessionId });
-    const upstream = await streamEndSession(sessionId);
-    await trace.pipeFiltered(res, upstream);
+    let state = await fetchRawSessionState(sessionId);
+    if (!state) {
+      trace.warn("Voxio has no session with that id");
+      return trace.send(res, 404, { message: "No simulator session with that session_id." });
+    }
+    if (hasFeedback(state)) {
+      trace.log("feedback already generated — returning it without another turn");
+      return trace.send(res, 200, fromState(state));
+    }
+
+    /*
+     * One retry: the patient node decides end_diagnosis, and a stray "no" sends
+     * the turn back to the consultation instead of to the feedback node.
+     */
+    for (let attempt = 1; attempt <= 2; attempt += 1) {
+      trace.log(`sending end-session turn (attempt ${attempt})`, { sessionId });
+      const outputs = parseStreamOutputs(
+        await trace.consume(await streamEndSession(sessionId)),
+      );
+      trace.log("node outputs", outputs);
+
+      // Read the field by name — feedbacko emits { feedback, score }. Every
+      // other output in this turn (the patient's goodbye, echoes) is ignored.
+      const result = outputs.find((out) => "feedback" in out);
+      if (result?.feedback) {
+        return trace.send(res, 200, {
+          feedback: String(result.feedback),
+          score: normaliseScore(result.score),
+        });
+      }
+
+      state = await fetchRawSessionState(sessionId);
+      if (hasFeedback(state)) {
+        trace.log("feedback found in state after the turn");
+        return trace.send(res, 200, fromState(state));
+      }
+      trace.warn("no feedback produced — the patient node did not end the session", {
+        end_diagnosis: outputs.find((out) => "end_diagnosis" in out)?.end_diagnosis,
+      });
+    }
+
+    return trace.send(res, 502, {
+      message: "The simulator did not produce feedback for this session.",
+    });
   } catch (err) {
     trace.fail(err);
     if (res.headersSent) return;
     trace.send(res, err.statusCode || 502, {
-      message: err.message || "Could not stream feedback.",
+      message: err.message || "Could not get feedback.",
     });
   }
 });
@@ -250,14 +307,45 @@ router.post("/reasoning", async (req, res) => {
   }
 
   try {
-    trace.log("calling Voxio reasoning turn", { sessionId, input });
-    const upstream = await streamReasoningTurn(sessionId, input);
-    await trace.pipeFiltered(res, upstream);
+    const state = await fetchRawSessionState(sessionId);
+    if (!state) {
+      trace.warn("Voxio has no session with that id");
+      return trace.send(res, 404, { message: "No simulator session with that session_id." });
+    }
+    /*
+     * Until feedback exists the flow is still in the consultation, so this
+     * input would be answered by the patient, not the reasoning coach.
+     */
+    if (!hasFeedback(state)) {
+      trace.warn("rejected: reasoning before feedback");
+      return trace.send(res, 409, {
+        message: "Call /api/sessions/feedback for this session before clinical reasoning.",
+      });
+    }
+
+    trace.log("sending reasoning turn", { sessionId, input });
+    const outputs = parseStreamOutputs(
+      await trace.consume(await streamReasoningTurn(sessionId, input)),
+    );
+    trace.log("node outputs", outputs);
+
+    // response2 emits { speak }; transcription2 only echoes { user_input }.
+    const spoken = outputs.filter((out) => typeof out.speak === "string" && out.speak.trim());
+    let reply = spoken.length ? spoken[spoken.length - 1].speak : "";
+    if (!reply) {
+      reply = latestReasoningReply(await fetchRawSessionState(sessionId));
+      trace.warn("no speak in the stream — read the reply from state", { found: !!reply });
+    }
+
+    if (!reply) {
+      return trace.send(res, 502, { message: "The reasoning coach returned no reply." });
+    }
+    return trace.send(res, 200, { speak: reply });
   } catch (err) {
     trace.fail(err);
     if (res.headersSent) return;
     trace.send(res, err.statusCode || 502, {
-      message: err.message || "Could not stream reasoning response.",
+      message: err.message || "Could not get a reasoning reply.",
     });
   }
 });
