@@ -10,7 +10,8 @@
  * missing step obvious: if step 4 is followed by nothing, the handler died there.
  */
 
-const SECRET_KEY_PATTERN = /(api[-_]?key|token|password|secret|authorization|cookie|jwe|jwt)/i;
+// `token` but not LLM usage counts like prompt_tokens / completion_tokens.
+const SECRET_KEY_PATTERN = /(api[-_]?key|token(?!s)|password|secret|authorization|cookie|jwe|jwt)/i;
 
 /*
  * Long enough to hold a whole scenario prompt and a consultation transcript,
@@ -114,6 +115,22 @@ export const startTrace = (tag, req) => {
    */
   if (req.scope) console.log(`${prefix()} scope=${dump(req.scope)}`);
 
+  /*
+   * A caller that gives up (the simulator's HTTP timeout, a dropped connection)
+   * looks like "sometimes it doesn't work" from its side while the server log
+   * shows a normal 200 later. Say so explicitly when the socket closes before
+   * the response was written.
+   */
+  const res = req.res;
+  res?.on("close", () => {
+    if (!res.writableFinished) {
+      console.warn(
+        `${prefix()} ! client disconnected after ${elapsed()} at step ${step}, ` +
+          `before the response was sent — the caller timed out or dropped the connection`,
+      );
+    }
+  });
+
   return {
     id,
 
@@ -143,6 +160,13 @@ export const startTrace = (tag, req) => {
      * log line drifts from the payload the moment either is edited.
      */
     send(res, status, payload) {
+      if (res.headersSent || res.destroyed) {
+        console.warn(
+          `${prefix()} ! wanted to send ${status} but the connection is already ` +
+            `${res.destroyed ? "closed by the client" : "answered"} (+${elapsed()}) payload=${dump(payload)}`,
+        );
+        return res;
+      }
       console.log(
         `${prefix()} ── ${status} in ${elapsed()} response=${dump(payload)}`,
       );
@@ -208,16 +232,36 @@ export const startTrace = (tag, req) => {
       const reader = upstream.body.getReader();
       let full = "";
       let chunks = 0;
-      for (;;) {
-        const { done, value } = await reader.read();
-        if (done) break;
-        chunks += 1;
-        const text = decoder.decode(value, { stream: true });
-        full += text;
-        console.log(`${prefix()} upstream chunk ${chunks} (+${elapsed()}): ${dump(text)}`);
+      let bytes = 0;
+      const readStart = Date.now();
+      try {
+        for (;;) {
+          const { done, value } = await reader.read();
+          if (done) break;
+          chunks += 1;
+          bytes += value.byteLength;
+          const text = decoder.decode(value, { stream: true });
+          full += text;
+          console.log(`${prefix()} upstream chunk ${chunks} (+${elapsed()}): ${dump(text)}`);
+        }
+      } catch (err) {
+        // A stream cut mid-turn (timeout, reset) — keep what arrived in the log.
+        console.error(
+          `${prefix()} ✗ upstream stream broke after ${chunks} chunks / ${bytes}B ` +
+            `(${Date.now() - readStart}ms reading): ${err.name}: ${err.message} ` +
+            `cause=${err.cause?.code || err.cause?.message || "-"}`,
+        );
+        console.log(`${prefix()} partial upstream=${dump(full)}`);
+        throw Object.assign(new Error(`Voxio stream broke: ${err.message}`), {
+          statusCode: err.name === "TimeoutError" ? 504 : 502,
+        });
       }
       full += decoder.decode();
-      console.log(`${prefix()} upstream ended: ${chunks} chunks in ${elapsed()}`);
+      console.log(
+        `${prefix()} upstream ended: ${chunks} chunks, ${bytes}B, ` +
+          `${Date.now() - readStart}ms reading (+${elapsed()})`,
+      );
+      if (!chunks) console.warn(`${prefix()} ! upstream stream was EMPTY`);
       return full;
     },
 

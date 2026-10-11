@@ -137,9 +137,48 @@ export const createFlow = async ({ flowName, workflow }) => {
  * Voxio has no such session. Used to tell which phase a run is in — feedback
  * already produced or not — before sending it another turn.
  */
+/*
+ * How long one Voxio call may take, end to end (an LLM turn included). Without
+ * a limit a stalled Voxio call hangs the request until the game gives up, and
+ * the log shows nothing at all for that request.
+ */
+const VOXIO_TIMEOUT_MS = Number(process.env.VOXIO_TIMEOUT_MS) || 90000;
+
+/**
+ * fetch() to Voxio with a timeout, and a network failure turned into an error
+ * that says what actually happened (timeout, refused, reset, DNS) instead of
+ * Node's bare "fetch failed".
+ */
+const voxioFetch = async (label, url, init = {}) => {
+  const startedAt = Date.now();
+  try {
+    const response = await fetch(url, { ...init, signal: AbortSignal.timeout(VOXIO_TIMEOUT_MS) });
+    console.log(
+      `[VOXIO] ${label} -> ${response.status} headers in ${Date.now() - startedAt}ms`,
+    );
+    return response;
+  } catch (err) {
+    const elapsed = Date.now() - startedAt;
+    const timedOut = err.name === "TimeoutError" || err.name === "AbortError";
+    const cause = err.cause?.code || err.cause?.message || "-";
+    console.error(
+      `[VOXIO] ${label} FAILED after ${elapsed}ms: ${err.name}: ${err.message} cause=${cause}` +
+        (timedOut ? ` (timeout is ${VOXIO_TIMEOUT_MS}ms, VOXIO_TIMEOUT_MS)` : ""),
+    );
+    throw Object.assign(
+      new Error(
+        timedOut
+          ? `Voxio did not answer within ${VOXIO_TIMEOUT_MS / 1000}s.`
+          : `Could not reach Voxio (${cause}).`,
+      ),
+      { statusCode: timedOut ? 504 : 502 },
+    );
+  }
+};
+
 export const fetchRawSessionState = async (sessionId) => {
   const url = `${VOXIO_CHAT_BASE_URL}/agents/session?session_id=${encodeURIComponent(sessionId)}`;
-  const response = await fetch(url);
+  const response = await voxioFetch(`state session=${sessionId}`, url);
   const raw = await response.text();
   if (!response.ok) {
     console.error(
@@ -164,19 +203,56 @@ export const fetchRawSessionState = async (sessionId) => {
  * -> the list of `out` objects in order. Lines that are not JSON or carry no
  * `out` are skipped.
  */
-export const parseStreamOutputs = (text) =>
-  String(text || "")
-    .split("\n")
-    .map((line) => line.trim())
-    .filter(Boolean)
-    .flatMap((line) => {
-      try {
-        const parsed = JSON.parse(line);
-        return parsed && typeof parsed.out === "object" && parsed.out ? [parsed.out] : [];
-      } catch {
-        return [];
-      }
-    });
+export const parseStreamOutputs = (text) => parseStreamLines(text).outputs;
+
+/**
+ * Same as parseStreamOutputs, but also returns every line that was not a node
+ * output: Voxio's status lines (waiting_for_input, token usage), error objects,
+ * and anything that was not JSON. Those are what explain a turn that produced
+ * no output, so they have to reach the log rather than be dropped.
+ */
+export const parseStreamLines = (text) => {
+  const outputs = [];
+  const other = [];
+  const unparseable = [];
+  for (const line of String(text || "").split("\n").map((l) => l.trim()).filter(Boolean)) {
+    try {
+      const parsed = JSON.parse(line);
+      if (parsed && typeof parsed.out === "object" && parsed.out) outputs.push(parsed.out);
+      else other.push(parsed);
+    } catch {
+      unparseable.push(line);
+    }
+  }
+  return { outputs, other, unparseable };
+};
+
+/**
+ * Which phase a Voxio session is in, for the log: position in the flow, and
+ * the presence/size of what each phase writes. Lengths rather than contents,
+ * apart from the short control values.
+ */
+export const summariseState = (state) => {
+  if (!state) return { exists: false };
+  const len = (v) => (Array.isArray(v) ? v.length : v == null ? null : typeof v);
+  return {
+    exists: true,
+    current_node: state.__current_node__ ?? null,
+    step: state.step ?? null,
+    node_type: state.node_type ?? null,
+    end_diagnosis: state.end_diagnosis ?? null,
+    feedback:
+      typeof state.feedback === "string"
+        ? `${state.feedback.length} chars`
+        : state.feedback === undefined
+          ? "absent"
+          : `${typeof state.feedback}: ${JSON.stringify(state.feedback).slice(0, 80)}`,
+    score: state.score ?? null,
+    diagnosis_turns: len(state.diagnosis_conversation_history),
+    reasoning_turns: len(state.reasoning_conversation_history),
+    updated_vars: state.__updated_vars__ ?? null,
+  };
+};
 
 /** A score as a number in [0, 1], or null when it is missing or not numeric. */
 export const normaliseScore = (value) => {
@@ -333,14 +409,18 @@ export const updateFlow = async ({ apiKey, flowName, workflow }) => {
  * both are just a turn on the same running flow, identified by session_id.
  */
 const streamProcessInput = async (sessionId, userInput) => {
-  const response = await fetch(`${VOXIO_CHAT_BASE_URL}/agents/process_input`, {
-    method: "POST",
-    headers: { "Content-Type": "application/json" },
-    body: JSON.stringify({
-      user_input: { user_input: userInput },
-      session_id: sessionId,
-    }),
-  });
+  const response = await voxioFetch(
+    `process_input session=${sessionId} input=${JSON.stringify(String(userInput).slice(0, 60))}`,
+    `${VOXIO_CHAT_BASE_URL}/agents/process_input`,
+    {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({
+        user_input: { user_input: userInput },
+        session_id: sessionId,
+      }),
+    },
+  );
 
   if (!response.ok || !response.body) {
     const raw = await response.text().catch(() => "");

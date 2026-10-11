@@ -9,7 +9,8 @@ import {
   hasFeedback,
   latestReasoningReply,
   normaliseScore,
-  parseStreamOutputs,
+  parseStreamLines,
+  summariseState,
   streamEndSession,
   streamReasoningTurn,
 } from "../utils/voxioClient.js";
@@ -200,6 +201,40 @@ const normaliseTranscription = (history, sessionId) => {
   return normalised;
 };
 
+/*
+ * session_id -> promise that settles when the running /feedback call for that
+ * session ends. Per process: fine for the single pm2 backend instance.
+ */
+const feedbackInFlight = new Map();
+
+/**
+ * Read a Voxio session's state, logging which phase it is in. The phase is
+ * what decides where the next turn goes, so it is the first thing to look at
+ * when one call works and the next does not.
+ */
+const readState = async (trace, label, sessionId) => {
+  const state = await fetchRawSessionState(sessionId);
+  trace.log(`Voxio state (${label})`, summariseState(state));
+  return state;
+};
+
+/**
+ * Send one turn and return its node outputs, logging every output and every
+ * line that was not one — Voxio reports its own errors as such lines.
+ */
+const runTurn = async (trace, label, upstreamPromise) => {
+  const { outputs, other, unparseable } = parseStreamLines(
+    await trace.consume(await upstreamPromise),
+  );
+  trace.log(`${label}: ${outputs.length} node outputs`, outputs);
+  if (other.length) trace.log(`${label}: non-output lines`, other);
+  if (unparseable.length) trace.warn(`${label}: lines that were not JSON`, unparseable);
+  const errors = other.filter((line) => line && (line.error || line.detail || line.status === "error"));
+  if (errors.length) trace.warn(`${label}: Voxio reported an error`, errors);
+  if (!outputs.length) trace.warn(`${label}: the turn produced NO node outputs`);
+  return outputs;
+};
+
 /**
  * Ends a running Voxio session and streams its feedback/summary/score back
  * as they arrive, instead of waiting for the whole flow to finish and
@@ -230,15 +265,43 @@ router.post("/feedback", async (req, res) => {
     score: normaliseScore(state.score),
   });
 
+  /*
+   * A second /feedback for the same session while the first is still waiting
+   * on the LLM (a game retry after its own timeout) would send another "end the
+   * session" turn — which lands in the reasoning phase. It waits for the first
+   * call instead and then answers from the state.
+   */
+  const running = feedbackInFlight.get(sessionId);
+  if (running) {
+    trace.warn("another /feedback for this session is still running — waiting for it instead of sending a second end turn");
+    await running.catch(() => {});
+    try {
+      const state = await readState(trace, "after waiting for the concurrent call", sessionId);
+      if (hasFeedback(state)) {
+        trace.log("PATH: feedback from state, produced by the concurrent call");
+        return trace.send(res, 200, fromState(state));
+      }
+      return trace.send(res, 502, { message: "The simulator did not produce feedback for this session." });
+    } catch (err) {
+      trace.fail(err);
+      return trace.send(res, err.statusCode || 502, { message: err.message || "Could not get feedback." });
+    }
+  }
+  let finish;
+  feedbackInFlight.set(sessionId, new Promise((resolve) => { finish = resolve; }));
+
   try {
-    let state = await fetchRawSessionState(sessionId);
+    let state = await readState(trace, "before", sessionId);
     if (!state) {
-      trace.warn("Voxio has no session with that id");
+      trace.warn("Voxio has no session with that id — wrong id, or the session expired on Voxio");
       return trace.send(res, 404, { message: "No simulator session with that session_id." });
     }
     if (hasFeedback(state)) {
-      trace.log("feedback already generated — returning it without another turn");
+      trace.log("PATH: feedback already generated — returning it from state without another turn");
       return trace.send(res, 200, fromState(state));
+    }
+    if (state.reasoning_conversation_history?.length) {
+      trace.warn("state has reasoning turns but no feedback — the flow is in an unexpected phase");
     }
 
     /*
@@ -246,32 +309,46 @@ router.post("/feedback", async (req, res) => {
      * the turn back to the consultation instead of to the feedback node.
      */
     for (let attempt = 1; attempt <= 2; attempt += 1) {
-      trace.log(`sending end-session turn (attempt ${attempt})`, { sessionId });
-      const outputs = parseStreamOutputs(
-        await trace.consume(await streamEndSession(sessionId)),
-      );
-      trace.log("node outputs", outputs);
+      trace.log(`PATH: sending end-session turn (attempt ${attempt}/2)`, { sessionId });
+      const outputs = await runTurn(trace, `end turn ${attempt}`, streamEndSession(sessionId));
 
       // Read the field by name — feedbacko emits { feedback, score }. Every
       // other output in this turn (the patient's goodbye, echoes) is ignored.
       const result = outputs.find((out) => "feedback" in out);
+      const endDiagnosis = outputs.find((out) => "end_diagnosis" in out)?.end_diagnosis;
+      trace.log(`end turn ${attempt}: decision inputs`, {
+        end_diagnosis: endDiagnosis ?? "(not emitted)",
+        feedbackOutput: result ? `${typeof result.feedback}, ${String(result.feedback ?? "").length} chars` : "(none)",
+        scoreOutput: result ? result.score ?? "(none)" : "(none)",
+      });
       if (result?.feedback) {
+        if (normaliseScore(result.score) === null) {
+          trace.warn("feedback arrived but score is missing or not a number", { score: result.score });
+        }
+        trace.log("PATH: feedback taken from the stream");
         return trace.send(res, 200, {
           feedback: String(result.feedback),
           score: normaliseScore(result.score),
         });
       }
+      if (result) trace.warn("feedback output was present but EMPTY", result);
 
-      state = await fetchRawSessionState(sessionId);
+      state = await readState(trace, `after end turn ${attempt}`, sessionId);
       if (hasFeedback(state)) {
-        trace.log("feedback found in state after the turn");
+        trace.log("PATH: feedback not in the stream but found in state after the turn");
         return trace.send(res, 200, fromState(state));
       }
-      trace.warn("no feedback produced — the patient node did not end the session", {
-        end_diagnosis: outputs.find((out) => "end_diagnosis" in out)?.end_diagnosis,
-      });
+      trace.warn(
+        `no feedback after attempt ${attempt}: ` +
+          (endDiagnosis === undefined
+            ? "the patient node emitted no end_diagnosis (LLM output malformed or the turn failed)"
+            : String(endDiagnosis).toLowerCase() === "yes"
+              ? "end_diagnosis was yes, so the FEEDBACK node failed or returned nothing"
+              : `the patient node said end_diagnosis=${JSON.stringify(endDiagnosis)}, so the flow stayed in the consultation`),
+      );
     }
 
+    trace.warn("giving up after 2 attempts", summariseState(state));
     return trace.send(res, 502, {
       message: "The simulator did not produce feedback for this session.",
     });
@@ -281,6 +358,9 @@ router.post("/feedback", async (req, res) => {
     trace.send(res, err.statusCode || 502, {
       message: err.message || "Could not get feedback.",
     });
+  } finally {
+    feedbackInFlight.delete(sessionId);
+    finish();
   }
 });
 
@@ -307,9 +387,9 @@ router.post("/reasoning", async (req, res) => {
   }
 
   try {
-    const state = await fetchRawSessionState(sessionId);
+    const state = await readState(trace, "before", sessionId);
     if (!state) {
-      trace.warn("Voxio has no session with that id");
+      trace.warn("Voxio has no session with that id — wrong id, or the session expired on Voxio");
       return trace.send(res, 404, { message: "No simulator session with that session_id." });
     }
     /*
@@ -317,23 +397,26 @@ router.post("/reasoning", async (req, res) => {
      * input would be answered by the patient, not the reasoning coach.
      */
     if (!hasFeedback(state)) {
-      trace.warn("rejected: reasoning before feedback");
+      trace.warn("rejected: reasoning before feedback (the game must call /feedback first and wait for it)");
       return trace.send(res, 409, {
         message: "Call /api/sessions/feedback for this session before clinical reasoning.",
       });
     }
 
-    trace.log("sending reasoning turn", { sessionId, input });
-    const outputs = parseStreamOutputs(
-      await trace.consume(await streamReasoningTurn(sessionId, input)),
-    );
-    trace.log("node outputs", outputs);
+    trace.log("PATH: sending reasoning turn", { sessionId, input });
+    const outputs = await runTurn(trace, "reasoning turn", streamReasoningTurn(sessionId, input));
 
     // response2 emits { speak }; transcription2 only echoes { user_input }.
     const spoken = outputs.filter((out) => typeof out.speak === "string" && out.speak.trim());
+    if (spoken.length > 1) trace.warn(`${spoken.length} speak outputs in one turn — using the last`);
+    if (outputs.some((out) => "feedback" in out || "score" in out || "end_diagnosis" in out)) {
+      trace.warn("reasoning turn emitted feedback/score/end_diagnosis — the flow is not in the reasoning phase");
+    }
     let reply = spoken.length ? spoken[spoken.length - 1].speak : "";
+    if (reply) trace.log("PATH: reply taken from the stream", `${reply.length} chars`);
     if (!reply) {
-      reply = latestReasoningReply(await fetchRawSessionState(sessionId));
+      const after = await readState(trace, "after reasoning turn", sessionId);
+      reply = latestReasoningReply(after);
       trace.warn("no speak in the stream — read the reply from state", { found: !!reply });
     }
 
