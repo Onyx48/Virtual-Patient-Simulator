@@ -426,6 +426,23 @@ router.post("/reasoning", async (req, res) => {
         trace.warn("this scenario's flow still uses the old `speak` field — rebuild it (scripts/rebuildVoxioFlows.mjs)");
       }
     }
+    /*
+     * response2 emits the `response` variable, not the node's fresh output. When
+     * the model answers under another key (it has drifted to the patient's
+     * `speak`), `response` is never overwritten and the previous turn's reply is
+     * emitted again. The node's real output is the last assistant entry in the
+     * reasoning history.
+     */
+    if (reply && "response" in last && typeof state.response === "string" && reply === state.response) {
+      trace.warn("stream repeated the previous turn's reply — the model answered under another key; reading this turn's reply from the reasoning history");
+      const fresh = latestReasoningReply(await readState(trace, "after stale reasoning turn", sessionId));
+      if (fresh && fresh !== reply) {
+        trace.log("PATH: reply taken from the reasoning history", `${fresh.length} chars`);
+        reply = fresh;
+      } else {
+        trace.warn("the reasoning history has no newer reply either");
+      }
+    }
     if (!reply) {
       const after = await readState(trace, "after reasoning turn", sessionId);
       reply = latestReasoningReply(after);

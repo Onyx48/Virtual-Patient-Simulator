@@ -2,6 +2,7 @@ import React, { useState, useEffect, useMemo } from "react";
 import axios from "axios";
 import { XMarkIcon, ClockIcon, PlusIcon, MinusIcon } from "@heroicons/react/24/outline";
 import { useLanguage } from "../../i18n/LanguageContext";
+import { toScorePercent } from "../../lib/utils.js";
 
 const getAuthHeaders = () => {
   const token = localStorage.getItem("token");
@@ -141,7 +142,7 @@ function TranscriptViewerModal({ isOpen, onClose, student }) {
                                 </span>
                                 {session.score > 0 && (
                                   <span className="ml-auto px-1.5 py-0.5 bg-blue-50 text-blue-700 text-xs font-medium rounded">
-                                    {session.score}%
+                                    {toScorePercent(session.score)}%
                                   </span>
                                 )}
                               </div>
@@ -165,7 +166,7 @@ function TranscriptViewerModal({ isOpen, onClose, student }) {
                   </h4>
                   {selectedSession.score > 0 && (
                     <span className="px-3 py-1 bg-blue-50 text-blue-700 text-sm font-medium rounded-lg">
-                      Score: {selectedSession.score}%
+                      Score: {toScorePercent(selectedSession.score)}%
                     </span>
                   )}
                 </div>

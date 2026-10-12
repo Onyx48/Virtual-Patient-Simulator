@@ -267,6 +267,32 @@ export const hasFeedback = (state) =>
   typeof state?.feedback === "string" && state.feedback.trim() !== "";
 
 /**
+ * The reply text from one stored reasoning-node output.
+ *
+ * Voxio stores the node's output as a Python dict repr — {'response': '...'},
+ * or {"response": "..."} when the text contains an apostrophe — not as JSON.
+ * The key is `response`, or `speak` from a flow published before the rename or
+ * when the model drifts to the patient's key. Anything else is used as-is.
+ */
+const replyFromNodeOutput = (content) => {
+  const raw = String(content).trim();
+  try {
+    const parsed = JSON.parse(raw);
+    const text = parsed?.response ?? parsed?.speak;
+    if (text) return String(text);
+  } catch {
+    // Not JSON — try the Python repr below.
+  }
+  const match = raw.match(/^\{\s*(['"])(response|speak)\1\s*:\s*(['"])([\s\S]*)\3\s*\}$/);
+  if (match) {
+    return match[4]
+      .replace(/\\n/g, "\n")
+      .replace(/\\(['"\\])/g, "$1");
+  }
+  return raw;
+};
+
+/**
  * The latest coach reply from the reasoning phase: the last assistant entry in
  * its history, else the `response` the reasoning node last wrote. Never the
  * state's `speak`: that is the patient's line (their goodbye, after feedback).
@@ -278,16 +304,7 @@ export const latestReasoningReply = (state) => {
   for (let i = history.length - 1; i >= 0; i -= 1) {
     const entry = history[i];
     if (entry?.role === "assistant" && entry.content) {
-      // The node's raw output is the JSON it was told to return.
-      try {
-        const parsed = JSON.parse(entry.content);
-        // `speak` for flows published before the rename to `response`.
-        const text = parsed?.response ?? parsed?.speak;
-        if (text) return String(text);
-      } catch {
-        // Plain text, use as-is.
-      }
-      return String(entry.content);
+      return replyFromNodeOutput(entry.content);
     }
   }
   return typeof state?.response === "string" ? state.response : "";

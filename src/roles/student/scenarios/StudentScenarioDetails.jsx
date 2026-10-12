@@ -4,7 +4,7 @@ import { useDispatch, useSelector } from "react-redux";
 import { ChevronLeft, MessageSquare } from "lucide-react";
 import axios from "axios";
 import toast from "react-hot-toast";
-import { getAuthHeaders } from "../../../lib/utils.js";
+import { getAuthHeaders, toScorePercent } from "../../../lib/utils.js";
 import {
   fetchSessionsByStudentAndScenario,
   fetchScenario,
@@ -52,21 +52,8 @@ function StudentScenarioDetails({ onBack }) {
     return sortedSessions[activeAttempt - 1] || sortedSessions[0];
   }, [sessions, activeAttempt]);
 
-  /*
-   * Scores reach us on two scales and have to be drawn on one.
-   *
-   * The assessor (posta's /get-results) clamps to 0-10, so a solid 7/10 was being
-   * fed straight into `height: 7%` and drawing a 13px sliver in a 192px box — the
-   * chart looked empty for a student who had done well. Anything at or below 10 is
-   * read as a mark out of ten and multiplied up; anything above is already a
-   * percentage. The ambiguity is real (a genuine 8% is indistinguishable from
-   * 8/10) but it resolves the right way round: the graders in use produce 0-10.
-   */
-  const toPercent = (score) => {
-    const value = Number(score);
-    if (!Number.isFinite(value) || value <= 0) return 0;
-    return Math.min(100, Math.round(value <= 10 ? value * 10 : value));
-  };
+  // Scores are stored as a 0-1 fraction (a few legacy rows out of 10).
+  const toPercent = toScorePercent;
 
   const attemptsData = useMemo(() => {
     if (sessions.length === 0) return [];
