@@ -268,7 +268,8 @@ export const hasFeedback = (state) =>
 
 /**
  * The latest coach reply from the reasoning phase: the last assistant entry in
- * its history, else the `speak` the reasoning node last wrote.
+ * its history, else the `response` the reasoning node last wrote. Never the
+ * state's `speak`: that is the patient's line (their goodbye, after feedback).
  */
 export const latestReasoningReply = (state) => {
   const history = Array.isArray(state?.reasoning_conversation_history)
@@ -280,14 +281,16 @@ export const latestReasoningReply = (state) => {
       // The node's raw output is the JSON it was told to return.
       try {
         const parsed = JSON.parse(entry.content);
-        if (parsed?.speak) return String(parsed.speak);
+        // `speak` for flows published before the rename to `response`.
+        const text = parsed?.response ?? parsed?.speak;
+        if (text) return String(text);
       } catch {
         // Plain text, use as-is.
       }
       return String(entry.content);
     }
   }
-  return typeof state?.speak === "string" ? state.speak : "";
+  return typeof state?.response === "string" ? state.response : "";
 };
 
 export const fetchSessionState = async (sessionId) => {

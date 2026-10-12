@@ -406,24 +406,36 @@ router.post("/reasoning", async (req, res) => {
     trace.log("PATH: sending reasoning turn", { sessionId, input });
     const outputs = await runTurn(trace, "reasoning turn", streamReasoningTurn(sessionId, input));
 
-    // response2 emits { speak }; transcription2 only echoes { user_input }.
-    const spoken = outputs.filter((out) => typeof out.speak === "string" && out.speak.trim());
-    if (spoken.length > 1) trace.warn(`${spoken.length} speak outputs in one turn — using the last`);
+    /*
+     * response2 emits { response }; transcription2 only echoes { user_input }.
+     * A flow published before the rename still emits { speak } from the
+     * reasoning node — accepted until every scenario has been rebuilt.
+     */
+    const replies = outputs.filter(
+      (out) => typeof (out.response ?? out.speak) === "string" && (out.response ?? out.speak).trim(),
+    );
+    if (replies.length > 1) trace.warn(`${replies.length} reply outputs in one turn — using the last`);
     if (outputs.some((out) => "feedback" in out || "score" in out || "end_diagnosis" in out)) {
       trace.warn("reasoning turn emitted feedback/score/end_diagnosis — the flow is not in the reasoning phase");
     }
-    let reply = spoken.length ? spoken[spoken.length - 1].speak : "";
-    if (reply) trace.log("PATH: reply taken from the stream", `${reply.length} chars`);
+    const last = replies[replies.length - 1];
+    let reply = last ? String(last.response ?? last.speak) : "";
+    if (last) {
+      trace.log(`PATH: reply taken from the stream's "${"response" in last ? "response" : "speak"}" field`, `${reply.length} chars`);
+      if (!("response" in last)) {
+        trace.warn("this scenario's flow still uses the old `speak` field — rebuild it (scripts/rebuildVoxioFlows.mjs)");
+      }
+    }
     if (!reply) {
       const after = await readState(trace, "after reasoning turn", sessionId);
       reply = latestReasoningReply(after);
-      trace.warn("no speak in the stream — read the reply from state", { found: !!reply });
+      trace.warn("no response in the stream — read the reply from state", { found: !!reply });
     }
 
     if (!reply) {
       return trace.send(res, 502, { message: "The reasoning coach returned no reply." });
     }
-    return trace.send(res, 200, { speak: reply });
+    return trace.send(res, 200, { response: reply });
   } catch (err) {
     trace.fail(err);
     if (res.headersSent) return;
