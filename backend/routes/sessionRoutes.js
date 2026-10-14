@@ -452,7 +452,13 @@ router.post("/reasoning", async (req, res) => {
     if (!reply) {
       return trace.send(res, 502, { message: "The reasoning coach returned no reply." });
     }
-    return trace.send(res, 200, { response: reply });
+    /*
+     * Returned to the simulator under `feedback`, the same key /feedback uses,
+     * so the game reads both endpoints the same way. Inside Voxio the node
+     * still writes `response`: writing `feedback` there would overwrite the
+     * session's real feedback in the shared state.
+     */
+    return trace.send(res, 200, { feedback: reply });
   } catch (err) {
     trace.fail(err);
     if (res.headersSent) return;
