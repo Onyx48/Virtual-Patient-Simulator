@@ -277,6 +277,8 @@ function ScenarioFormPage() {
   const [aiInput, setAiInput] = useState("");
   // Voxio flow key. Returned by the AI endpoints, saved onto the scenario.
   const [apiKey, setApiKey] = useState("");
+  // Patient identity the AI extracted; sent on save alongside apiKey.
+  const [patientInfo, setPatientInfo] = useState(null);
   const [isAiLoading, setIsAiLoading] = useState(false);
   // Seconds the current AI request has been running; drives the stage caption.
   const [aiElapsed, setAiElapsed] = useState(0);
@@ -294,6 +296,11 @@ function ScenarioFormPage() {
   useEffect(() => {
     if (isDbEdit && selectedScenario) {
       setApiKey(selectedScenario.apiKey || "");
+      setPatientInfo({
+        patientName: selectedScenario.patientName || "",
+        patientGender: selectedScenario.patientGender || "",
+        language: selectedScenario.language || "",
+      });
       setValue("scenarioName", selectedScenario.scenarioName || "");
       setValue("difficulty", selectedScenario.difficulty || "Medium");
       setValue("status", selectedScenario.status || "Draft");
@@ -370,6 +377,11 @@ function ScenarioFormPage() {
       // The simulator key must survive the save, or the scenario can never be
       // edited or run again. Not a form field — held in state and sent on submit.
       if (returnedJson.api_key) setApiKey(returnedJson.api_key);
+      setPatientInfo({
+        patientName: returnedJson.patient_name || "",
+        patientGender: returnedJson.patient_gender || "",
+        language: returnedJson.language || "",
+      });
 
       if (returnedJson.scenario_prompt) {
         setValue("scenarioPrompt", returnedJson.scenario_prompt);
@@ -416,6 +428,7 @@ function ScenarioFormPage() {
         // Only send it when we have one, so a manual edit of an AI scenario
         // cannot blank out its existing key.
         ...(apiKey && { apiKey }),
+        ...patientInfo,
       };
 
       return isDbEdit
@@ -511,6 +524,7 @@ function ScenarioFormPage() {
           animationTriggers: formatMovementsForBackend(values.movements),
           aiQuestions: values.questionsForFeedback,
           ...(apiKey && { apiKey }),
+          ...patientInfo,
         }),
       ).unwrap();
       toast.success("Saved as a draft.");

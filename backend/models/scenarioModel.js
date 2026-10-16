@@ -43,6 +43,15 @@ const scenarioSchema = new mongoose.Schema(
     apiKey: { type: String },
 
     /*
+     * Who the simulator plays, served by GET /api/scenarios/json so the avatar's
+     * voice and look match the patient. The AI routes extract them from the
+     * prompt they generate; scripts/backfillPatientInfo.mjs fills older ones.
+     */
+    patientName: { type: String, trim: true },
+    patientGender: { type: String, enum: ["Male", "Female", ""], default: "" },
+    language: { type: String, trim: true },
+
+    /*
      * Range-of-motion limits, one array of "Movement_Value" strings per body
      * region. The region list lives in utils/bodyRegions.js — see there for what
      * else has to change alongside it.

@@ -14,6 +14,7 @@ import { withStudentScope } from "../utils/scenarioAssignment.js";
 import Group from "../models/groupModel.js";
 import { buildWorkflow, createFlow, updateFlow } from "../utils/voxioClient.js";
 import { publicMessage } from "../utils/appEnv.js";
+import { patientInfoFrom } from "../utils/patientInfo.js";
 import {
   setLiveScenario,
   getLiveScenario,
@@ -140,6 +141,7 @@ const shapeGenerated = (generated, apiKey) => ({
   // the old service persisted it under that name.
   difficulty_level: generated.difficulty_level || generated.difficulty_status || "Medium",
   movements: generated.movements || emptyMovements(),
+  ...patientInfoFrom(generated),
   api_key: apiKey,
 });
 
@@ -292,6 +294,9 @@ router.get("/json", (req, res) => {
   res.json({
     api_key: liveScenario?.apiKey || null,
     session_id: meta.sessionId ? String(meta.sessionId) : null,
+    patient_name: liveScenario?.patientName || null,
+    gender: liveScenario?.patientGender || null,
+    language: liveScenario?.language || null,
   });
 });
 
@@ -360,6 +365,9 @@ router.post(
       difficulty,
       animationTriggers,
       apiKey,
+      patientName,
+      patientGender,
+      language,
       html,
     } = req.body;
 
@@ -451,6 +459,9 @@ router.post(
         difficulty: difficulty || "Medium",
         animationTriggers: animationTriggers || emptyTriggers(),
         apiKey: apiKey || "",
+        patientName: patientName || "",
+        patientGender: patientGender || "",
+        language: language || "",
         html: html || "",
       };
 
@@ -581,6 +592,9 @@ router.put(
       difficulty,
       animationTriggers,
       apiKey,
+      patientName,
+      patientGender,
+      language,
       html,
     } = req.body;
 
@@ -687,6 +701,9 @@ router.put(
       if (animationTriggers !== undefined)
         scenario.animationTriggers = animationTriggers;
       if (apiKey !== undefined) scenario.apiKey = apiKey;
+      if (patientName !== undefined) scenario.patientName = patientName;
+      if (patientGender !== undefined) scenario.patientGender = patientGender;
+      if (language !== undefined) scenario.language = language;
       if (html !== undefined) scenario.html = html;
 
       /*

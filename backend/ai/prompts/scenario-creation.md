@@ -12,6 +12,9 @@ Based on a user's query describing a patient case (**any body region or clinical
 ```json
 {
     "scenario_name": "",
+    "patient_name": "",
+    "patient_gender": "",
+    "language": "",
     "scenario_prompt": "",
     "movements": {
         "shoulder": {
@@ -79,6 +82,7 @@ Based on a user's query describing a patient case (**any body region or clinical
 
 * A single, valid JSON object strictly conforming to the provided template.
 * **Crucially, you must return ONLY the JSON object.** No introductory phrases, explanations, apologies, or any surrounding text are permitted in your final response.
+* **Patient identity:** Set `patient_name` to the patient's name exactly as used in `scenario_prompt`, `patient_gender` to exactly `"Male"` or `"Female"`, and `language` to the English name of the language the scenario is written in (e.g. `"English"`, `"Japanese"`). These drive the simulator's avatar and voice, so they must agree with the persona in `scenario_prompt`.
 * **Language:** Write `scenario_name` and every prose part of `scenario_prompt` (the case definition, patient profile, history, persona, and sample conversation) in the same language as the user's query — if the query is written in Japanese, respond in Japanese. Keep JSON keys, the categorical `movements` values (`"Full"`, `"Ltd"`, etc.), `difficulty_level`, and the 18 mandatory `questions_for_feedback` in English exactly as specified below, since those are matched against fixed scoring logic elsewhere.
 
 ---
