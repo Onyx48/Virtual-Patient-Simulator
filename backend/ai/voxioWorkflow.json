@@ -47,7 +47,7 @@
             "type": "out",
             "parameters": {
                 "out_dict": {
-                    "speak": "Hello! Lets start the session"
+                    "speak": "Hi"
                 }
             },
             "next": "input1"
