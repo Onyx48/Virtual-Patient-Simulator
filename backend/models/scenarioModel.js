@@ -51,6 +51,10 @@ const scenarioSchema = new mongoose.Schema(
     patientGender: { type: String, enum: ["Male", "Female", ""], default: "" },
     language: { type: String, trim: true },
 
+    // Ids from src/lib/scenarioOptions.js, picked on the scenario form.
+    environment: { type: String, trim: true, default: "" },
+    avatarModel: { type: String, trim: true, default: "" },
+
     /*
      * Range-of-motion limits, one array of "Movement_Value" strings per body
      * region. The region list lives in utils/bodyRegions.js — see there for what

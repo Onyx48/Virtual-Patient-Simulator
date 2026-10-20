@@ -1,4 +1,6 @@
 import React, { useState, useEffect } from "react";
+import { ENVIRONMENTS, MODELS } from "../../lib/scenarioOptions";
+import { useLanguage } from "../../i18n/LanguageContext";
 import { useDispatch, useSelector } from "react-redux";
 import { useNavigate, useParams } from "react-router-dom";
 import { useForm, Controller } from "react-hook-form";
@@ -243,12 +245,47 @@ const AI_STAGES = [
 
 const STAGE_SECONDS = 6;
 
+// Card grid for picking one of a few image options; clicking the selected card clears it.
+function ImagePicker({ label, options, value, onChange, imageClass }) {
+  return (
+    <div>
+      <label className="block text-xs font-semibold text-gray-700 mb-1">
+        {label}
+      </label>
+      <div className="grid grid-cols-2 md:grid-cols-4 gap-3">
+        {options.map((opt) => {
+          const selected = value === opt.id;
+          return (
+            <button
+              key={opt.id}
+              type="button"
+              onClick={() => onChange(selected ? "" : opt.id)}
+              className={`overflow-hidden rounded-md border-2 text-left transition ${
+                selected
+                  ? "border-blue-500 ring-2 ring-blue-200"
+                  : "border-gray-200 hover:border-gray-400"
+              }`}
+            >
+              <img src={opt.image} alt={opt.label} className={imageClass} />
+              <div className="px-2 py-1.5 text-xs font-medium text-gray-700">
+                {opt.label}
+              </div>
+            </button>
+          );
+        })}
+      </div>
+    </div>
+  );
+}
+
 function ScenarioFormPage() {
   const navigate = useNavigate();
   const { id } = useParams();
   const { user } = useAuth();
   const { scenarios } = useSelector((state) => state.scenarios);
   const dispatch = useDispatch();
+  // The AI writes the scenario in the UI language, whatever language the brief is in.
+  const { language } = useLanguage();
 
   const isDbEdit = !!id;
   const selectedScenario = id
@@ -259,6 +296,8 @@ function ScenarioFormPage() {
     defaultValues: {
       scenarioName: "",
       difficulty: "Medium",
+      environment: "",
+      avatarModel: "",
       status: "Draft",
       shortDescription: "",
       movements: emptyMovements(),
@@ -303,6 +342,8 @@ function ScenarioFormPage() {
       });
       setValue("scenarioName", selectedScenario.scenarioName || "");
       setValue("difficulty", selectedScenario.difficulty || "Medium");
+      setValue("environment", selectedScenario.environment || "");
+      setValue("avatarModel", selectedScenario.avatarModel || "");
       setValue("status", selectedScenario.status || "Draft");
       setValue("scenarioPrompt", selectedScenario.scenarioPrompt || "");
       setValue(
@@ -361,6 +402,7 @@ function ScenarioFormPage() {
 
       const response = await axios.post(url, {
         scenario_prompt: aiInput,
+        language,
         ...(existingApiKey && { api_key: existingApiKey }),
       });
 
@@ -710,6 +752,34 @@ function ScenarioFormPage() {
                   <option value="High">High</option>
                 </select>
               </div>
+
+              <Controller
+                name="environment"
+                control={control}
+                render={({ field }) => (
+                  <ImagePicker
+                    label="Environment"
+                    options={ENVIRONMENTS}
+                    value={field.value}
+                    onChange={field.onChange}
+                    imageClass="h-24 w-full object-cover"
+                  />
+                )}
+              />
+
+              <Controller
+                name="avatarModel"
+                control={control}
+                render={({ field }) => (
+                  <ImagePicker
+                    label="Model"
+                    options={MODELS}
+                    value={field.value}
+                    onChange={field.onChange}
+                    imageClass="h-28 w-full object-cover object-top"
+                  />
+                )}
+              />
 
               <div>
                 <label className="block text-xs font-semibold text-gray-700 mb-1">
