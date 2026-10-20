@@ -133,7 +133,7 @@ const withOutputLanguage = (query, code) => {
   if (!name) return String(query);
   return `${query}
 
-[Output language: ${name}. Write scenario_name and every prose part of scenario_prompt in ${name}, regardless of the language of the request above or of any existing scenario text, and set "language" to "${name}". Keep JSON keys, movements values, difficulty_level and the mandatory questions_for_feedback in English as specified.]`;
+[Output language: ${name}. This overrides every other language rule in your instructions. Write ALL human-readable text in ${name}, regardless of the language of the request above or of any existing scenario text: scenario_name; every part of scenario_prompt, including its section headings (e.g. "Patient Profile", "--- Simulation Instructions ---", "--- Sample Conversation ---"), the simulation instruction lines and both sides of the sample conversation; and every item of questions_for_feedback, including the mandatory ones (translate them faithfully, keeping their meaning and order). Set "language" to "${name}". Only JSON keys, the movements values ("Full", "Ltd", ...), difficulty_level and patient_gender stay in English.]`;
 };
 
 // Read once at boot; these are static assets, not per-request data.

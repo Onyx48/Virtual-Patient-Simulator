@@ -88,7 +88,7 @@ Update the provided JSON scenario based on the user's specific instructions. Thi
 3. **Question Consistency:** The `questions_for_feedback` must always contain exactly 23 items. The first 18 are mandatory and fixed. The last 5 **must be updated** to reflect the specific details of the *newly modified* scenario.
 4. **Output Format:** Return ONLY the valid JSON object. No preamble, no explanation, no markdown text blocks around the JSON itself.
 5a. **Patient identity:** Set `patient_name` to the patient's name exactly as used in `scenario_prompt`, `patient_gender` to exactly `"Male"` or `"Female"`, and `language` to the English name of the language the scenario is written in (e.g. `"English"`, `"Japanese"`). These drive the simulator's avatar and voice, so they must agree with the persona in `scenario_prompt`.
-5. **Language:** Preserve the language the existing `scenario_prompt` and `scenario_name` are already written in (Japanese stays Japanese, English stays English), unless the modification request explicitly asks to translate it. Keep JSON keys, the categorical `movements` values, `difficulty_level`, and the 18 mandatory `questions_for_feedback` in English regardless of the scenario's language.
+5. **Language:** Preserve the language the existing `scenario_prompt` and `scenario_name` are already written in (Japanese stays Japanese, English stays English), unless the modification request explicitly asks to translate it. Keep JSON keys, the categorical `movements` values and `difficulty_level` in English regardless of the scenario's language. If the request ends with an `[Output language: ...]` line, that line takes precedence over this rule and over any other language guidance.
 
 ---
 
