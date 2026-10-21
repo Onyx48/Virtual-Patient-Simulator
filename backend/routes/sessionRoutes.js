@@ -265,6 +265,17 @@ router.post("/feedback", async (req, res) => {
     score: normaliseScore(state.score),
   });
 
+  // Every feedback answer is logged in full (pm2 logs vps-backend), so a 0 or
+  // odd score can be checked against the feedback text that came with it.
+  const reply = (result) => {
+    console.log(
+      `[FEEDBACK] session=${sessionId} score=${JSON.stringify(result.score)}
+` +
+        `[FEEDBACK] text: ${JSON.stringify(result.feedback ?? "")}`,
+    );
+    return trace.send(res, 200, result);
+  };
+
   /*
    * A second /feedback for the same session while the first is still waiting
    * on the LLM (a game retry after its own timeout) would send another "end the
@@ -279,7 +290,7 @@ router.post("/feedback", async (req, res) => {
       const state = await readState(trace, "after waiting for the concurrent call", sessionId);
       if (hasFeedback(state)) {
         trace.log("PATH: feedback from state, produced by the concurrent call");
-        return trace.send(res, 200, fromState(state));
+        return reply(fromState(state));
       }
       return trace.send(res, 502, { message: "The simulator did not produce feedback for this session." });
     } catch (err) {
@@ -298,7 +309,7 @@ router.post("/feedback", async (req, res) => {
     }
     if (hasFeedback(state)) {
       trace.log("PATH: feedback already generated — returning it from state without another turn");
-      return trace.send(res, 200, fromState(state));
+      return reply(fromState(state));
     }
     if (state.reasoning_conversation_history?.length) {
       trace.warn("state has reasoning turns but no feedback — the flow is in an unexpected phase");
@@ -326,7 +337,7 @@ router.post("/feedback", async (req, res) => {
           trace.warn("feedback arrived but score is missing or not a number", { score: result.score });
         }
         trace.log("PATH: feedback taken from the stream");
-        return trace.send(res, 200, {
+        return reply({
           feedback: String(result.feedback),
           score: normaliseScore(result.score),
         });
@@ -336,7 +347,7 @@ router.post("/feedback", async (req, res) => {
       state = await readState(trace, `after end turn ${attempt}`, sessionId);
       if (hasFeedback(state)) {
         trace.log("PATH: feedback not in the stream but found in state after the turn");
-        return trace.send(res, 200, fromState(state));
+        return reply(fromState(state));
       }
       trace.warn(
         `no feedback after attempt ${attempt}: ` +

@@ -4,7 +4,7 @@
 
 ## OUTPUT LANGUAGE: JAPANESE (overrides every language rule above)
 
-The whole scenario must be written in Japanese, whatever language the user's request or any existing scenario text is in. Every fixed English string given above in quotes or backticks is a template to be **replaced by the Japanese version below**, not copied. No English sentence, heading or label may remain in `scenario_name`, `scenario_prompt` or `questions_for_feedback`. Only JSON keys, the `movements` values (`"Full"`, `"Ltd"`, ...), `difficulty_level` and `patient_gender` stay in English. Set `language` to `"Japanese"`.
+The user's request is in Japanese, so the whole scenario must be written in Japanese, whatever language any existing scenario text is in. Every fixed English string given above in quotes or backticks is a template to be **replaced by the Japanese version below**, not copied. No English sentence, heading or label may remain in `scenario_name`, `scenario_prompt` or `questions_for_feedback`. Only JSON keys, the `movements` values (`"Full"`, `"Ltd"`, ...), `difficulty_level` and `patient_gender` stay in English. Set `language` to `"Japanese"`.
 
 ### Section headings in `scenario_prompt` (use exactly these, in this order)
 

@@ -173,8 +173,8 @@ function TranscriptViewerModal({ isOpen, onClose, student }) {
 
                 {selectedSession.feedback && (
                   <div className="mb-4 p-3 bg-yellow-50 border border-yellow-200 rounded-xl text-sm">
-                    <span className="font-medium text-gray-900">Feedback: </span>
-                    <span className="text-gray-700">{selectedSession.feedback}</span>
+                    <div className="font-medium text-gray-900 mb-1">Feedback</div>
+                    <div className="text-gray-700 whitespace-pre-line">{selectedSession.feedback}</div>
                   </div>
                 )}
 

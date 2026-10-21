@@ -1,6 +1,5 @@
 import React, { useState, useEffect } from "react";
 import { ENVIRONMENTS, MODELS } from "../../lib/scenarioOptions";
-import { useLanguage } from "../../i18n/LanguageContext";
 import { useDispatch, useSelector } from "react-redux";
 import { useNavigate, useParams } from "react-router-dom";
 import { useForm, Controller } from "react-hook-form";
@@ -284,8 +283,6 @@ function ScenarioFormPage() {
   const { user } = useAuth();
   const { scenarios } = useSelector((state) => state.scenarios);
   const dispatch = useDispatch();
-  // The AI writes the scenario in the UI language, whatever language the brief is in.
-  const { language } = useLanguage();
 
   const isDbEdit = !!id;
   const selectedScenario = id
@@ -402,7 +399,6 @@ function ScenarioFormPage() {
 
       const response = await axios.post(url, {
         scenario_prompt: aiInput,
-        language,
         ...(existingApiKey && { api_key: existingApiKey }),
       });
 

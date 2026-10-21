@@ -295,7 +295,7 @@ function StudentScenarioDetails({ onBack }) {
             )}
           </div>
           {currentFeedback ? (
-            <p className="text-xs text-gray-500 leading-relaxed">
+            <p className="text-xs text-gray-500 leading-relaxed whitespace-pre-line">
               {currentFeedback}
             </p>
           ) : (
@@ -435,7 +435,7 @@ function StudentScenarioDetails({ onBack }) {
         <div className="bg-white rounded-2xl p-8 shadow-[0_2px_10px_-3px_rgba(6,81,237,0.1)] border border-gray-100 mb-10">
           <h3 className="text-sm font-bold text-gray-900 mb-3">Feedback</h3>
           {currentFeedback ? (
-            <p className="text-xs text-gray-500 leading-relaxed">
+            <p className="text-xs text-gray-500 leading-relaxed whitespace-pre-line">
               {currentFeedback}
             </p>
           ) : (
