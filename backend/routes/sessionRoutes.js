@@ -273,7 +273,8 @@ router.post("/feedback", async (req, res) => {
 ` +
         `[FEEDBACK] text: ${JSON.stringify(result.feedback ?? "")}`,
     );
-    return trace.send(res, 200, result);
+    // `sc` is a fixed constant the simulator expects on every feedback reply.
+    return trace.send(res, 200, { ...result, sc: 1.5342 });
   };
 
   /*
