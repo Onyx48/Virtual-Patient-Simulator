@@ -247,14 +247,18 @@ const runTurn = async (trace, label, upstreamPromise) => {
 // login token. Anyone holding a session_id can end that session and read its
 // feedback.
 /*
- * Every attempt starts from a base of 0.2: the graded share of questions met
- * (0-1) is mapped onto 0.2-1, so a consultation that covers nothing scores 0.2
- * and a perfect one still scores 1. A missing score stays null rather than
- * being passed off as a base score. The logs keep the graded value alongside.
+ * The simulator gets a score out of 10. The grader returns the share of
+ * questions met (0-1); every attempt starts from a base of 2, so that share is
+ * mapped onto 2-10: a consultation that covers nothing scores 2 and a perfect
+ * one scores 10. Rounded to one decimal. A missing score stays null rather than
+ * being passed off as a base score. The logs keep the graded 0-1 value alongside.
  */
-const BASE_SCORE = 0.2;
+const BASE_SCORE = 2;
+const MAX_SCORE = 10;
 const withBaseScore = (score) =>
-  score === null ? null : Math.round((BASE_SCORE + (1 - BASE_SCORE) * Math.min(Math.max(score, 0), 1)) * 100) / 100;
+  score === null
+    ? null
+    : Math.round((BASE_SCORE + (MAX_SCORE - BASE_SCORE) * Math.min(Math.max(score, 0), 1)) * 10) / 10;
 
 router.post("/feedback", async (req, res) => {
   const trace = startTrace("feedback", req);
