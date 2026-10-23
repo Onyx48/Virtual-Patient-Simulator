@@ -92,7 +92,10 @@ export const startTrace = (tag, req) => {
   const startedAt = Date.now();
   let step = 0;
 
-  const prefix = () => `[${tag} ${id}]`;
+  // Simulator calls (/feedback, /reasoning) carry a session_id; putting it in
+  // every line means one grep finds the whole request, response included.
+  const sessionId = req.body?.session_id ? ` session=${String(req.body.session_id).trim()}` : "";
+  const prefix = () => `[${tag} ${id}${sessionId}]`;
   const elapsed = () => `${Date.now() - startedAt}ms`;
 
   console.log(
