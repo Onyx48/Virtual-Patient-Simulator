@@ -246,6 +246,16 @@ const runTurn = async (trace, label, upstreamPromise) => {
 // Unauthenticated on purpose: the Unreal simulator calls this with no dashboard
 // login token. Anyone holding a session_id can end that session and read its
 // feedback.
+/*
+ * Every attempt starts from a base of 0.2: the graded share of questions met
+ * (0-1) is mapped onto 0.2-1, so a consultation that covers nothing scores 0.2
+ * and a perfect one still scores 1. A missing score stays null rather than
+ * being passed off as a base score. The logs keep the graded value alongside.
+ */
+const BASE_SCORE = 0.2;
+const withBaseScore = (score) =>
+  score === null ? null : Math.round((BASE_SCORE + (1 - BASE_SCORE) * Math.min(Math.max(score, 0), 1)) * 100) / 100;
+
 router.post("/feedback", async (req, res) => {
   const trace = startTrace("feedback", req);
   const sessionId = String(req.body?.session_id || "").trim();
@@ -278,8 +288,9 @@ router.post("/feedback", async (req, res) => {
    */
   const reply = async (result, path, rawScore) => {
     const score = result.score;
+    const sent = withBaseScore(score);
     console.log(
-      `[FEEDBACK] session=${sessionId} path=${path} score=${JSON.stringify(score)} ` +
+      `[FEEDBACK] session=${sessionId} path=${path} sent=${JSON.stringify(sent)} graded=${JSON.stringify(score)} ` +
         `raw=${JSON.stringify(rawScore)} chars=${String(result.feedback ?? "").length}`,
     );
     console.log(`[FEEDBACK] text: ${JSON.stringify(result.feedback ?? "")}`);
@@ -319,7 +330,7 @@ router.post("/feedback", async (req, res) => {
     }
 
     // `sc` is a fixed constant the simulator expects on every feedback reply.
-    return trace.send(res, 200, { ...result, sc: 1.5342 });
+    return trace.send(res, 200, { ...result, score: sent, sc: 1.5342 });
   };
 
   /*
