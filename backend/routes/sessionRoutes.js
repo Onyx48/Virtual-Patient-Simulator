@@ -15,7 +15,7 @@ import {
   streamReasoningTurn,
 } from "../utils/voxioClient.js";
 import { publicMessage } from "../utils/appEnv.js";
-import { setLiveScenario } from "../state/liveScenario.js";
+import { setLiveScenario, getLiveScenario } from "../state/liveScenario.js";
 import Scenario from "../models/scenarioModel.js";
 import Session from "../models/sessionModel.js";
 import User from "../models/userModel.js";
@@ -295,6 +295,19 @@ router.post("/feedback", async (req, res) => {
     );
     console.log(`[FEEDBACK] text: ${JSON.stringify(result.feedback ?? "")}`);
 
+    /*
+     * The full Voxio state graph for this session, on every reply: every node's
+     * output, every history (diagnosis / feedback / reasoning) exactly as the
+     * grader saw it, and any [SUMMARY] the summariser wrote in place of turns.
+     */
+    let state = null;
+    try {
+      state = await fetchRawSessionState(sessionId, getLiveScenario()?.apiKey);
+      console.log(`[FEEDBACK][STATE] session=${sessionId} ${JSON.stringify(state)}`);
+    } catch (err) {
+      console.warn(`[FEEDBACK][STATE] session=${sessionId} could not read Voxio state: ${err.message}`);
+    }
+
     if (score === null || score < 0.1) {
       const reason =
         score === null
@@ -303,8 +316,7 @@ router.post("/feedback", async (req, res) => {
             ? "score is exactly 0"
             : `score is very low (${score})`;
       console.warn(`[FEEDBACK][LOW-SCORE] session=${sessionId} ${reason}`);
-      try {
-        const state = await fetchRawSessionState(sessionId);
+      if (state) {
         const history = state?.diagnosis_conversation_history || [];
         const summary = history.find((m) => String(m.content).startsWith("[SUMMARY]"));
         console.warn(
@@ -324,8 +336,6 @@ router.post("/feedback", async (req, res) => {
               `[FEEDBACK][LOW-SCORE] session=${sessionId} turn ${i + 1} ${m.role}: ${JSON.stringify(String(m.content).slice(0, 300))}`,
             ),
           );
-      } catch (err) {
-        console.warn(`[FEEDBACK][LOW-SCORE] session=${sessionId} could not read Voxio state: ${err.message}`);
       }
     }
 

@@ -86,6 +86,7 @@
                 "service": "groq",
                 "model": "openai/gpt-oss-120b",
                 "history_key": "diagnosis_conversation_history",
+                "summariser": false,
                 "llm_return_type": {
                     "speak": {
                         "type": "str",

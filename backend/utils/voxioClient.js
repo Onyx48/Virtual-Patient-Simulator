@@ -176,9 +176,19 @@ const voxioFetch = async (label, url, init = {}) => {
   }
 };
 
-export const fetchRawSessionState = async (sessionId) => {
+/*
+ * GET /agents/session (agent/routers/agents/server.py in vx-backend-monorepo).
+ * Newer Voxio builds only return a session to the flow_api_key it was started
+ * with, sent as a `flow_api_key` header; it is passed when known and ignored by
+ * builds that do not check it yet.
+ */
+export const fetchRawSessionState = async (sessionId, flowApiKey) => {
   const url = `${VOXIO_CHAT_BASE_URL}/agents/session?session_id=${encodeURIComponent(sessionId)}`;
-  const response = await voxioFetch(`state session=${sessionId}`, url);
+  const response = await voxioFetch(
+    `state session=${sessionId}`,
+    url,
+    flowApiKey ? { headers: { flow_api_key: flowApiKey } } : undefined,
+  );
   const raw = await response.text();
   if (!response.ok) {
     console.error(
