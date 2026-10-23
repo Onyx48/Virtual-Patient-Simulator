@@ -265,14 +265,59 @@ router.post("/feedback", async (req, res) => {
     score: normaliseScore(state.score),
   });
 
-  // Every feedback answer is logged in full (pm2 logs vps-backend), so a 0 or
-  // odd score can be checked against the feedback text that came with it.
-  const reply = (result) => {
+  /*
+   * Every feedback answer is logged in full (pm2 logs vps-backend | grep FEEDBACK),
+   * tagged with which path produced it, so a score the simulator reports can be
+   * matched to the exact reply this server sent.
+   *
+   * A score of 0, a missing score, or a score under 0.1 also gets a
+   * [FEEDBACK][LOW-SCORE] block read back from Voxio's state: the raw stored
+   * score, how many turns the grader had, and whether Voxio had squashed the
+   * consultation into a [SUMMARY] entry — the cause seen in testing, where the
+   * grader ignores the summary and credits only the last turn.
+   */
+  const reply = async (result, path, rawScore) => {
+    const score = result.score;
     console.log(
-      `[FEEDBACK] session=${sessionId} score=${JSON.stringify(result.score)}
-` +
-        `[FEEDBACK] text: ${JSON.stringify(result.feedback ?? "")}`,
+      `[FEEDBACK] session=${sessionId} path=${path} score=${JSON.stringify(score)} ` +
+        `raw=${JSON.stringify(rawScore)} chars=${String(result.feedback ?? "").length}`,
     );
+    console.log(`[FEEDBACK] text: ${JSON.stringify(result.feedback ?? "")}`);
+
+    if (score === null || score < 0.1) {
+      const reason =
+        score === null
+          ? `score MISSING or not a number (raw=${JSON.stringify(rawScore)}) — the simulator may show this as 0`
+          : score === 0
+            ? "score is exactly 0"
+            : `score is very low (${score})`;
+      console.warn(`[FEEDBACK][LOW-SCORE] session=${sessionId} ${reason}`);
+      try {
+        const state = await fetchRawSessionState(sessionId);
+        const history = state?.diagnosis_conversation_history || [];
+        const summary = history.find((m) => String(m.content).startsWith("[SUMMARY]"));
+        console.warn(
+          `[FEEDBACK][LOW-SCORE] session=${sessionId} state: score=${JSON.stringify(state?.score)} ` +
+            `end_diagnosis=${JSON.stringify(state?.end_diagnosis)} history=${history.length} entries ` +
+            `(roles ${history.map((m) => m.role).join(",") || "none"}), ` +
+            `student turns=${history.filter((m) => m.role === "user").length}, ` +
+            `summary=${summary ? "YES — earlier turns were squashed and the grader likely ignored them" : "no"}`,
+        );
+        if (summary) {
+          console.warn(`[FEEDBACK][LOW-SCORE] session=${sessionId} summary: ${JSON.stringify(summary.content)}`);
+        }
+        history
+          .filter((m) => m.role !== "system")
+          .forEach((m, i) =>
+            console.warn(
+              `[FEEDBACK][LOW-SCORE] session=${sessionId} turn ${i + 1} ${m.role}: ${JSON.stringify(String(m.content).slice(0, 300))}`,
+            ),
+          );
+      } catch (err) {
+        console.warn(`[FEEDBACK][LOW-SCORE] session=${sessionId} could not read Voxio state: ${err.message}`);
+      }
+    }
+
     // `sc` is a fixed constant the simulator expects on every feedback reply.
     return trace.send(res, 200, { ...result, sc: 1.5342 });
   };
@@ -291,7 +336,7 @@ router.post("/feedback", async (req, res) => {
       const state = await readState(trace, "after waiting for the concurrent call", sessionId);
       if (hasFeedback(state)) {
         trace.log("PATH: feedback from state, produced by the concurrent call");
-        return reply(fromState(state));
+        return reply(fromState(state), "concurrent-call", state.score);
       }
       return trace.send(res, 502, { message: "The simulator did not produce feedback for this session." });
     } catch (err) {
@@ -310,7 +355,7 @@ router.post("/feedback", async (req, res) => {
     }
     if (hasFeedback(state)) {
       trace.log("PATH: feedback already generated — returning it from state without another turn");
-      return reply(fromState(state));
+      return reply(fromState(state), "already-in-state", state.score);
     }
     if (state.reasoning_conversation_history?.length) {
       trace.warn("state has reasoning turns but no feedback — the flow is in an unexpected phase");
@@ -338,17 +383,18 @@ router.post("/feedback", async (req, res) => {
           trace.warn("feedback arrived but score is missing or not a number", { score: result.score });
         }
         trace.log("PATH: feedback taken from the stream");
-        return reply({
-          feedback: String(result.feedback),
-          score: normaliseScore(result.score),
-        });
+        return reply(
+          { feedback: String(result.feedback), score: normaliseScore(result.score) },
+          "stream",
+          result.score,
+        );
       }
       if (result) trace.warn("feedback output was present but EMPTY", result);
 
       state = await readState(trace, `after end turn ${attempt}`, sessionId);
       if (hasFeedback(state)) {
         trace.log("PATH: feedback not in the stream but found in state after the turn");
-        return reply(fromState(state));
+        return reply(fromState(state), "state-after-turn", state.score);
       }
       trace.warn(
         `no feedback after attempt ${attempt}: ` +
