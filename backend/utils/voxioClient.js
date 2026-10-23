@@ -417,7 +417,9 @@ export const updateFlow = async ({ apiKey, flowName, workflow }) => {
   // wrong key fails with a clear error instead of a partial edit.
   await request("/flow", { method: "GET", headers: { api_key: apiKey } });
 
-  return request("/edit-flow", {
+  // PUT /flow on Voxio's database service: `user_api_key` must own the flow
+  // named by `api_key`. (There is no /edit-flow route; that path 404s.)
+  return request("/flow", {
     method: "PUT",
     headers: { api_key: apiKey, user_api_key: process.env.VOXIO_API_KEY },
     body: {
