@@ -33,6 +33,6 @@ pnpm-debug.log*
 package-lock.json
 
 # Not needed inside the image
-Dockerfile
+Dockerfile.*
 .dockerignore
 README.md

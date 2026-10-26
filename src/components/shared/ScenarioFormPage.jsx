@@ -311,7 +311,7 @@ function ScenarioFormPage() {
   });
 
   const [aiInput, setAiInput] = useState("");
-  // Voxio flow key. Returned by the AI endpoints, saved onto the scenario.
+  // Simulator key. Returned by the AI endpoints, saved onto the scenario.
   const [apiKey, setApiKey] = useState("");
   // Patient identity the AI extracted; sent on save alongside apiKey.
   const [patientInfo, setPatientInfo] = useState(null);
@@ -475,7 +475,7 @@ function ScenarioFormPage() {
     };
 
     /*
-     * A published scenario has to be runnable, and a run needs the Voxio flow
+     * A published scenario has to be runnable, and a run needs the simulator key
      * the AI creates — its key. Without one, "Published" is a label on something
      * a student would open into nothing, so it is saved as a draft instead.
      */

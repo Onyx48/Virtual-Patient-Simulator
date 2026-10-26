@@ -11,6 +11,7 @@ import path from "path";
 import { protect } from "../middleware/authMiddleware.js";
 import { sendWelcomeEmail } from "../utils/emailService.js";
 import { canonicalizeEmail, findUserByEmail } from "../utils/emailLookup.js";
+import { capture } from "../utils/analytics.js";
 
 const router = express.Router();
 
@@ -269,6 +270,7 @@ router.post(
        */
       User.updateOne({ _id: user._id }, { $set: { lastLoginAt: new Date() } })
         .catch((err) => console.error("[AUTH] lastLoginAt update failed:", err.message));
+      capture(user._id, "user_logged_in", { role: user.role });
 
       res.json({
         _id: user._id,

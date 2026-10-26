@@ -109,3 +109,9 @@ The simulator uses `api_key` to ask Voxio which flow to run, and `session_id` to
 **Before:** Parse the full scenario JSON from `GET /api/scenarios/json`, extract the prompt, questions, and instructions, and run the conversation locally.
 
 **After:** Read `api_key` and `session_id` from `GET /api/scenarios/json`, then talk to Voxio's conversation API (`chat.voxio.in`) using those two values. Voxio handles the conversation, scoring, and feedback. The simulator is now a thin presentation layer — it renders the avatar and streams audio, but the AI conversation runs on Voxio's side.
+
+---
+
+## Update: Voxio removed
+
+Voxio is no longer used. The conversation now runs on this backend, using the same prompts. The game keeps the same calls and only changes its base URL from `chat.voxio.in` to this backend: `/agents/start_session`, `/agents/process_input`, `/agents/session` and `/agents/session/pl` mirror Voxio's. See `docs/VOXIO_REPLACEMENT_PLAN.md`.

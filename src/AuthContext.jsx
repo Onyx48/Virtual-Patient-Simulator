@@ -8,6 +8,7 @@ import React, {
 import axios from "axios";
 import { useDispatch } from "react-redux";
 import { clearSessions } from "./redux/slices/sessionSlice.js";
+import { identifyUser } from "./lib/monitoring";
 
 const AuthContext = createContext(null);
 
@@ -48,6 +49,11 @@ export const AuthProvider = ({ children }) => {
     return null;
   });
   const [loading, setLoading] = useState(false);
+
+  // Tag Sentry errors and PostHog events with who is logged in.
+  useEffect(() => {
+    identifyUser(user);
+  }, [user]);
   const processUserSession = useCallback((userData) => {
     if (userData && userData._id) {
       setUser(userData);

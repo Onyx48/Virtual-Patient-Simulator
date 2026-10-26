@@ -113,3 +113,42 @@ export const assignedStudentIdsByScenario = async (scenarios) => {
 
   return result;
 };
+
+/**
+ * Aggregation stage counting, per student document, the scenarios assigned to
+ * them — individually or through their group — into `assignedScenariosCount`.
+ *
+ * The pipeline form of assignedToStudentQuery, for the paginated roster, which
+ * has to filter and sort on the count before choosing a page. One $lookup
+ * returns each scenario at most once, so a student both picked individually and
+ * in an assigned group is still counted once.
+ */
+export const assignedScenarioCountStages = () => [
+  {
+    $lookup: {
+      from: "scenarios",
+      let: { uid: "$_id", gid: "$groupId" },
+      pipeline: [
+        {
+          $match: {
+            $expr: {
+              $or: [
+                { $in: ["$$uid", { $ifNull: ["$assignedTo", []] }] },
+                {
+                  $and: [
+                    { $ne: [{ $ifNull: ["$$gid", null] }, null] },
+                    { $in: ["$$gid", { $ifNull: ["$assignedGroups", []] }] },
+                  ],
+                },
+              ],
+            },
+          },
+        },
+        { $project: { _id: 1 } },
+      ],
+      as: "_assigned",
+    },
+  },
+  { $addFields: { assignedScenariosCount: { $size: "$_assigned" } } },
+  { $project: { _assigned: 0 } },
+];

@@ -8,6 +8,7 @@ import crypto from "crypto";
 import redisClient from "../utils/redisClient.js";
 import { invalidateStudentsCache } from "../utils/studentsCache.js";
 import { publicMessage } from "../utils/appEnv.js";
+import { parsePagination, pageResponse, escapeRegex } from "../utils/pagination.js";
 import { groupNameMatcher } from "../utils/groupName.js";
 
 const router = express.Router();
@@ -47,6 +48,14 @@ const invalidateUsersCache = async (schoolId, educatorIds = []) => {
   }
 };
 
+const USER_SORT_FIELDS = {
+  name: "name",
+  email: "email",
+  role: "role",
+  createdAt: "createdAt",
+  lastLoginAt: "lastLoginAt",
+};
+
 // GET ALL USERS (with filters)
 router.get("/", protect, checkAccess("manageUsers"), async (req, res) => {
   try {
@@ -56,6 +65,24 @@ router.get("/", protect, checkAccess("manageUsers"), async (req, res) => {
     if (schoolId) query.schoolId = schoolId;
     if (req.scope?.schoolId) {
       query.schoolId = req.scope.schoolId;
+    }
+
+    const paging = parsePagination(req.query, USER_SORT_FIELDS, { name: 1 });
+    if (paging) {
+      if (req.query.searchTerm) {
+        const rx = new RegExp(escapeRegex(req.query.searchTerm), "i");
+        query.$or = [{ name: rx }, { email: rx }];
+      }
+      const [items, total] = await Promise.all([
+        User.find(query)
+          .select("-password")
+          .populate("schoolId", "schoolName")
+          .sort(paging.sort)
+          .skip(paging.skip)
+          .limit(paging.limit),
+        User.countDocuments(query),
+      ]);
+      return res.status(200).json(pageResponse(items, total, paging));
     }
 
     const cacheKey = usersListCacheKey(req.scope?.schoolId, role);

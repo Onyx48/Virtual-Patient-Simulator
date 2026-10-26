@@ -8,6 +8,9 @@ import { LanguageProvider } from "./i18n/LanguageContext";
 import "./index.css";
 import App from "./App";
 import axios from "axios";
+import { initMonitoring } from "./lib/monitoring";
+
+initMonitoring();
 
 const container = document.getElementById("root");
 const root = ReactDOM.createRoot(container);

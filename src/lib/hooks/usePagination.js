@@ -53,38 +53,10 @@ export function usePagination(data = [], initialItemsPerPage = 5) {
     [currentPage, itemsPerPage],
   );
 
-  const pageNumbers = useMemo(() => {
-    const siblingCount = 1;
-    const totalNumbersToShow = siblingCount * 2 + 5;
-
-    if (totalPages <= totalNumbersToShow) {
-      return Array.from({ length: totalPages }, (_, i) => i + 1);
-    }
-
-    const leftSibling = Math.max(currentPage - siblingCount, 1);
-    const rightSibling = Math.min(currentPage + siblingCount, totalPages);
-
-    const showLeftEllipsis = leftSibling > 2;
-    const showRightEllipsis = rightSibling < totalPages - 1;
-
-    const pages = [];
-
-    pages.push(1);
-    if (showLeftEllipsis) pages.push("...");
-
-    for (
-      let i = Math.max(leftSibling, 2);
-      i <= Math.min(rightSibling, totalPages - 1);
-      i++
-    ) {
-      pages.push(i);
-    }
-
-    if (showRightEllipsis) pages.push("...");
-    pages.push(totalPages);
-
-    return pages;
-  }, [currentPage, totalPages]);
+  const pageNumbers = useMemo(
+    () => buildPageNumbers(currentPage, totalPages),
+    [currentPage, totalPages],
+  );
 
   return {
     paginatedData,
@@ -110,4 +82,38 @@ export function usePagination(data = [], initialItemsPerPage = 5) {
         : (Math.min(currentPage, totalPages) - 1) * itemsPerPage + 1,
     rangeEnd: Math.min(currentPage * itemsPerPage, totalItems),
   };
+}
+
+/** Page buttons with ellipses: 1 … 4 5 6 … 12. Shared with useServerPagination. */
+export function buildPageNumbers(currentPage, totalPages) {
+  const siblingCount = 1;
+  const totalNumbersToShow = siblingCount * 2 + 5;
+
+  if (totalPages <= totalNumbersToShow) {
+    return Array.from({ length: totalPages }, (_, i) => i + 1);
+  }
+
+  const leftSibling = Math.max(currentPage - siblingCount, 1);
+  const rightSibling = Math.min(currentPage + siblingCount, totalPages);
+
+  const showLeftEllipsis = leftSibling > 2;
+  const showRightEllipsis = rightSibling < totalPages - 1;
+
+  const pages = [];
+
+  pages.push(1);
+  if (showLeftEllipsis) pages.push("...");
+
+  for (
+    let i = Math.max(leftSibling, 2);
+    i <= Math.min(rightSibling, totalPages - 1);
+    i++
+  ) {
+    pages.push(i);
+  }
+
+  if (showRightEllipsis) pages.push("...");
+  pages.push(totalPages);
+
+  return pages;
 }

@@ -10,9 +10,20 @@ import { checkAccess } from "../middleware/roleAccessMiddleware.js";
 import { sendSchoolInviteEmail } from "../utils/emailService.js";
 import { canonicalizeEmail, findUserByEmail } from "../utils/emailLookup.js";
 import { isProd, publicMessage } from "../utils/appEnv.js";
+import { parsePagination, pageResponse, escapeRegex } from "../utils/pagination.js";
 import crypto from "crypto";
 
 const router = express.Router();
+
+// Column keys SchoolTable sorts by. timeSpent is a display string, not sortable.
+const SCHOOL_SORT_FIELDS = {
+  schoolName: "schoolName",
+  email: "email",
+  description: "description",
+  status: "status",
+  expireDate: "expireDate",
+  inviteStatus: "inviteStatus",
+};
 
 const parseDateString = (dateString) => {
   if (!dateString) return null;
@@ -91,7 +102,7 @@ router.get("/", protect, checkAccess("viewSchools"), async (req, res) => {
     }
 
     if (searchTerm) {
-      const searchRegex = new RegExp(searchTerm, "i");
+      const searchRegex = new RegExp(escapeRegex(searchTerm), "i");
       query.$or = [
         { schoolName: searchRegex },
         { email: searchRegex },
@@ -103,8 +114,17 @@ router.get("/", protect, checkAccess("viewSchools"), async (req, res) => {
       query["assignedAdmin.id"] = null;
     }
 
-    const schools = await School.find(query).sort({ schoolName: 1 });
-    res.json(schools);
+    const paging = parsePagination(req.query, SCHOOL_SORT_FIELDS, { schoolName: 1 });
+    if (!paging) {
+      const schools = await School.find(query).sort({ schoolName: 1 });
+      return res.json(schools);
+    }
+
+    const [items, total] = await Promise.all([
+      School.find(query).sort(paging.sort).skip(paging.skip).limit(paging.limit),
+      School.countDocuments(query),
+    ]);
+    res.json(pageResponse(items, total, paging));
   } catch (err) {
     console.error("Get Schools Error:", err);
     res.status(500).json({ message: "Server error fetching schools." });

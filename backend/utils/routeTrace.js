@@ -105,7 +105,7 @@ export const startTrace = (tag, req) => {
       `user=${req.user?._id || "(unauthenticated)"} role=${req.user?.role || "-"} ` +
       `school=${req.user?.schoolId?._id || req.user?.schoolId || "-"}`,
   );
-  // Every header, so a caller (the simulator, Voxio, a browser) can be told
+  // Every header, so a caller (the simulator, a browser) can be told
   // apart; Authorization / cookie / token values are masked by redact().
   console.log(`${prefix()} headers=${dump(req.headers)}`);
   console.log(`${prefix()} params=${dump(req.params)} query=${dump(req.query)}`);
@@ -255,7 +255,7 @@ export const startTrace = (tag, req) => {
             `cause=${err.cause?.code || err.cause?.message || "-"}`,
         );
         console.log(`${prefix()} partial upstream=${dump(full)}`);
-        throw Object.assign(new Error(`Voxio stream broke: ${err.message}`), {
+        throw Object.assign(new Error(`Upstream stream broke: ${err.message}`), {
           statusCode: err.name === "TimeoutError" ? 504 : 502,
         });
       }

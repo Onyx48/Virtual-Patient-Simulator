@@ -1,5 +1,5 @@
-import React, { useState, useMemo, useEffect } from "react";
-import { useSelector, useDispatch } from "react-redux";
+import React, { useState } from "react";
+import { useDispatch } from "react-redux";
 import { useNavigate } from "react-router-dom";
 import { useAuth } from "../../../AuthContext";
 
@@ -8,11 +8,10 @@ import ScenarioTable from "./ScenarioTable.jsx";
 import PaginationBar from "../../../components/ui/PaginationBar";
 // import AssignScenariosModal from "../../components/shared/AssignScenariosModal";
 
-import { usePagination } from "../../../lib/hooks/usePagination";
+import { useServerPagination } from "../../../lib/hooks/useServerPagination";
 import { Spinner } from "../../../lib/hooks/useLoading";
 
 import {
-  fetchScenarios,
   setSelectedScenario,
 } from "../../../redux/slices/scenarioSlice.js";
 
@@ -21,7 +20,6 @@ function ScenariosPage() {
   const navigate = useNavigate();
   const { user } = useAuth();
 
-  const { scenarios, loading, error } = useSelector((state) => state.scenarios);
 
   const canEditScenarios =
     user?.role === "educator" || user?.role === "superadmin";
@@ -31,63 +29,12 @@ function ScenariosPage() {
   const [filterCriteria, setFilterCriteria] = useState({});
   const [isAssignModalOpen, setIsAssignModalOpen] = useState(false);
 
-  useEffect(() => {
-    dispatch(fetchScenarios());
-  }, [dispatch]);
-
-  const filteredScenarios = useMemo(() => {
-    if (!scenarios) return [];
-    let currentData = [...scenarios];
-
-    if (searchTerm) {
-      const lowerCaseSearchTerm = searchTerm.toLowerCase();
-      currentData = currentData.filter(
-        (scenario) =>
-          scenario.scenarioName?.toLowerCase().includes(lowerCaseSearchTerm) ||
-          scenario.description?.toLowerCase().includes(lowerCaseSearchTerm) ||
-          scenario.educator?.name?.toLowerCase().includes(lowerCaseSearchTerm),
-      );
-    }
-
-    const hasActiveFilters = Object.values(filterCriteria).some(
-      (value) => value !== "" && value !== null && value !== undefined,
-    );
-
-    if (hasActiveFilters) {
-      currentData = currentData.filter((scenario) => {
-        let matchesFilters = true;
-        if (filterCriteria.status && filterCriteria.status !== "") {
-          if (scenario.status !== filterCriteria.status) matchesFilters = false;
-        }
-        return matchesFilters;
-      });
-    }
-
-    return currentData;
-  }, [scenarios, searchTerm, filterCriteria]);
-
-  const filteredAndSortedScenarios = useMemo(() => {
-    let sortableItems = [...filteredScenarios];
-    if (sortConfig !== null) {
-      sortableItems.sort((a, b) => {
-        const aValue = a[sortConfig.key];
-        const bValue = b[sortConfig.key];
-
-        if (aValue === null || aValue === undefined)
-          return sortConfig.direction === "asc" ? 1 : -1;
-        if (bValue === null || bValue === undefined)
-          return sortConfig.direction === "asc" ? -1 : 1;
-
-        if (aValue < bValue) return sortConfig.direction === "asc" ? -1 : 1;
-        if (aValue > bValue) return sortConfig.direction === "asc" ? 1 : -1;
-        return 0;
-      });
-    }
-    return sortableItems;
-  }, [filteredScenarios, sortConfig]);
-
+  // Only the visible page is fetched; search, filters and sort run server-side.
   const {
     paginatedData,
+    isInitialLoading: loading,
+    error,
+    refetch: refetchScenarios,
     currentPage,
     totalPages,
     totalItems,
@@ -99,12 +46,11 @@ function ScenariosPage() {
     isLastPage,
     rangeStart,
     rangeEnd,
-    resetPage,
-  } = usePagination(filteredAndSortedScenarios, 8);
-
-  useEffect(() => {
-    resetPage();
-  }, [searchTerm, filterCriteria]);
+  } = useServerPagination("/api/scenarios", {
+    params: { searchTerm, status: filterCriteria.status || "" },
+    pageSize: 8,
+    sortConfig,
+  });
 
   const handleSearchChange = (term) => {
     setSearchTerm(term);
@@ -198,7 +144,7 @@ function ScenariosPage() {
       {isAssignModalOpen && (
         <AssignScenariosModal
           onClose={() => setIsAssignModalOpen(false)}
-          onAssignSuccess={() => dispatch(fetchScenarios())}
+          onAssignSuccess={refetchScenarios}
         />
       )}
     </div>

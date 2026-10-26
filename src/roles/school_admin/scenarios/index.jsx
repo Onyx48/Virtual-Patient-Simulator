@@ -1,5 +1,5 @@
-import React, { useState, useMemo, useEffect } from "react";
-import { useSelector, useDispatch } from "react-redux";
+import React, { useState, useEffect } from "react";
+import { useDispatch } from "react-redux";
 import { useNavigate } from "react-router-dom";
 import { toast } from "react-hot-toast";
 import { Squares2X2Icon, TableCellsIcon } from "@heroicons/react/24/outline";
@@ -10,11 +10,10 @@ import ScenarioListTable from "./ScenarioListTable.jsx";
 import PaginationBar from "../../../components/ui/PaginationBar";
 import ConfirmationModal from "../../../components/ui/ConfirmationModal";
 
-import { usePagination } from "../../../lib/hooks/usePagination";
+import { useServerPagination } from "../../../lib/hooks/useServerPagination";
 import { Spinner } from "../../../lib/hooks/useLoading";
 
 import {
-  fetchScenarios,
   deleteScenario,
   setSelectedScenario,
 } from "../../../redux/slices/scenarioSlice.js";
@@ -24,8 +23,6 @@ const VIEW_STORAGE_KEY = "schoolAdmin.scenarios.view";
 function SchoolAdminScenariosPage() {
   const dispatch = useDispatch();
   const navigate = useNavigate();
-
-  const { scenarios, loading, error } = useSelector((state) => state.scenarios);
 
   // Table is the default view; the choice is remembered per browser so the
   // page does not snap back to a view the admin just switched away from.
@@ -46,66 +43,12 @@ function SchoolAdminScenariosPage() {
 
   const [pendingDelete, setPendingDelete] = useState(null);
 
-  useEffect(() => {
-    dispatch(fetchScenarios());
-  }, [dispatch]);
-
-  const filteredScenarios = useMemo(() => {
-    if (!scenarios) return [];
-    let currentData = [...scenarios];
-
-    if (searchTerm) {
-      const lowerTerm = searchTerm.toLowerCase();
-      currentData = currentData.filter(
-        (s) =>
-          s.scenarioName?.toLowerCase().includes(lowerTerm) ||
-          s.description?.toLowerCase().includes(lowerTerm) ||
-          (s.educator?.name || "").toLowerCase().includes(lowerTerm),
-      );
-    }
-
-    if (filterCriteria.status) {
-      currentData = currentData.filter(
-        (s) => s.status === filterCriteria.status,
-      );
-    }
-
-    if (filterCriteria.educator) {
-      currentData = currentData.filter((s) =>
-        (s.educator?.name || "")
-          .toLowerCase()
-          .includes(filterCriteria.educator.toLowerCase()),
-      );
-    }
-
-    return currentData;
-  }, [scenarios, searchTerm, filterCriteria]);
-
-  const filteredAndSortedScenarios = useMemo(() => {
-    let sortableItems = [...filteredScenarios];
-    if (sortConfig !== null) {
-      sortableItems.sort((a, b) => {
-        let aValue = a[sortConfig.key];
-        let bValue = b[sortConfig.key];
-
-        if (sortConfig.key === "educator") {
-          aValue = typeof aValue === "object" ? aValue?.name : aValue;
-          bValue = typeof bValue === "object" ? bValue?.name : bValue;
-        }
-
-        if (!aValue) return 1;
-        if (!bValue) return -1;
-
-        if (aValue < bValue) return sortConfig.direction === "asc" ? -1 : 1;
-        if (aValue > bValue) return sortConfig.direction === "asc" ? 1 : -1;
-        return 0;
-      });
-    }
-    return sortableItems;
-  }, [filteredScenarios, sortConfig]);
-
+  // Only the visible page is fetched; search, filters and sort run server-side.
   const {
     paginatedData,
+    isInitialLoading: loading,
+    error,
+    refetch: refetchScenarios,
     currentPage,
     totalPages,
     totalItems,
@@ -117,12 +60,15 @@ function SchoolAdminScenariosPage() {
     isLastPage,
     rangeStart,
     rangeEnd,
-    resetPage,
-  } = usePagination(filteredAndSortedScenarios, view === "table" ? 15 : 8);
-
-  useEffect(() => {
-    resetPage();
-  }, [searchTerm, filterCriteria, view]);
+  } = useServerPagination("/api/scenarios", {
+    params: {
+      searchTerm,
+      status: filterCriteria.status || "",
+      educatorName: filterCriteria.educator || "",
+    },
+    pageSize: view === "table" ? 15 : 8,
+    sortConfig,
+  });
 
   const handleSort = (key) => {
     let direction = "asc";
@@ -152,6 +98,7 @@ function SchoolAdminScenariosPage() {
     if (!scenario) return;
     try {
       await dispatch(deleteScenario(scenario._id || scenario.id)).unwrap();
+      refetchScenarios();
       toast.success("Scenario deleted.");
     } catch (err) {
       toast.error(err?.message || "Failed to delete the scenario.");

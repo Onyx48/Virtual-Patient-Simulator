@@ -9,7 +9,7 @@ export function cn(...inputs) {
 /*
  * A stored session score as a whole percentage (0-100), or 0 if missing.
  *
- * The Voxio grader writes a fraction in [0, 1], which is what almost every
+ * The simulator's grader writes a fraction in [0, 1], which is what almost every
  * stored session holds. A few legacy rows came from a grader that marked out
  * of 10, and anything above 10 is taken as already being a percentage.
  */

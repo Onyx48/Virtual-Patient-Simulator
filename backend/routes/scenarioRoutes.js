@@ -11,8 +11,9 @@ import { checkAccess } from "../middleware/roleAccessMiddleware.js";
 import { generateJsonWithFallback } from "../utils/aiText.js";
 import { emptyMovements, emptyTriggers } from "../utils/bodyRegions.js";
 import { withStudentScope } from "../utils/scenarioAssignment.js";
+import { parsePagination, pageResponse, escapeRegex } from "../utils/pagination.js";
 import Group from "../models/groupModel.js";
-import { buildWorkflow, createFlow, updateFlow } from "../utils/voxioClient.js";
+import { randomBytes } from "crypto";
 import { publicMessage } from "../utils/appEnv.js";
 import { patientInfoFrom } from "../utils/patientInfo.js";
 import {
@@ -40,16 +41,39 @@ const scenarioValidationRules = [
   body("permissions").optional().isIn(["Read Only", "Write Only", "Both"]),
 ];
 
+// Column keys the scenario tables sort by. "educator" sorts by the creator's
+// name and is handled separately below.
+const SCENARIO_SORT_FIELDS = {
+  scenarioName: "scenarioName",
+  createdAt: "createdAt",
+  status: "status",
+  difficulty: "difficulty",
+  educator: "educator",
+};
+
+const educatorIdsNamed = async (regex) =>
+  (await User.find({ name: regex }).select("_id").lean()).map((u) => u._id);
+
 router.get("/", protect, checkAccess("viewScenarios"), async (req, res) => {
   try {
     let query = {};
-    const { status, permissions, searchTerm } = req.query;
+    const { status, permissions, searchTerm, educatorName } = req.query;
+    const paging = parsePagination(req.query, SCENARIO_SORT_FIELDS);
 
     if (status) query.status = status;
     if (permissions) query.permissions = permissions;
     if (searchTerm) {
-      const searchRegex = new RegExp(searchTerm, "i");
+      const searchRegex = new RegExp(escapeRegex(searchTerm), "i");
       query.$or = [{ scenarioName: searchRegex }, { description: searchRegex }];
+      // The tables also match on the creator's name. Only done when paginating:
+      // the unpaginated callers filter client-side and never relied on it.
+      if (paging) {
+        query.$or.push({ educator: { $in: await educatorIdsNamed(searchRegex) } });
+      }
+    }
+    if (educatorName && paging) {
+      const ids = await educatorIdsNamed(new RegExp(escapeRegex(educatorName), "i"));
+      query.$and = [...(query.$and || []), { educator: { $in: ids } }];
     }
 
     if (req.scope) {
@@ -64,13 +88,49 @@ router.get("/", protect, checkAccess("viewScenarios"), async (req, res) => {
       }
     }
 
-    const scenarios = await Scenario.find(query)
-      .populate("educator", "name email")
-      .populate("assignedTo", "name")
-      .populate("assignedGroups", "name")
-      .sort({ createdAt: -1 });
+    const populateList = (q) =>
+      q
+        .populate("educator", "name email")
+        .populate("assignedTo", "name")
+        .populate("assignedGroups", "name");
 
-    // Attach session stats (avgScore, totalSessions) to each scenario
+    let scenarios;
+    let total;
+    if (!paging) {
+      scenarios = await populateList(Scenario.find(query).sort({ createdAt: -1 }));
+    } else if (paging.sort.educator !== undefined) {
+      // Sorting by creator means sorting by the populated name, which find()
+      // cannot do — resolve the page's ids through an aggregate, then load them.
+      const dir = paging.sort.educator;
+      const [ids, count] = await Promise.all([
+        Scenario.aggregate([
+          { $match: query },
+          { $lookup: { from: "users", localField: "educator", foreignField: "_id", as: "_e" } },
+          { $addFields: { _educatorName: { $toLower: { $ifNull: [{ $first: "$_e.name" }, ""] } } } },
+          { $sort: { _educatorName: dir, _id: 1 } },
+          { $skip: paging.skip },
+          { $limit: paging.limit },
+          { $project: { _id: 1 } },
+        ]),
+        Scenario.countDocuments(query),
+      ]);
+      const order = ids.map((d) => d._id.toString());
+      const docs = await populateList(Scenario.find({ _id: { $in: ids.map((d) => d._id) } }));
+      scenarios = docs.sort(
+        (a, b) => order.indexOf(a._id.toString()) - order.indexOf(b._id.toString()),
+      );
+      total = count;
+    } else {
+      [scenarios, total] = await Promise.all([
+        populateList(
+          Scenario.find(query).sort(paging.sort).skip(paging.skip).limit(paging.limit),
+        ),
+        Scenario.countDocuments(query),
+      ]);
+    }
+
+    // Attach session stats (avgScore, totalSessions) to each scenario — only
+    // the ones being returned, so a page costs the same however many exist.
     const scenarioIdStrings = scenarios.map((s) => s._id.toString());
     const sessionStats = await Session.aggregate([
       { $match: { scenario_id: { $in: scenarioIdStrings } } },
@@ -98,7 +158,7 @@ router.get("/", protect, checkAccess("viewScenarios"), async (req, res) => {
       };
     });
 
-    res.json(scenariosWithStats);
+    res.json(paging ? pageResponse(scenariosWithStats, total, paging) : scenariosWithStats);
   } catch (err) {
     console.error("Get Scenarios Error:", err);
     res.status(500).json({ message: "Server error fetching scenarios." });
@@ -108,10 +168,11 @@ router.get("/", protect, checkAccess("viewScenarios"), async (req, res) => {
 /*
  * ── AI scenario authoring ──────────────────────────────────────────────────────
  *
- * Ported from the standalone FastAPI service that used to run on :8888. Same
- * pipeline: Gemini turns a one-line brief into the structured scenario, the
- * result is injected into the Voxio workflow graph, and Voxio returns the
- * api_key that identifies the runnable flow.
+ * Ported from the standalone FastAPI service that used to run on :8888. Gemini
+ * turns a one-line brief into the structured scenario. The simulator runs it
+ * from the saved scenarioPrompt/aiQuestions (utils/simEngine.js), so nothing is
+ * published anywhere else; the api_key is a token of our own that the game is
+ * handed and that marks the scenario as runnable.
  *
  * Difference from the Python original: nothing is written to a second database.
  * The generated fields come back to the form, and the existing POST/PUT
@@ -169,7 +230,13 @@ const shapeGenerated = (generated, apiKey) => ({
   api_key: apiKey,
 });
 
-// Generate a brand new scenario and publish it as a Voxio flow.
+/*
+ * The simulator key for a new scenario. "sim_" marks it as ours; scenarios made
+ * before the switch keep their old Voxio key, which still works as a key.
+ */
+const newSimulatorKey = () => `sim_${randomBytes(24).toString("hex")}`;
+
+// Generate a brand new scenario.
 router.post(
   "/ai/generate",
   protect,
@@ -189,17 +256,7 @@ router.post(
       });
       console.log(`[AI] scenario generated by ${provider} (${model})`);
 
-      const workflow = buildWorkflow({
-        scenarioPrompt: generated.scenario_prompt,
-        feedbackQuestions: generated.questions_for_feedback,
-      });
-
-      const apiKey = await createFlow({
-        flowName: generated.scenario_name || "Untitled Scenario",
-        workflow,
-      });
-
-      res.json({ response: shapeGenerated(generated, apiKey) });
+      res.json({ response: shapeGenerated(generated, newSimulatorKey()) });
     } catch (err) {
       console.error("[AI] generate failed:", err);
       res.status(503).json({
@@ -209,7 +266,7 @@ router.post(
   },
 );
 
-// Regenerate an existing scenario and overwrite the flow behind its api_key.
+// Regenerate an existing scenario. Its api_key is kept.
 router.post(
   "/ai/edit",
   protect,
@@ -223,12 +280,6 @@ router.post(
         .status(400)
         .json({ message: "Missing 'scenario_prompt' in request body." });
     }
-    if (!apiKey) {
-      return res.status(400).json({
-        message:
-          "Missing 'api_key'. This scenario has no simulator flow yet — generate one first.",
-      });
-    }
 
     try {
       const { json: generated, provider, model } = await generateJsonWithFallback({
@@ -237,18 +288,7 @@ router.post(
       });
       console.log(`[AI] scenario edited by ${provider} (${model})`);
 
-      const workflow = buildWorkflow({
-        scenarioPrompt: generated.scenario_prompt,
-        feedbackQuestions: generated.questions_for_feedback,
-      });
-
-      await updateFlow({
-        apiKey,
-        flowName: generated.scenario_name || "Untitled Scenario",
-        workflow,
-      });
-
-      res.json({ response: shapeGenerated(generated, apiKey) });
+      res.json({ response: shapeGenerated(generated, apiKey || newSimulatorKey()) });
     } catch (err) {
       console.error("[AI] edit failed:", err);
       res.status(503).json({
@@ -284,7 +324,7 @@ router.post("/json", protect, async (req, res) => {
     }
 
     // Educator pressing Test: no student and no enrolled attempt, but the
-    // simulator still needs a session_id to tag this run's Voxio state, so one
+    // simulator still needs a session_id to tag this run's conversation, so one
     // is minted here the same way a student's Start would.
     const sessionId = new mongoose.Types.ObjectId().toString();
     setLiveScenario(scenario, { userId: req.user._id, sessionId });
@@ -306,10 +346,9 @@ router.post("/json", protect, async (req, res) => {
 });
 
 /*
- * The simulator no longer needs the scenario's content from us: the persona,
- * movements and rubric are already baked into the Voxio flow behind api_key at
- * publish time (buildWorkflow/createFlow). All it needs to run and later be
- * looked up is which flow to run and which session to tag the result with.
+ * The simulator does not need the scenario's content: the conversation runs on
+ * this server (routes/simRoutes.js), which looks the scenario up from the
+ * session_id. The game only needs the session_id to send its turns with.
  */
 router.get("/json", (req, res) => {
   const liveScenario = getLiveScenario();

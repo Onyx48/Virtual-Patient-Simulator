@@ -1,0 +1,285 @@
+﻿CR ID,Category,Date Added,Description,MVP,Milestone,Owner,Owner Comment,Priority,Status,Sub-Milestone,Planned End Date
+ID1,Instructional Design,"August 3, 2026","Dashboards for Educator and Student need improvement. See document ‘DASHBOARD feedback working document’ for feedback to Educator dashboard (feel free to update).
+7 Oct 2026: Draft Dashboards: Add Cohort Level when clicking main categories (so for example Dashboard shows overall ‘Common Learning Gaps’, when that is clicked, we should zoom into Cohort Level and when that is clicked: zoom into individual learner level",Yes,Milestone 1,"Olaf Kwakman, Ezril Jamil Official",See Docs: “vps_dashboards.html” & “Instructional Designer - Training Matrix.docx”,High,In progress,01-Apr,
+TECH5,Technical,"August 3, 2026","Feedback Summary: use sections, paragraphs, or bullet points (instead of a single paragraph) for easier reading.",Yes,Milestone 1,Ayush Singhal,,Medium,Not started,01-Feb,
+TECH6,Technical,"August 3, 2026",Need instruction on how to use the group peer learning function in the system - not clear how to do it.,No,Final Milestone,Kapil Chhabra,,Medium,Not started,02-Dec,
+TECH1,Technical,"August 3, 2026","""The UE-VPS Game has crashed and will close"" / ""Fatal error!"" (Happened once early in the simulation)
+Bug fixes",Yes,Milestone 1,chirag chetnani,UE engine updates completed; testing completed; no more fatal errors,High,Done,01-Sep,
+3DA1,3D Artist,"August 3, 2026","The plinth behind the patient is gigantic (out of proportion), maybe can make it smaller.",Yes,Final Milestone,chirag chetnani,,Low,Not started,Feb-17,
+AI1,AI,"August 3, 2026","Scenario Feedback may not accurately reflect student actions, and its relevance to the case is unclear. Full example AI-generated feedback text is in the page content below.",Yes,Milestone 1,Ayush Singhal,,High,Not started,01-Feb,
+TECH3,Technical,"November 21, 2025","Once the window is closed, the session should be closed, with an option to just restart it (restart button) while the user is in the session. Currently you have to close the window and exit the program to restart, otherwise the timer and session just continue - difficult for testing.
+Closing a tab doesn't close the application since it is streaming. Provision to end a session already exists (end session button). Need a better way to end sessions so people don't just leave and let the app keep running.",Yes,Final Milestone,chirag chetnani,,Medium,Not started,Feb-17,
+TECH2,Technical,"August 3, 2026","Clinical Reasoning error, but user is still able to chat. ""No Controller EC2AMAZ-LP2RCL-D00D"" / ""Debug actor: BP_CameraView_C_2147482456 [ROLE_Authority] Vlog not recording to file"" / ""Tap [Apostrophe] to close or hold to select new Pawn...""
+Bug fixes",Yes,Milestone 1,chirag chetnani,Is this also completed now?,High,Not started,01-Feb,
+UI1,UI,"August 3, 2026","Users may not understand what actions are possible/expected. Add a tutorial at the start outlining objectives and navigation (patient interaction goal, assessment/time factor, space bar to speak, keyboard shortcuts, how to end session). But we need to make sure that user does not need to click-through instructions every time.    Feedback Summary should note it's AI-generated, clarify Clinical Reasoning/Exit buttons and the score-out-of-10 meaning. Also: the live chat transcription box does not auto-scroll to the bottom, requiring manual scrolling.",Yes,Final Milestone,Olaf Kwakman,,Medium,Not started,Feb-17,
+QA1,Testing,"August 3, 2026","Mass uploading of students. The system creates empty profiles for some students uploaded. Maybe it is user error, but good to check.
+Might be solved: TEST",Yes,Final Milestone,chirag chetnani,,Low,In progress,Feb-17,
+QA2,Testing,"August 3, 2026","received feedback: The AI coach was unfamiliar with the specific case. It would help for the AI to have access to case + conversation info so users don't have to repeat details.
+Solved? Test",Yes,Milestone 1,Ayush Singhal,,High,In progress,01-Feb,
+TECH4,Technical,"August 3, 2026","Users might be unsure how to show or use the floating buttons. Consider adding a trigger button and tooltips for clearer guidance.
+This is part of Vagon Infrastructure, which is not in our control in current pipeline.",Yes,Final Milestone,chirag chetnani,,Low,Not started,Feb-17,
+AI2,AI,"August 3, 2026",AI Coach should ask one question at a time to make it easier to reply and chat.,Yes,Final Milestone,Ayush Singhal,,Low,Not started,Feb-18,
+MOV8,Movement Technology,"August 3, 2026",Full AROM (active range of motion) on the left shoulder as a comparison.,No,Milestone 1,chirag chetnani,,Medium,Not started,01-Feb,
+TECH7,Technical,"August 3, 2026","Voice command to activate movement (instead of clicking a key on a keyboard).
+This is also important for students to learn to ask questions clearly. If avatar does not understand how to move because the question is not clear enough, he can ask “what exactly do you want me to do?”",Yes,Final Milestone,chirag chetnani,Yet to start,High,In progress,Feb-17,
+MOV5,Movement Technology,"August 3, 2026","Neuro movement: walking with aid, sitting to stand, turning in bed, supine arm/leg movement (L&R), sitting knee extension, sitting arm movement, sitting lean to side (L&R), sitting arm reach to side/forward (L&R).",No,Final Milestone,chirag chetnani,,Medium,Not started,02-Nov,
+TECH8,Technical,"August 3, 2026","Live transcript scrolling doesn't work properly - allow scrolling on the transcript text box (bottom left) so users can read the text.
+We can change the default to the transcript below the avatar (check if that is working properly). And only use the scrolling box as another option.",Yes,Milestone 1,chirag chetnani,Scrolling function is working and tested.,High,Done,01-Feb,
+MOV4,Movement Technology,"August 3, 2026","Neurological physiotherapy function: Neuro PT session setting - patient sitting or lying in bed, hospital environment, home environment.",No,Final Milestone,chirag chetnani,,Medium,Not started,02-Nov,
+MOV1,Movement Technology,"August 3, 2026","MSK Movement for avatar: squat, sit-to-stand, lower back forward flexion/backward extension/side flexion (L&R)/rotation (L&R), knee flexion/extension, ankle dorsiflexion/plantarflexion/inversion/eversion.
+For full-body MSK movements, we will need these additional movements. Sitting down etc.
+Because we are running a pilot study with TCU in Taiwan, we need to prioritise creation of movements relevant to the scenarios created for them (4 scenarios).
+",Yes,Milestone 1,chirag chetnani,In testing phase. some samples are submitted. First extension to lower body has started.,High,In progress,01-Feb,
+MOV6,Movement Technology,"August 3, 2026","Adding emotion to all patient types, especially Neuro cases (e.g. mild cognitive impairment, confusion).
+Neuro cases will cover later. For now, we will include facial expression/emotions when converting videos to 3D animations",No,Final Milestone,"Kapil Chhabra, chirag chetnani",,Low,Not started,02-Nov,
+DOM7,Domain Specialist,"August 3, 2026","Clinical decision-making function for patient management - user decides on treatment approach (Neuro/CP cases focus more on problem identification and treatment planning than diagnosis).   Needs discussion - treatment plan decisions may carry liability implications (raised by an InnovSpur panel member). Possible approach: human-in-the-loop, where the educator confirms the correct treatment plan and the AI guides students using only educator-approved scenario knowledge.",No,Final Milestone,Benjamin ,Under review by Domain Expert.  This is a training app; not a consultation.  Ultimate decision lies with the therapist.  For the training; human-in-the-loop; educator ultimately remains responsible.  We also do thorough testing with domain experts before this can actually be used for assessments.,Low,Done,02-Nov,
+MOV7,Movement Technology,"August 3, 2026",Eye tracking of the avatar to the screen so it feels like the avatar is looking at the user.,No,Final Milestone,chirag chetnani,,Low,Not started,Feb-17,
+MOV3,Movement Technology,"August 3, 2026","Cardiopulmonary (CP) physiotherapy function: CP session setting - patient lying in bed, hospital environment, patient sitting.",No,Final Milestone,chirag chetnani,,Medium,Not started,02-Nov,
+DOM6,Domain Specialist,"August 3, 2026",Neuro additional information: MRI report. Discuss with domain specialist gfirst. Does this make sense? Small on-screen MRI might not help..  Maybe create an option to download images.,No,Final Milestone,Benjamin ,"Add option for MRI / Scan info. No actual full reports, but textual summary information.",Medium,In progress,02-Nov,
+DOM5,Domain Specialist,"August 3, 2026","Neuro cases: post-stroke assessment (communicative patient), post-stroke assessment (via caregiver), Parkinson's disease, dementia, brain trauma. Stroke cases are challenging to build - some patients non-communicative or display emotional changes from brain damage.  Ben will link us to Domain Specialists",No,Final Milestone,chirag chetnani,,Medium,Not started,02-Nov,
+TECH28,Technical,"August 3, 2026","MSK additional info for assessment: MRI report, X-ray result.   Does this make sense? Yes. But small on-screen MRI might not help..  Maybe create an option to download images or open it in another tab.   It’s not always the image, but the report that is more important. Just a text window might be sufficient.  Note: this would also need to be entered by the educator. Extra feature. Would it be possible to upload an image (X-ray / MRI) which is then linked to the scenario?
+
+Implementation: this needs to be part of the scenario creation (separate block text for scanning reports?). Then a student can click a button to read text that informs him about the scanning reporrts (no visuals, just simple text.)",No,Final Milestone,"Kapil Chhabra, chirag chetnani",,Low,Not started,Feb-17,
+AI3,AI,"August 3, 2026","Lower quadrant MSK conditions: lower back, knee, ankle, foot, hip.",Yes,Milestone 1,Ayush Singhal,Working on creating scenario,High,In progress,01-Jul,
+DOM2,Domain Specialist,"August 3, 2026","CP cases: COPD, Asthma, Pneumonia, post-operative assessment, pre-operative education. Will need input from CP colleagues on which is most relevant for training. Ben will link us to Domain Specialists",No,Final Milestone,Benjamin ,,Medium,Not started,02-Nov,
+MOV2,Movement Technology,"August 3, 2026","MSK physiotherapy session: new setting with patient starting the session sitting on a chair.
+Needs to be built into the scenario (scenario starts like that) - likely needs a specific avatar (wheelchair?). Discuss with Ben.",No,Final Milestone,Benjamin ,,Medium,Not started,Feb-17,
+DOM4,Domain Specialist,"August 3, 2026","CP additional info for assessment: chest x-ray, lung sounds on stethoscope (multiple sounds indicating different conditions).   Blood levels.
+Maybe create an option to pull up images and audio files and add these to scenarios.",No,Final Milestone,Benjamin ,,Medium,Not started,02-Nov,
+DOM3,Domain Specialist,"August 3, 2026","CP movement: Create ROM Table for all possible movements required for CP Physiotherapy.   coughing, deep breathing, accessory muscles of breathing vs diaphragmatic breathing.",No,Final Milestone,Benjamin ,,Medium,Not started,02-Nov,
+UI2,UI,"August 3, 2026","Select language at the start; dynamic language selection.
+IMPORTANT addition: When a scenario is created and published in language A (for example English), it can not be used in another language. We do not want to do automated translation, because of risk of mis-translation of medical terms.  But, when an educator wants to publish scenarios in other languages (for example Japanese), that is possible. And then the scenario can only be run for students in Japanese.
+As a second step, we might want to accomodate option for educator to take an English scenario, translate it to Japanese, validate and approve it, and then publish it in Japanese. With the human-in-the-loop, the educator remains responsible for published scenarios.",Yes,Milestone 1,Ayush Singhal,Testing with Japanese. Dynamic Language selection is added. Testing in progress. Additional languages to be added after successful testing.,Medium,In progress,01-May,
+AI4,AI,"August 3, 2026",Medical conditions for entire body - check with AI-Dev what info is needed. (ONly for scenario creation - not movement yet),Yes,Milestone 1,Ayush Singhal,"Implementation has started. Checking the performance with other body parts.
+Incorporated full body parts directly inside scenarios, with
+scenario creation in progress for remaining body parts.  TESTING in progress",High,In progress,01-Jul,
+AI5,AI,"August 3, 2026","Better way of linking the movement to the scenario. AI proposes, Educator can change? For nnow, we keep the limited collapsing, so only relevant body part movements will be shown.
+
+Already asked Domain Expert to provide text with videos, so to develop: AI to pre-select videos, based on the scenario.  (Educator can always change)
+
+",Yes,Milestone 1,Ayush Singhal,We have started the testing,Medium,In progress,01-Mar,
+FUT1,Future Development,"August 3, 2026","Option for educators to create their own movements - e.g. when an educator encounters a specific patient, can they create a virtual scenario based on that real case's movements?",No,Future,Kapil Chhabra,"Future? Based on the technology chosen for movement creation, it might be possible to add this option.",Low,Not started,FUTURE,
+ID2,Instructional Design,"August 3, 2026",Evaluation framework and learning outcomes.,Yes,Milestone 1,"Olaf Kwakman, Ezril Jamil Official",Working on the framework of feedbacks and also taking feedback from educators.,Medium,In progress,01-Aug,
+TECH27,Technical,"August 3, 2026",For avatar creation: decide on underlying technology (MetaHuman?).,Yes,Milestone 1,"Kapil Chhabra, chirag chetnani",Yes Metahuman is final,High,Done,01-Jun,
+MOV9,Movement Technology,"August 3, 2026",Technology for movement creation.,Yes,Milestone 1,"chirag chetnani, Kapil Chhabra","Motion tracking sample submitted and approved;
+expanding animations across remaining assets.",High,In progress,01-Feb,
+TECH9,Technical,"August 3, 2026","Sandbox setup. So we have seperate test and development environment, and separate production environment",Yes,Milestone 1,chirag chetnani,Next phase,High,In progress,01-Sep,
+3DA2,3D Artist,"August 3, 2026",Option to select multiple different (culturally distinct) environments.,Yes,Final Milestone,chirag chetnani,Yet to start,Medium,In progress,Feb-17,
+TECH10,Technical,"August 3, 2026","Option for avatar to walk (not stay in the same spot).
+This is also a requirement from Hwee Kuan (SIT - module clinical placement):
+  • walk with different gait patterns",No,Final Milestone,chirag chetnani,Yet to start,Medium,Not started,Feb-17,
+TECH11,Technical,"August 3, 2026","Publishing of scenarios by educators (not by Silver Wings).
+Unreal Engine Integration",Yes,Milestone 1,"chirag chetnani, Ayush Singhal","In progress.
+Single scenario connection active; work in progress for
+multiple scenarios (including language, gender, and environment parameters).
+
+See PDF in Docs for individual actions (Markdown to PDF)",Medium,In progress,01-Mar,
+AI6,AI,"August 3, 2026","AI consistency. Raised in Focus Group: AI did not respond consistently.
+
+@Ayush Singhal Do you have enough info here? We received some feedback from students.",Yes,Milestone 1,Ayush Singhal,Doing testing,High,In progress,01-Feb,
+APP1,App-Development,"August 3, 2026","Add 3 languages to front-end: Japanese + Chinese (urgent, because we will run a pilot study with University in Taiwan) + ? (Cantonese?)",Yes,Milestone 1,Ayush Singhal,Japanese in progress ,Medium,In progress,01-May,
+DOM9,Domain Specialist,"August 3, 2026",ROM Table for entire body MSK; list of all potential movements that Physiotherapist can ask,Yes,Milestone 1,"Benjamin , Olaf Kwakman",Completed. I have uploaded the document ,High,Done,01-Jul,
+3DC1,3D Character Artist,"August 3, 2026","Create a total of 4 avatars. Diversity. We already have a older man and younger women. Add one young (teenage - 16/17) athletic guy (Japanese). Second female: older and heavier (Thai? Typical aunty. Short hair, late 50’s early 60’s). ",Yes,Milestone 1,chirag chetnani,started; Ongoing work on Meta Human avatars.,Medium,In progress,01-Jun,
+TECH12,Technical,"August 3, 2026",Decide on Architecture / pipeline (Unreal / Streaming / Unity / Browser based). AWS Implementation. Migrate platform to React.js and MongoDB,Yes,Milestone 1,"Kapil Chhabra, Ayush Singhal",Completed. Unreal streaming with streaming is the best option. still testing,High,Done,01-Jan,
+M1-8,M1,"August 3, 2026","Evaluation framework designed and implemented, including learning outcome measures, usability and engagement indicators, and data collection protocols aligned with partner institutions.
+
+Check with iAL what is expected from these reports.",No,Milestone 1,,Instructional Design; When can this be completed? Only when entire learning design is live and tested; so month 6?,High,Not started,01-Aug,
+M1-10,M1,"August 3, 2026",Finalise agreements (signed MOUs and/or LOIs and/or onboarding plans) with at least two additional institutions besides SIT. LOIs already signed with multiple institutions.,Yes,Final Milestone,,Onboarding; Olaf to work on this; find adopters,High,Not started,01-Oct,
+M2-7,M2,"August 3, 2026","Final system optimisation, QA testing, documentation, and completion of UAT in line with approved proposal.",No,Final Milestone,,Technology,Medium,Not started,Feb-17,
+M1-5,M1,"August 3, 2026","Multi-language support implemented (minimum three languages). Languages TBD - current options: Chinese (urgent), Malay, Japanese (in scope already), Thai, Hindi.",Yes,Milestone 1,,"Technology; first Japanese finish Sepetember; three languages by end of October.
+Added support for Meta Human avatar gender
+selection and language selection (including Japanese). Avatars can understand and
+speak the chosen language.",High,Not started,01-May,
+M1-3,M1,"August 3, 2026","Scenario authoring framework implemented (AI-assisted scenario creation and educator configuration) - educators can configure/adapt training scenarios using structured, AI-supported inputs.",Yes,Milestone 1,,Technology; Finish in September,High,Not started,01-Mar,
+M2-4,M2,"August 3, 2026","Evaluation data collected and analysed using the designed framework; refine the framework based on findings if needed.",No,Final Milestone,,Instructional Design,Medium,Not started,Feb-14,
+M1-2,M1,"August 3, 2026","End-to-end MSK training workflow implemented (history taking, physical assessment with motion interaction, clinical reasoning, immediate feedback).",Yes,Milestone 1,,"Technology + Domain; First decide on entire workflow (incl guided vs unguided C.R. + T.P.), then include full movements and scenarios.  Aim for November finalisation.",High,Not started,01-Feb,
+M1-6,M1,"August 3, 2026","Choice of minimum 4 different avatars (culturally diverse) - variation in age, gender and ethnicity to support inclusive training contexts.",Yes,Milestone 1,,"3D Avatar Design. Avatar selection & design to be completed and of Sept; inclusion in platform (so they can be selected with scenario creation) October.",High,Not started,01-Jun,
+M1-4,M1,"August 3, 2026",Learner progress dashboards (v1) for tracking performance and outcomes at individual and cohort level.,Yes,Milestone 1,,"Technology + Domain. Under development, November launch + additional testing and revision in December.",High,Not started,01-Apr,
+M1-7,M1,"August 3, 2026","Initial MSK clinical scenario library delivered, covering full MSK range (different parts of the body).",Yes,Milestone 1,,"Finish in Jan 2027; can only be done after all movements and features in platform are included.
+Incorporated full body parts directly inside scenarios, with
+scenario creation in progress for remaining body parts.",High,Not started,01-Jul,
+M1-9,M1,"August 3, 2026",Stable deployment environment and technical documentation to support evaluation and testing.,Yes,Milestone 1,,Technology + Testing; Jan 2027,High,Not started,01-Sep,
+M2-3,M2,"August 3, 2026",Enhanced educator tools and analytics dashboards (v2) - deeper insights and improved management of learner activity.,No,Final Milestone,,Instructional Design,Medium,Not started,Feb-13,
+M2-8,M2,"August 3, 2026",Demonstrate that the AI system achieves validity (accuracy equivalent to a human expert) and reliability (consistent results across repeated use).,No,Final Milestone,,AI + Testing,Medium,Not started,Feb-18,
+M2-2,M2,"August 3, 2026",Real-time multiplayer functionality implemented and stabilised - shared/facilitated sessions involving more than one user in real time.,No,Final Milestone,,Technology,Medium,Not started,02-Dec,
+M2-6,M2,"August 3, 2026",White-labelling capability for institutional deployment - configurable institutional branding and deployment settings without altering core functionality.,No,Final Milestone,,Technology,Medium,Not started,Feb-16,
+M1-1,M1,"August 3, 2026",Core VPS platform (complete UI + back-end) operational with role-based access (admin / educator / learner). Functional end-to-end platform where different user roles can access relevant features appropriate to evaluation and testing.,Yes,Milestone 1,,Technology; Oct finished entire platform; after that we continue improving on existing platform,High,Not started,01-Jan,
+M2-5,M2,"August 3, 2026","Pilot evaluations/research completed on VPS applicability, usability and educational relevance with 2 partner institutions, with feedback incorporated.",No,Final Milestone,,Instructional Design + Evaluation,Medium,Not started,Feb-15,
+M2-1,M2,"August 3, 2026",Include cardiopulmonary and neurological modules - additional clinical domains extending the platform beyond MSK training.,No,Final Milestone,,Domain + Technology + Movement,Medium,Not started,02-Nov,
+DOM10,Domain Specialist,"August 3, 2026",Neuro Movement: Create a ROM table for all possible movements required for Neurological Physiotherapy,No,Final Milestone,Benjamin ,"Some requests  from Domain Specialists are under review. Such as revised structures for different disciplines. Different requirements for C.V. and Neuro.
+
+",Medium,Not started,02-Nov,
+AI7,AI,"August 7, 2026",Can we provide more Persona to the different avatars? So change the use of language and tone.,No,Final Milestone,Ayush Singhal,see TECH23,Medium,In progress,Feb-18,
+MOV10,Movement Technology,,"Some patient conditions will already show at the starting position. So, not just with movement, but already just standing there. So for example, patient has bent knees. Think about how/if we can solve this.",No,Milestone 1,"Kapil Chhabra, chirag chetnani",,Medium,Not started,01-Feb,
+DOM11,Domain Specialist,,"Creating grouping for the different scenario: so we can identify MSK separate from CP and Neuro.
+Actually, we need to think about if we need separation to avoid becoming too heavy.",No,Final Milestone,"Olaf Kwakman, Benjamin ",,Medium,Not started,Feb-13,
+UI4,UI,,"Think about grouping options. When we name a group MSK1, the next year they will be MSK2, should we renamen? Or can we do different group names?   ",No,Milestone 1,"Benjamin , Kapil Chhabra, Olaf Kwakman, chirag chetnani",,Medium,Not started,01-Mar,
+UI5,UI,,Educator dashboard: Average score: Monthly Performance Overview - Does this have value? Think about what we need here.  Discuss with Instructional Designer,No,Milestone 1,Ezril Jamil Official,,Medium,Not started,01-Apr,
+APP2,App-Development,,"Multiplayer option development: First decide what to do and how to set it up. No need for multiple learners to interact with the patient, but peers or assessor should be able to join and give guidance to the learner",No,Final Milestone,"chirag chetnani, Kapil Chhabra",,Medium,Not started,02-Dec,
+DOM12,Domain Specialist,,"Do we need a guidance module? Are students clear about what is expected from them when they start a session?  Should we add a module where they get guidance on what is expected from them, what the goal is and providing tips? (Or is all that covered separately in the foundational / theoretical training?)
+Additional information on foundational learning (textbooks) and case studies helps for AI training.  Start with less complicated cases.",Yes,Final Milestone,"Benjamin , Ezril Jamil Official","Overall Platform guidance will be covered by Learning Design.  Possible specific guidance for Clinical Reasoning (or Treatment Plan) needed? If so, needs to be provided by Domain Specialist. Structure of asking learners to write a treatment plan to be provided.",High,Not started,Feb-17,
+ID3,Instructional Design,,"Feedback evaluation; what kind of feedback is provided after the session and is this sufficient for students to learn from and understand how they can improve?  Should we include a downloadable document?  Should we apply more structure?
+•  Design meaningful assessment and feedback mechanisms within VPS
+•  Support learner reflection and skill development",Yes,Milestone 1,Ezril Jamil Official,Entire Feedback loop under review,High,In progress,01-Feb,
+ID4,Instructional Design,,"Learning Design & Pedagogical Framework
+•  Design evidence-based, learner-centred learning experiences for VPS
+•  Define clear learning objectives and outcomes for virtual patient scenarios
+•  Ensure learning design supports:
+    ◦  Clinical reasoning
+    ◦  Decision-making
+    ◦  Reflection and feedback
+•  Apply established instructional frameworks (e.g. scenario-based learning, experiential learning)
+  • documentation of learning design principles ",Yes,Milestone 1,Ezril Jamil Official,,High,In progress,01-Aug,
+ID5,Instructional Design,,"Ensure learning designs are pedagogically sound across different:
+    ◦  Cultural contexts
+    ◦  Educational norms
+    ◦  Institutional expectations",No,Final Milestone,Ezril Jamil Official,,Medium,In progress,Feb-15,
+TECH13,Technical,,"For bulk-email, current maximum 50 per day. Either we get rid of that limitation, or we have a clear workflow for organisations that need to bulk-mail more than that to avoid it.",No,Final Milestone,chirag chetnani,,Medium,Not started,Feb-17,
+A17,AI,,"Can we create more variation, so the scenarios don’t always feel the same? (Part of that is persona variation, but also within one persona, responses of patient could have more variation).",No,Final Milestone,Ayush Singhal,,Medium,In progress,Feb-18,
+DOM13,Domain Specialist,,Scoring rubrics for non-guided Clinical Reasoning,No,Milestone 1,Benjamin ,,Medium,Done,01-Aug,
+DOM14,Domain Specialist,,"MSK: Scoring rubrics for treatment plan. We have the scoring rubrics, but need more input to train the AI to make sure the thought process from Goal Setting to Selection of Interventions is addressed correctly.",No,Milestone 1,"Benjamin , Kapil Chhabra, Olaf Kwakman, Ezril Jamil Official",,Medium,In progress,01-Aug,
+TECH14,Technical,,"Add a box at scenario creation, for instructions to the AI for  Clinical Reasoning",Yes,Milestone 1,chirag chetnani,,Medium,Not started,01-Mar,
+TECH15,Technical,,"Add a box at scenario creation for additional physical evaluation information. For example; MRI shows xxxx, CT-scan shows xxx, (We will use just textual information and avoid using MRI and ascanning documents)",Yes,Milestone 1,chirag chetnani,,Medium,Not started,01-Mar,
+UI6,UI,,"We need an additional box with information about Physical Evaluation (Scans etc .) at the Clinical Reasoning and at Treatment Plan
+",Yes,Milestone 1,chirag chetnani,,Medium,Not started,01-Mar,
+UI7,UI,,Clinical Reasoning = verbal,Yes,Milestone 1,chirag chetnani,,High,Not started,01-Feb,
+UI8,UI,,Treatment Plan = typing (comes after Clinical Reasoning),No,Milestone 1,chirag chetnani,,Medium,Not started,01-Feb,
+UI9,UI,,"Time limit: the counter starts at 15 minutes and will count down. When it reaches 0, it will continue to count (negative time numbers and in red), also a warning appears that the learner is taking too much time. At total 20 minutes, the session will automatically stop.",No,Milestone 1,chirag chetnani,,Low,Not started,01-Feb,
+UI10,UI,,First time log-in: Mandatory pasword change initiated immediately. Include email check. 2FA,Yes,Milestone 1,chirag chetnani,,Medium,Not started,01-Jan,
+UI11,UI,,"First time start a session: show instructions in pop-ups and option to do a demo session. Instructions should include: ‘Press and hold T when talking’, show entire flow, so user knows what to expect, ",No,Milestone 1,"chirag chetnani, Ezril Jamil Official",,Low,Not started,01-Feb,
+TECH16,Technical,,"Test option to talk with AI without having to press a button when talking. If this works well, we can make this optional, but we should not remove the ‘press and hold button option’.",No,Final Milestone,chirag chetnani,,Low,Not started,Feb-17,
+TECH17,Technical,,"Explore adding an AI-Coach immediately after the History Taking Feedback, for learner to reflect on performance in History Taking.",No,Final Milestone,"Kapil Chhabra, Ezril Jamil Official, Olaf Kwakman",,Medium,Not started,Feb-18,
+DOM15,Domain Specialist,,"Create  a few videos with movements while standing and a few while sitting. Total max 10 videos for now. Please add titles, so we know which movement is which video (and include ‘full movement’ or ‘limited’ in description). Add a few videos with limited movement, also including body compensation and facial expression.",Yes,Milestone 1,Benjamin ,https://drive.google.com/drive/folders/1yUR9E5ucrIh4EoY8uD4pQdy7TXOqqczZ?usp=drive_link,High,Done,01-Jul,
+BD1,Buss.Dev.,"September 6, 2026","Establish consistent relationships with Universities, Hospitals and Private Clinics",Yes,Milestone 1,Olaf Kwakman,"Regular contact with Shinshu. New relationship with Tung Wah College, HongKong. They are interested to start using the platform for OT ",Medium,In progress,01-Oct,
+BD2,Buss.Dev.,,"Create Agreements for commercial use with Universities, Hospitals and Private Clinics",Yes,Final Milestone,Olaf Kwakman,,Medium,Not started,01-Oct,
+BD3,Buss.Dev.,,"Create Research / Collaboration agreements with Universities. Reach out to Hospitals, Universities and Private Clinics.",Yes,,,"Ongoing active conversations with:
+Shinshu University Tokyo: Research project planned for 2027;
+Tung Wah College HongKong: Capstone project confirmed Q4 2026, awaiting OT input and ongoing conversation about onboarding Q2 2027;
+Ng Teng Fong General Hospital: Expanding collaboration confirmed (domain knowledge and feedback) over the coming months and potential onboarding 2027 (after validation study);
+Rehab Alliance: small scale adoption under discussion;
+NUH: also showed interest in further collaboration, meetings are being planned
+Tzu Chi University Taiwan: Exploratory meetings underway. Exploring research to start and grant application for release in April",High,In progress,01-Oct,
+MOV11,Movement Technology,,"The position for the History Taking needs to be seated position. Seated on the bed or chair. Bed can be lowered so patient can touch the ground with feet.
+When the movement assessment is done, often it starts from a standing position (sometimes sitting, sometimes lying). How to transfer? Note that the learner should ask the patient to first stand up before he should ask to perform movements that require standing.",Yes,Milestone 1,"Kapil Chhabra, chirag chetnani",,High,Not started,01-Feb,
+APP3,App-Development,,See Notion Docs ‘Test Results VPS Japanese version’. Address errors.,Yes,Milestone 1,chirag chetnani,,Medium,Done,01-May,
+DOM16,Domain Specialist,,Provide input for dashboards. Anything that is needed additionally on the dashboard (Educator or Student) or changes required.,Yes,Milestone 1,Benjamin ,Ezril will propose based on input received,Medium,In progress,01-Apr,
+ID6,Instructional Design,,"We need some kind of instructions for users. Usage instructions (such as press Spacebar when talking), instructions on the goal (what are they actually trying to achieve when going through this training) and an overview of the entire system before they start (so they know what to expect; HT, feedback, CR, TP). Most of that information only needs to be shown once (first time of logging in), after that they can find it again under the Help section.  How to present this information (video? Text? plaform walk-through?). ",Yes,Milestone 1,Ezril Jamil Official,,Medium,Not started,01-Jan,
+A18,AI,,"Current voice (Furrakh) is very robotic. Doesn’t sound nice. Since we need to give demo’s to potential clients, we need a more realistic voice. URGENT",Yes,Milestone 1,"Ayush Singhal, chirag chetnani",,High,Not started,01-Feb,
+TECH18,Technical,,"Dynamic Scenario Loading; so scenarios, avatars and environment can be loaded dynamically.",Yes,Milestone 1,,Converted backend for dynamic loading of scenarios.,High,Done,01-Jan,
+TECH19,Technical,,Feedback Loop,Yes,Milestone 1,"Ezril Jamil Official, Ayush Singhal","Feedback mechanisms being implemented directly on
+http://proroleplay.com/.",Medium,Done,01-Feb,
+AI18,AI,,"AI Coach Reasoning:
+Currently researching conversational clinical reasoning and
+awaiting feedback on AI Coach clinical evaluation capabilities.
+
+@Ayush Singhal  let’s discuss this again, so we have a good understanding what we want to achieve",Yes,Milestone 1,"Ayush Singhal, Ezril Jamil Official",,High,In progress,01-Feb,
+TECH20,Technical,,"Streaming & Performance: Integrated Pixel Streaming to improve speech latency and
+overall system speed.",Yes,Milestone 1,chirag chetnani,,High,Done,01-Sep,
+TECH21,Technical,,"Automation & API Integration: Automate the pipeline connected to dynamic scenario
+loading, create and test APIs between backend and Unreal Engine.",Yes,Milestone 1,"Ayush Singhal, chirag chetnani",,High,In progress,01-Jan,
+TECH22,Technical,,"AWS Pipeline Optimization: Build a new pipeline for Unreal Engine on AWS operating
+without third-party streaming platforms.",Yes,Milestone 1,"chirag chetnani, Ayush Singhal",,High,In progress,01-Sep,
+,,,,,,,,,Not started,,
+TECH23,Technical,,"Run pipeline directly and dynamically from AWS, instead of using separate Pixel Streaming, to avoid needing a separate built for each scenario/avatar/environment. This is essential to make it scalable.",Yes,Milestone 1,chirag chetnani,"Testing in progress. Mutliple sessions (up to 6) can already run simultaniously. Increasing is a matter of increasing server load, but much cheaper than running separate builts and streams.
+e.g. 10 personas with 10 environments = 100 streams. or if we also have 10 scenarios, we need 10x10x120 builds.
+If a single stream is 100; running 100 would cost $10000 p.m.
+Now, with T4 (NVDIA) we only pay $300 per month and can run 6 concurrent users.
+Current variables:
+  - avatar
+  • scenario / persona (not sure if we can do that separately - check later)
+  • environment
+  • language
+",High,In progress,01-Sep,
+TECH24,Technical,,"Can we separate the persona from the scenario? (In that way, we could run more variation with existing scenarios.) Needs investigation; first get the pipeline going.
+
+Is it possible to make this part of the dynamic loading, so each scenario can be run with multiple personas",No,Final Milestone,Ayush Singhal,,Low,Not started,Feb-17,
+TECH25,Technical,,Facial expression for avatar. Can we show pain / discomfort? This creates more realistic movement limitation,Yes,Final Milestone,chirag chetnani,Working on automated solution; facial expression from video is translated to avatar movement,Medium,In progress,02-Nov,
+AI19,AI,,"Feedback questions:
+We have a list of generic questions and some additional questions are generated by AI for a scenario.
+We can hide the list of generic questions, once approved by Domain Expert.
+The scenario specific questions for feedback generated need to be visible, because (human in the loop) they need to be checked by educator",Yes,Milestone 1,Ayush Singhal,,Medium,In progress,01-Feb,
+AI20,AI,,"Organising the movement selection in the educator dashboard. How are we going to make sure that with the least effort the correct movements are selected?",Yes,Milestone 1,Ayush Singhal,,High,In progress,01-Mar,
+TECH26,Technical,,"Create a new URL, to be used for hosting the web-application",Yes,,,http://proroleplay.com bought and in use now,High,Done,,
+APP4,App-Development,,"Can we create a ‘save’ options when learners are halfway in the flow. For example after they finish History Taking / before they start Clinical Reasoning, or after Clinical Reasoning / before starting Treatment Plan?
+This gives learner the opportunity to pause and continue later. If they dont have sufficient time to do the entire flow in one go.",No,Final Milestone,Ayush Singhal,,Medium,Not started,,
+FUT3,Future Development,,"ISO27001 certification or SOC2.
+Organisations require this kind of certification before they are willing to onboard a platform, to ensure compliance with data security regulations.
+Even though not in the Milestones, we added this as a priority for the go-to-market",Yes,Future,Kapil Chhabra,Started the process with an external consultant (costs are outside of innovSpur budget),Medium,In progress,FUTURE,
+DOM18,3D Artist,,"for environments:
+1 - clinic (already available); reduce size of plint, patient can sit on it; or patient sit on chair
+2 - in ward; patient in bed
+3 - in gym; with plint
+Please provide some visual references (pictures)",Yes,Milestone 1,"Kapil Chhabra, chirag chetnani",,Medium,In progress,,
+TECH29,Technical,,"We need to be able to keep track of number of users per client.
+Subscription model means that Super Admin can assign maximum number of seats/users to an organisation (Admin).
+We need to have a system to avoid that previously registered users can still access.",Yes,Final Milestone,"Kapil Chhabra, vikrant@silverwingsxr.com, Ayush Singhal",,Medium,Not started,,
+DOM19,Domain Specialist,,"All videos need a description, so the AI can select the correct videos, based on the scenarios created.
+Description needs:
+  • Starting position
+  • Movement shown
+  • Limited or full? (Describe, so when it’s extreme, mention that; or 30%, or other)
+  • Also describe more complicated movements
+  • Describe compensatory movement (e.g. leaning to one side)
+  • Describe typical age/gender for this movement
+  • Patient expression (e.g. pain, no pain)
+  • Possible conditions linked to this animation
+  • Other remarks (all information helps)",Yes,Milestone 1,Benjamin ,,Medium,Not started,,
+TECH30,Technical,,"Videos will be provided with explanation, so the AI can select/propose the correct videos that go with the scenario.
+Educator should be able to overwrite the proposed videos.
+Think about front-end visualisation and categorisation; how to make this easy and manageable for educators.
+Educators need to be able to see the video description and might need a preview of the videos to be able to select (this doesn’t need to be the 3D animation; can just be a video).",Yes,,"Kapil Chhabra, Ayush Singhal",,Medium,Not started,,
+BD4,Buss.Dev.,,"Create a VPS brochure, to show potential clients ",Yes,,Olaf Kwakman,,High,Done,,
+UI13,UI,"October 12, 2026",Sound output should be on by default (currently off).,Yes,Milestone 1,chirag chetnani,,High,Not started,,
+UI12,UI,"October 12, 2026",Live transcript: hide the left scroll panel. Make the transcript communication box below the avatar the default. It shows what the avatar is saying and what the avatar understood from the user.,Yes,Milestone 1,chirag chetnani,,High,Not started,,
+DOM21,Domain Specialist,"October 12, 2026",Scoring rubric and conversational flow for guided Clinical Reasoning (MVP is guided only). DOM13 covers the unguided version.,Yes,Milestone 1,"Benjamin , Ezril Jamil Official",,High,Not started,,
+QA3,Testing,"October 12, 2026","Load testing with realistic concurrent users on the AWS setup (autoscaling, concurrent sessions per server, latency and voice quality under load). See TECH23.",Yes,Milestone 1,chirag chetnani,,High,Not started,,
+DOM20,Domain Specialist,"October 12, 2026","Include Occupational Therapy (OT) in the MVP: define OT scenarios, movements and assessment requirements with domain input (Tung Wah College), and the changes needed for OT in the platform.",Yes,Milestone 1,"Ayush Singhal, Olaf Kwakman",,High,Not started,,
+BD5,Buss.Dev.,"October 12, 2026","Check with Tung Wah College whether Cantonese is needed for Hong Kong (UI and conversational AI), or whether Chinese (Mandarin) is sufficient.",Yes,Milestone 1,Olaf Kwakman,,Medium,Not started,,
+DOM22,Domain Specialist,"October 12, 2026","Feedback: create a full downloadable PDF with the complete structured feedback for the learner (in addition to the on-screen feedback, see TECH5 for on-screen formatting).
+
+First create a structure
+
+This can include some of the data from the dashboard.
+Olaf will propose a few additional questions to be included for soft skills (to be validated by Ben); rest we can use the feedback questions as shared with Ben in earlier stage.",Yes,Milestone 1,"Benjamin , Olaf Kwakman",,High,Not started,,
+TECH31,Technical,,"We need good user management (back-end) to make sure that the number of users stays within the subscribed number for the subscribed period. (They can not add more; they can also not delete a few and then add more).
+Part of this should be managed by the Super Admin; partly to be managed by back-end.
+@Vikrant Tripathi First discuss with Kapil and Olaf, then proposal to Ayush",,Final Milestone,vikrant@silverwingsxr.com,,Medium,Not started,,
+AI21,AI,,"Conversational AI available in multiple languages:
+  • English (already available)
+  • Japanese (in progress)
+  • Chinese (urgent; for pilot study with TCU in Taiwan)",,Milestone 1,"Ayush Singhal, chirag chetnani",,High,Not started,,
+DOM23,Domain Specialist,,"Created videos for the relevant movements for the 4 scenarios for TCU (Taiwan) )(shoulder, knee, sports injury, hip joint)",,Milestone 1,Benjamin ,,High,Not started,,
+APP5,App-Development,,"set up Tzu Chi University (TCU Taiwan) as organisation (Admin), with Educator (Dr Richard) and student layers",,Milestone 1,Kapil Chhabra,,High,Not started,,
+APP6,App-Development,,"Create the option for a few scenarios for practice without being recorded. When learners do these scenarios, they will not be recorded (for familiarisation and practice).
+All other scenarios are recorded and visible for eductors.",,Milestone 1,"Kapil Chhabra, Ayush Singhal",,Medium,Not started,,
+UI14,UI,,"Replace the pictures in the UI for selecting the avatar and environment with actual pictures of projected avatars and environments. We are using this for demo purposes, and current pictures are confusing and not representative.",,,chirag chetnani,,High,Not started,,
+,M2,,,,,,,,Not started,,
+UI15,UI,,"Educator Dashboard: Proposed VPS History-Taking Rubric - change order of items; most important first.
+New order:
+2, 3, 5, 6, 4, 7, 8, 1
+
+",,Milestone 1,"Ezril Jamil Official, chirag chetnani",,High,Not started,,
+UI16,UI,,"Educator Dashboard: How to access all detailed information of a learner? So how to get to all sessions / scenarios / transcripts.
+We need to be able to see the breakdown of the score (shown on the main page).
+i.e. Click on overall score: see breakdown of sesions; click on session, see breakdwon into individual sessions..",,Milestone 1,Ezril Jamil Official,Olaf working on it,High,In progress,,
+UI17,UI,,Educator dashboard: Clarify rubris of the 5 boxes at the top,,Milestone 1,Ezril Jamil Official,Olaf working on it,High,In progress,,
+UI18,UI,,Educator dashboard: how to switch between cohorts?,,Milestone 1,Ezril Jamil Official,,High,Done,,
+UI19,UI,,"Learner Dashboard: In Progress means that a session has been saved. Saving can only be done after HT (before CR), or after CR (before TP).",,Milestone 1,Ezril Jamil Official,Olaf working on it,Low,In progress,,
+TECH32,Technical,,"Add options to save a session, after completing the History Taking, before they start Clinical Reasoning, and after the Clinical Reasoning , before the Treatment Plan",,Final Milestone,Ayush Singhal,,Low,Not started,,
+UI20,UI,,"Learner dashboard: do we want to show the cohort average as well? If so, how and where?",,Milestone 1,Ezril Jamil Official,Olaf working on it,Medium,Done,,
+UI21,UI,,"Learner Dashboard: Graph My Progress over Time: how is this measured? Across multiple different scenarios? Clarify if this is only regarding the Case 5 (then it does make sense; if it’s only on one case)",,Milestone 1,Ezril Jamil Official,Olaf working on it,High,Done,,
+UI22,UI,,Learner dashboard: how to click though to details per session? and transcripts,,Milestone 1,Ezril Jamil Official,Olaf working on it,High,Done,,
+UI23,UI,,"Should we have the AI Coach immediately aftter the history taking? So before the Feedback shows? (Otherwise the reflection will be tainted by the feedback)",,,,Olaf working on it,,In progress,,
+UI24,UI,,"Learner Dashboard: at the bottom ‘my reflection’; not logical to put that here. Reflection should be done as part of the session, after tyhe history taking and after the CR.",,Milestone 1,Ezril Jamil Official,Olaf working on it,High,In progress,,
+UI25,UI,,"points 1 to 6 (below Peformance feedback); review. How does this help?
+Case selection is missing.
+Dashboard shouild first provide overview; then zoom in to indidividual cases.",,Milestone 1,Ezril Jamil Official,Olaf working on it,High,Done,,
+TECH34,Technical,,"For CP and Neuro, we need to be able to show patients that are connected to measurement tools, like heart rate monitor and blood oxygen level meter. We also need to show the data from these measurements on the screen somehow.
+Think about how we can achieve this",,Final Milestone,"Kapil Chhabra, Olaf Kwakman, chirag chetnani",,Low,Not started,,
+UI27,UI,"October 24, 2026","Trust in AI scoring: decide how educators can check and, if needed, adjust AI-generated scores. Options: educator override of a criterion rating (with reason), a 'flag for review' option, and a sample-based check of agreement between AI and educator scores. Universities are likely to ask how reliable the AI scoring is; agreement data also supports evidence and validation.",,Backlog / Unscheduled,"Ezril Jamil Official, Olaf Kwakman",,Medium,Not started,,
+UI26,UI,"October 24, 2026","Dashboards: use the AI Coach reflection as learning data. Idea: the learner rates their own performance in the AI Coach reflection (e.g. per competency or on key criteria), and the dashboard compares this self-assessment with the assessed score. This shows whether learners judge their own performance accurately, which is a recognised marker of clinical maturity. To decide: do we want this, what exactly does the learner rate, and how is it shown to learner and educator?",,Backlog / Unscheduled,"Ezril Jamil Official, Olaf Kwakman",,Medium,Not started,,
+UI28,UI,"October 24, 2026","Dashboards: measure transfer of skills to new cases in a fair way. Raw scores across different cases are not comparable because cases differ in difficulty. Options: (1) relative score per case: compare each learner's score with the cohort average for the same case; (2) educator-set difficulty level per case, and compare only within the same level. Needs enough session data per case before it is meaningful.",,Backlog / Unscheduled,"Ezril Jamil Official, Olaf Kwakman",,Low,Not started,,
+TECH35,Technical,,"The following is a requirement from Hwee Kuan (SIT - MSK module for clinical placement) to progress with VPS in their module:
+• interact with simple objects or exercise equipment, for example holding a dumbbell or pulling an elastic resistance band.",,Final Milestone,"Kapil Chhabra, Ayush Singhal",,Low,Not started,,
+ID7,Instructional Design,," - Make the value of completing Clinical Reasoning attractive e.g. by emphasising how it helps them use history-taking findings to develop and justify differential diagnoses.
+This could be part of the instructions",,Milestone 1,"Ezril Jamil Official, Olaf Kwakman",,Low,Not started,,

@@ -1,4 +1,4 @@
-import React, { useState, useEffect, useCallback } from "react";
+import React, { useState, useCallback } from "react";
 import axios from "axios";
 import { useAuth } from "../../../AuthContext";
 import { useNavigate } from "react-router-dom";
@@ -11,16 +11,19 @@ import SchoolAdminModal from "../../../components/SchoolAdminModal.jsx";
 import ConfirmationModal from "../../../components/ui/ConfirmationModal.jsx";
 import PaginationBar from "../../../components/ui/PaginationBar";
 import { toast } from "react-hot-toast";
-import { usePagination } from "../../../lib/hooks/usePagination";
-import { useLoading, Spinner } from "../../../lib/hooks/useLoading";
+import { useServerPagination } from "../../../lib/hooks/useServerPagination";
+import { Spinner } from "../../../lib/hooks/useLoading";
+
+const toSchoolRow = (school) => ({
+  ...school,
+  startDate: school.startDate ? new Date(school.startDate) : null,
+  expireDate: school.expireDate ? new Date(school.expireDate) : null,
+});
 
 function SchoolsPage() {
   const { user } = useAuth();
   const navigate = useNavigate();
 
-  const [schools, setSchools] = useState([]);
-  const { isLoading, withLoading } = useLoading(true);
-  const [error, setError] = useState(null);
   const [searchTerm, setSearchTerm] = useState("");
   const [isSchoolAdminModalOpen, setIsSchoolAdminModalOpen] = useState(false);
   const [availableSchools, setAvailableSchools] = useState([]);
@@ -31,26 +34,15 @@ function SchoolsPage() {
   const [isDeletingId, setIsDeletingId] = useState(null);
   const [isInvitingId, setIsInvitingId] = useState(null);
 
-  const fetchSchools = useCallback(async () => {
-    await withLoading(async () => {
-      try {
-        const response = await axios.get("/api/schools", {
-          params: { searchTerm },
-          ...getAuthHeaders(),
-        });
-
-        const fetchedSchools = response.data.map((school) => ({
-          ...school,
-          startDate: school.startDate ? new Date(school.startDate) : null,
-          expireDate: school.expireDate ? new Date(school.expireDate) : null,
-        }));
-        setSchools(fetchedSchools);
-      } catch (err) {
-        console.error("Error fetching schools:", err);
-        setError(err.response?.data?.message || "Failed to load schools.");
+  const [sortConfig, setSortConfig] = useState(null);
+  const handleSort = (key) => {
+    setSortConfig((prev) => {
+      if (prev?.key === key) {
+        return prev.direction === "asc" ? { key, direction: "desc" } : null;
       }
+      return { key, direction: "asc" };
     });
-  }, [searchTerm]);
+  };
 
   const fetchAvailableSchools = useCallback(async () => {
     try {
@@ -58,23 +50,18 @@ function SchoolsPage() {
         params: { availableForSchoolAdmin: true },
         ...getAuthHeaders(),
       });
-      return response.data.map((school) => ({
-        ...school,
-        startDate: school.startDate ? new Date(school.startDate) : null,
-        expireDate: school.expireDate ? new Date(school.expireDate) : null,
-      }));
+      return response.data.map(toSchoolRow);
     } catch (err) {
       console.error("Error fetching available schools:", err);
       return [];
     }
   }, []);
 
-  useEffect(() => {
-    fetchSchools();
-  }, [fetchSchools]);
-
+  // Only the visible page is fetched; search and sort run server-side.
   const {
     paginatedData,
+    isInitialLoading,
+    refetch: fetchSchools,
     currentPage,
     totalPages,
     totalItems,
@@ -86,12 +73,12 @@ function SchoolsPage() {
     isLastPage,
     rangeStart,
     rangeEnd,
-    resetPage,
-  } = usePagination(schools, 15);
-
-  useEffect(() => {
-    resetPage();
-  }, [searchTerm]);
+  } = useServerPagination("/api/schools", {
+    params: { searchTerm },
+    pageSize: 15,
+    sortConfig,
+    mapItem: toSchoolRow,
+  });
 
   const handleAddNewClick = () => {
     navigate("/schools/add");
@@ -171,7 +158,7 @@ function SchoolsPage() {
     }
   };
 
-  if (isLoading)
+  if (isInitialLoading)
     return (
       <div className="p-8 flex justify-center">
         <Spinner size={40} />
@@ -206,7 +193,7 @@ function SchoolsPage() {
         data={paginatedData}
         onEditClick={handleEditClick}
         onDeleteClick={handleDeleteClick}
-        onSort={() => {}}
+        onSort={handleSort}
         canEdit={user?.role === "superadmin"}
         isDeletingId={isDeletingId}
         onInviteClick={handleInviteClick}

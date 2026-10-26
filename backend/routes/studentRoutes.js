@@ -5,7 +5,11 @@ import User from "../models/userModel.js";
 import { protect } from "../middleware/authMiddleware.js";
 import { checkAccess } from "../middleware/roleAccessMiddleware.js";
 import redisClient from "../utils/redisClient.js";
-import { assignedStudentIdsByScenario } from "../utils/scenarioAssignment.js";
+import {
+  assignedStudentIdsByScenario,
+  assignedScenarioCountStages,
+} from "../utils/scenarioAssignment.js";
+import { parsePagination, pageResponse, escapeRegex } from "../utils/pagination.js";
 import {
   studentsCacheKey,
   invalidateStudentsCache,
@@ -68,8 +72,131 @@ router.post("/", protect, checkAccess("manageStudents"), async (req, res) => {
   }
 });
 
+// Column keys StudentPage sorts by -> fields computed in the pipeline below.
+// visualId is the tail of _id, so _id is the closest stable order for it.
+const STUDENT_SORT_FIELDS = {
+  visualId: "_id",
+  name: "name",
+  email: "email",
+  schoolName: "_schoolName",
+  groupName: "_groupName",
+  totalSessions: "totalSessions",
+  assignedScenariosCount: "assignedScenariosCount",
+  inviteStatus: "inviteStatus",
+};
+
+/*
+ * One page of the roster. The Progress and Scenarios columns are derived
+ * (sessions, assignments), and the table filters and sorts on them, so they are
+ * computed in the pipeline before the page is cut; only the page's documents
+ * leave the database. Not cached: the key space per page/sort/filter is too
+ * large for the two-minute cache to pay off.
+ */
+const sendStudentPage = async (req, res, paging) => {
+  const match = { role: "student" };
+  if (req.scope.educatorId) match.supervisor = req.scope.educatorId;
+  else if (req.scope.schoolId) match.schoolId = req.scope.schoolId;
+
+  const { searchTerm, assigned, progress } = req.query;
+  if (searchTerm) {
+    const rx = new RegExp(escapeRegex(searchTerm), "i");
+    match.$or = [{ name: rx }, { email: rx }];
+  }
+
+  const filters = {};
+  if (assigned === "assigned") filters.assignedScenariosCount = { $gt: 0 };
+  if (assigned === "unassigned") filters.assignedScenariosCount = 0;
+  if (progress === "active") filters.totalSessions = { $gt: 0 };
+  if (progress === "inactive") filters.totalSessions = 0;
+
+  const [result] = await User.aggregate([
+    { $match: match },
+    ...assignedScenarioCountStages(),
+    {
+      $lookup: {
+        from: "sessions",
+        let: { sid: { $toString: "$_id" } },
+        pipeline: [
+          { $match: { $expr: { $eq: ["$student_id", "$$sid"] } } },
+          {
+            $group: {
+              _id: null,
+              best: { $max: "$score" },
+              avg: { $avg: "$score" },
+              n: { $sum: 1 },
+            },
+          },
+        ],
+        as: "_stats",
+      },
+    },
+    { $addFields: { _stats: { $first: "$_stats" } } },
+    {
+      $addFields: {
+        totalSessions: { $ifNull: ["$_stats.n", 0] },
+        bestScore: { $ifNull: ["$_stats.best", null] },
+        avgScore: { $ifNull: ["$_stats.avg", null] },
+        // Must agree with inviteStatusOf in utils/inviteStatus.js.
+        inviteStatus: {
+          $cond: [
+            { $ifNull: ["$lastLoginAt", false] },
+            "active",
+            { $cond: [{ $ifNull: ["$credentialsSentAt", false] }, "invited", "pending"] },
+          ],
+        },
+      },
+    },
+    { $match: filters },
+    { $lookup: { from: "schools", localField: "schoolId", foreignField: "_id", as: "_school" } },
+    { $lookup: { from: "groups", localField: "groupId", foreignField: "_id", as: "_group" } },
+    {
+      $addFields: {
+        schoolId: {
+          $let: {
+            vars: { s: { $first: "$_school" } },
+            in: { $cond: ["$$s", { _id: "$$s._id", schoolName: "$$s.schoolName" }, null] },
+          },
+        },
+        groupId: {
+          $let: {
+            vars: { g: { $first: "$_group" } },
+            in: { $cond: ["$$g", { _id: "$$g._id", name: "$$g.name" }, null] },
+          },
+        },
+        _schoolName: { $toLower: { $ifNull: [{ $first: "$_school.schoolName" }, ""] } },
+        _groupName: { $toLower: { $ifNull: [{ $first: "$_group.name" }, ""] } },
+      },
+    },
+    {
+      $facet: {
+        items: [
+          { $sort: paging.sort },
+          { $skip: paging.skip },
+          { $limit: paging.limit },
+          {
+            $project: {
+              password: 0,
+              _stats: 0,
+              _school: 0,
+              _group: 0,
+              _schoolName: 0,
+              _groupName: 0,
+            },
+          },
+        ],
+        total: [{ $count: "n" }],
+      },
+    },
+  ]);
+
+  res.json(pageResponse(result.items, result.total[0]?.n || 0, paging));
+};
+
 router.get("/", protect, checkAccess("viewStudents"), async (req, res) => {
   try {
+    const paging = parsePagination(req.query, STUDENT_SORT_FIELDS, { name: 1 });
+    if (paging) return await sendStudentPage(req, res, paging);
+
     const cacheKey = studentsCacheKey(req.scope);
 
     if (isRedisReady()) {

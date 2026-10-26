@@ -1,4 +1,4 @@
-import React, { useState, useEffect, useMemo, useRef } from "react";
+import React, { useState, useEffect, useRef } from "react";
 import axios from "axios";
 import * as XLSX from "xlsx";
 import {
@@ -26,9 +26,8 @@ import ConfirmationModal from "../ui/ConfirmationModal";
 import PaginationBar from "../ui/PaginationBar";
 import { toast } from "react-hot-toast";
 import { useAuth } from "../../AuthContext";
-import { usePagination } from "../../lib/hooks/usePagination";
-import { useLoading, Spinner, FullPageSpinner } from "../../lib/hooks/useLoading";
-import { useSorting } from "../../lib/hooks/useSorting";
+import { useServerPagination } from "../../lib/hooks/useServerPagination";
+import { Spinner, FullPageSpinner } from "../../lib/hooks/useLoading";
 
 const getAuthHeaders = () => {
   const token = localStorage.getItem("token");
@@ -98,10 +97,8 @@ function StudentPage({ role }) {
   const columnCount =
     8 + (showGroupColumn ? 1 : 0) + (showScenariosColumn ? 1 : 0);
 
-  const [students, setStudents] = useState([]);
   const [groups, setGroups] = useState([]);
   const [searchTerm, setSearchTerm] = useState("");
-  const { isLoading, withLoading } = useLoading(true);
 
   const [isUploading, setIsUploading] = useState(false);
   const fileInputRef = useRef(null);
@@ -137,34 +134,32 @@ function StudentPage({ role }) {
   const [confirmMessage, setConfirmMessage] = useState("");
   const [onConfirmAction, setOnConfirmAction] = useState(() => {});
 
-  const fetchStudents = async () => {
-    await withLoading(async () => {
-      const response = await axios.get("/api/students", getAuthHeaders());
-      const mappedData = response.data.map((student) => ({
-        id: student._id,
-        visualId: `VS${student._id.slice(-6).toUpperCase()}`,
-        user_id: student._id,
-        name: student.name || "Unknown",
-        email: student.email || "No Email",
-        schoolName: student.schoolId?.schoolName || "Unassigned",
-        groupName: student.groupId?.name || null,
-        groupId: student.groupId || null,
-        progress: student.avgScore != null
-          ? `${Math.round(student.avgScore * 100)}%`
-          : "N/A",
-        assignedScenariosCount: student.assignedScenariosCount || 0,
-        isAssigned: (student.assignedScenariosCount || 0) > 0,
-        bestScore: student.bestScore != null
-          ? `${Math.round(student.bestScore * 100)}%`
-          : null,
-        totalSessions: student.totalSessions || 0,
-        inviteStatus: student.inviteStatus || "pending",
-        credentialsSentAt: student.credentialsSentAt || null,
-        originalData: student,
-      }));
-      setStudents(mappedData);
-    });
-  };
+  /*
+   * Rows as the table renders them, applied to each page as it arrives from
+   * the server — see useServerPagination below.
+   */
+  const toRow = (student) => ({
+    id: student._id,
+    visualId: `VS${student._id.slice(-6).toUpperCase()}`,
+    user_id: student._id,
+    name: student.name || "Unknown",
+    email: student.email || "No Email",
+    schoolName: student.schoolId?.schoolName || "Unassigned",
+    groupName: student.groupId?.name || null,
+    groupId: student.groupId || null,
+    progress: student.avgScore != null
+      ? `${Math.round(student.avgScore * 100)}%`
+      : "N/A",
+    assignedScenariosCount: student.assignedScenariosCount || 0,
+    isAssigned: (student.assignedScenariosCount || 0) > 0,
+    bestScore: student.bestScore != null
+      ? `${Math.round(student.bestScore * 100)}%`
+      : null,
+    totalSessions: student.totalSessions || 0,
+    inviteStatus: student.inviteStatus || "pending",
+    credentialsSentAt: student.credentialsSentAt || null,
+    originalData: student,
+  });
 
   const fetchGroups = async () => {
     try {
@@ -176,7 +171,6 @@ function StudentPage({ role }) {
   };
 
   useEffect(() => {
-    fetchStudents();
     if (showGroupColumn) fetchGroups();
   }, []);
 
@@ -321,7 +315,7 @@ function StudentPage({ role }) {
     setOnConfirmAction(() => async () => {
       try {
         await axios.delete(`/api/users/${id}`, getAuthHeaders());
-        setStudents((prev) => prev.filter((s) => s.id !== id));
+        fetchStudents();
         toast.success("Student deleted successfully");
       } catch (error) {
         toast.error(
@@ -435,31 +429,16 @@ function StudentPage({ role }) {
     }
   };
 
-  const filteredData = useMemo(() => {
-    return students.filter((student) => {
-      const matchesSearch =
-        student.name.toLowerCase().includes(searchTerm.toLowerCase()) ||
-        student.email.toLowerCase().includes(searchTerm.toLowerCase());
-
-      const matchesAssigned =
-        filterAssigned === ""
-          ? true
-          : filterAssigned === "assigned"
-          ? student.isAssigned
-          : !student.isAssigned;
-
-      const matchesProgress =
-        filterProgress === ""
-          ? true
-          : filterProgress === "active"
-          ? student.totalSessions > 0
-          : student.totalSessions === 0;
-
-      return matchesSearch && matchesAssigned && matchesProgress;
+  const [sortConfig, setSortConfig] = useState(null);
+  const handleSort = (key) => {
+    setSortConfig((prev) => {
+      if (prev?.key === key) {
+        return prev.direction === "asc" ? { key, direction: "desc" } : null;
+      }
+      return { key, direction: "asc" };
     });
-  }, [students, searchTerm, filterAssigned, filterProgress]);
+  };
 
-  const { sortedData, sortConfig, handleSort } = useSorting(filteredData);
 
   /*
    * The active column's arrow is orange and the idle ones are grey, so the
@@ -480,8 +459,12 @@ function StudentPage({ role }) {
     );
   };
 
+  // Only the visible page is fetched; search, filters and sort run server-side.
   const {
     paginatedData,
+    setPaginatedData: setStudents,
+    isLoading,
+    refetch: fetchStudents,
     currentPage,
     totalPages,
     totalItems,
@@ -493,12 +476,12 @@ function StudentPage({ role }) {
     isLastPage,
     rangeStart,
     rangeEnd,
-    resetPage,
-  } = usePagination(sortedData, 8);
-
-  useEffect(() => {
-    resetPage();
-  }, [searchTerm, sortConfig, filterAssigned, filterProgress]);
+  } = useServerPagination("/api/students", {
+    params: { searchTerm, assigned: filterAssigned, progress: filterProgress },
+    pageSize: 8,
+    sortConfig,
+    mapItem: toRow,
+  });
 
   return (
     <div className="p-8 bg-white min-h-screen font-sans">

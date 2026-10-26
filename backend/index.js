@@ -1,3 +1,4 @@
+import { Sentry } from "./instrument.js";
 import express from "express";
 import cors from "cors";
 import connectDB from "./db.js";
@@ -8,6 +9,7 @@ import studentRoutes from "./routes/studentRoutes.js";
 import schoolRoutes from "./routes/schoolRoutes.js";
 import scenarioRoutes from "./routes/scenarioRoutes.js";
 import sessionRoutes from "./routes/sessionRoutes.js";
+import simRoutes from "./routes/simRoutes.js";
 import dashboardRoutes from "./routes/dashboardRoutes.js";
 import importRoutes from "./routes/importRoutes.js";
 import groupRoutes from "./routes/groupRoutes.js";
@@ -67,6 +69,10 @@ app.use("/api/students", studentRoutes);
 app.use("/api/schools", schoolRoutes);
 app.use("/api/scenarios", scenarioRoutes);
 app.use("/api/sessions", sessionRoutes);
+// The simulator's conversation API, a drop-in copy of Voxio's chat.voxio.in.
+// /agents keeps Voxio's paths so the game only changes its base URL.
+app.use("/agents", simRoutes);
+app.use("/api/chat", simRoutes);
 app.use("/api/dashboard", dashboardRoutes);
 app.use("/api/import", importRoutes);
 app.use("/api/groups", groupRoutes);
@@ -111,6 +117,9 @@ app.use("*", (req, res) => {
     message: `Cannot ${req.method} ${req.originalUrl} - Route not found`,
   });
 });
+
+// Reports unhandled route errors to Sentry (no-op without SENTRY_DSN).
+Sentry.setupExpressErrorHandler(app);
 
 app.use((err, req, res, next) => {
   console.error("--- Global Error Handler ---");

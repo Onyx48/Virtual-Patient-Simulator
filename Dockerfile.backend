@@ -1,0 +1,28 @@
+# syntax=docker/dockerfile:1
+# API server only. The website is a separate image (Dockerfile.frontend).
+#
+#   docker build -f Dockerfile.backend -t vps-backend .
+#   docker run -p 8080:8080 --env-file .env vps-backend
+#
+# Secrets (MONGODB_URI, JWT_SECRET, SENTRY_DSN, POSTHOG_KEY, ...) are passed at
+# run time, never baked into the image.
+FROM node:22-slim
+WORKDIR /app
+ENV NODE_ENV=production
+ENV PORT=8080
+ENV COREPACK_ENABLE_DOWNLOAD_PROMPT=0
+RUN corepack enable && corepack prepare pnpm@10.24.0 --activate
+
+COPY package.json pnpm-lock.yaml ./
+RUN pnpm install --prod --frozen-lockfile
+
+COPY backend ./backend
+
+# Profile pictures and CSV imports are written to ./uploads; the node user must
+# own it or uploads fail with EACCES. Files here are lost when the container is
+# replaced; move them to S3 before relying on them.
+RUN mkdir -p uploads/imports && chown -R node:node uploads
+
+USER node
+EXPOSE 8080
+CMD ["node", "backend/index.js"]

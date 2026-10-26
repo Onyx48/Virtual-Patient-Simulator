@@ -4,19 +4,16 @@
  * Run with: node scripts/seedFarukhScenario.mjs
  *
  * A one-off, and idempotent: re-running finds the scenario by name and updates it
- * in place rather than adding a second copy. It goes through the real Voxio
- * createFlow so the scenario is actually conversational — POST /api/scenarios
- * takes the api_key from its caller and does not mint one, so inserting straight
- * into Mongo would have produced a scenario that opens and then cannot talk.
+ * in place rather than adding a second copy. The simulator runs the scenario
+ * from its saved prompt and questions (backend/utils/simEngine.js); the api_key
+ * is our own simulator key, kept across re-runs.
  */
 import dotenv from "dotenv";
 import mongoose from "mongoose";
 
 dotenv.config();
 
-const { buildWorkflow, createFlow, updateFlow } = await import(
-  "../backend/utils/voxioClient.js"
-);
+const { randomBytes } = await import("crypto");
 const Scenario = (await import("../backend/models/scenarioModel.js")).default;
 const User = (await import("../backend/models/userModel.js")).default;
 
@@ -167,39 +164,7 @@ const run = async () => {
    */
   const existing = await Scenario.findById(SCENARIO_ID);
 
-  /*
-   * The flow is minted once and thereafter edited in place — a second createFlow
-   * would leave the first one orphaned. It must be edited, not just left alone:
-   * the flow is where the prompt and the marking questions actually live, so a
-   * scenario row updated without its flow would converse and grade against the
-   * previous version of the case.
-   */
-  const workflow = buildWorkflow({
-    scenarioPrompt: SCENARIO_PROMPT,
-    feedbackQuestions: FEEDBACK_QUESTIONS,
-  });
-
-  let apiKey = existing?.apiKey || "";
-  if (apiKey) {
-    /*
-     * Voxio's PUT /edit-flow currently answers 404 even for a key its own
-     * GET /flow accepts, so editing in place is not available. A fresh flow is
-     * minted instead and the scenario repointed at it — the old flow is left
-     * orphaned, which is the lesser problem next to a case that grades against a
-     * prompt nobody can see.
-     */
-    try {
-      await updateFlow({ apiKey, flowName: SCENARIO_NAME, workflow });
-      console.log(`updated the existing Voxio flow (${apiKey.slice(0, 12)}…)`);
-    } catch (err) {
-      console.warn(`could not edit the existing flow (${err.message})`);
-      apiKey = await createFlow({ flowName: SCENARIO_NAME, workflow });
-      console.log(`minted a replacement flow, api_key ${apiKey.slice(0, 12)}…`);
-    }
-  } else {
-    apiKey = await createFlow({ flowName: SCENARIO_NAME, workflow });
-    console.log(`created Voxio flow, api_key ${apiKey.slice(0, 12)}…`);
-  }
+  const apiKey = existing?.apiKey || `sim_${randomBytes(24).toString("hex")}`;
 
   const fields = {
     scenarioName: SCENARIO_NAME,
