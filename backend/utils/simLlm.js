@@ -6,14 +6,18 @@
  * the whole conversation sent as alternating turns, and a reply fast enough to
  * be spoken, so this calls the providers directly:
  *
- *   SIM_LLM_PROVIDER   groq | gemini. Default: groq when GROQ_API_KEY is set
- *                      (the same gpt-oss-120b Voxio ran), else gemini.
+ *   SIM_LLM_PROVIDER   openrouter | groq | gemini, the one to try first.
+ *                      Default order: openrouter, groq, gemini, among those
+ *                      with a key set (OpenRouter and Groq both run
+ *                      openai/gpt-oss-120b, the model Voxio ran).
+ *   OPENROUTER_MODEL   see openRouterClient.js
  *   GROQ_SIM_MODEL     default GROQ_MODEL, else openai/gpt-oss-120b
  *   GEMINI_SIM_MODEL   default gemini-2.5-flash
  *
- * The other provider is tried when the first fails, if it has a key.
+ * The others are tried in turn when one fails, if they have a key.
  */
 import { isProd } from "./appEnv.js";
+import { isOpenRouterConfigured, openRouterChat } from "./openRouterClient.js";
 
 const GROQ_BASE_URL = process.env.GROQ_BASE_URL || "https://api.groq.com/openai/v1";
 const GEMINI_BASE_URL = process.env.GEMINI_BASE_URL || "https://generativelanguage.googleapis.com/v1beta";
@@ -23,6 +27,7 @@ const TIMEOUT_MS = Number(process.env.SIM_LLM_TIMEOUT_MS) || 60000;
 
 const providers = () => {
   const available = [
+    isOpenRouterConfigured() && "openrouter",
     process.env.GROQ_API_KEY && "groq",
     process.env.GEMINI_API_KEY && "gemini",
   ].filter(Boolean);
@@ -62,6 +67,29 @@ const parseObject = (text) => {
  * gpt-oss reasons before answering. Low effort keeps a patient reply speakable
  * (under ~2s); the grader gets more room since nobody is waiting mid-sentence.
  */
+const callOpenRouter = async ({ system, messages, effort }) => {
+  const { text, usage: u } = await openRouterChat({
+    messages: [{ role: "system", content: system }, ...messages],
+    json: true,
+    effort,
+    maxTokens: 4096,
+  });
+  return {
+    data: parseObject(text),
+    // OpenRouter reports tokens but no timings; total_time is filled in by chatJson.
+    usage: {
+      prompt_tokens: u.prompt_tokens ?? 0,
+      completion_tokens: u.completion_tokens ?? 0,
+      queue_time: 0,
+      prompt_time: 0,
+      completion_time: 0,
+      total_time: 0,
+    },
+  };
+};
+
+const CALLERS = { openrouter: callOpenRouter, groq: (a) => callGroq(a), gemini: (a) => callGemini(a) };
+
 const callGroq = async ({ system, messages, effort }) => {
   const response = await fetch(`${GROQ_BASE_URL}/chat/completions`, {
     method: "POST",
@@ -149,7 +177,7 @@ const callGemini = async ({ system, messages, schema, effort }) => {
 export const chatJson = async ({ system, messages, schema, effort = "low", label = "sim" }) => {
   const order = providers();
   if (!order.length) {
-    throw Object.assign(new Error("AI is not configured: set GROQ_API_KEY or GEMINI_API_KEY."), {
+    throw Object.assign(new Error("AI is not configured: set OPENROUTER_API_KEY, GROQ_API_KEY or GEMINI_API_KEY."), {
       statusCode: 503,
     });
   }
@@ -158,7 +186,7 @@ export const chatJson = async ({ system, messages, schema, effort = "low", label
   for (const provider of order) {
     const started = Date.now();
     try {
-      const { data, usage } = await (provider === "groq" ? callGroq : callGemini)({ system, messages, schema, effort });
+      const { data, usage } = await CALLERS[provider]({ system, messages, schema, effort });
       const ms = Date.now() - started;
       if (!usage.total_time) usage.total_time = ms / 1000;
       console.log(`[SIM] ${label} answered by ${provider} in ${ms}ms`);

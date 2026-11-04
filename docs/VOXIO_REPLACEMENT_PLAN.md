@@ -16,7 +16,7 @@ Prompts now live in `backend/ai/prompts/sim-patient.md`, `sim-feedback.md` and `
 
 ## What the game developer has to change
 
-**The base address, and how replies are read.** Requests are the same as Voxio's. Successful replies are now a single JSON object holding only what is said: `{"speak": "..."}`.
+**The base address, and how replies are read.** Requests are the same as Voxio's. Replies are plain JSON (`Content-Type: application/json`), not NDJSON and not streamed: one object holding only what is said, `{"speak": "..."}`.
 
 - Old: `https://chat.voxio.in`
 - New: our backend, for example `https://vpsbackend.metawingsxr.com`
@@ -29,7 +29,7 @@ Prompts now live in `backend/ai/prompts/sim-patient.md`, `sim-feedback.md` and `
 
 How it works (same as Voxio):
 1. `start_session` with `{"api_key": "...", "session_id": "..."}`. The `api_key` picks the scenario, as it does on Voxio. The `session_id` is optional, and a UUID is created if it's missing. Starting the same `session_id` again restarts the conversation.
-2. `process_input` with `{"session_id": "...", "user_input": {"user_input": "student's words"}}`. Before the visit ends, the patient answers. When it ends, the feedback and score come back in the same reply. After that, the tutor answers.
+2. `process_input` with `{"session_id": "...", "user_input": {"user_input": "student's words"}}`. Before the visit ends, the patient answers. After feedback, the tutor answers.
 
 - `start_session` returns `{"speak": "Hi"}`.
 - `process_input` returns `{"speak": "..."}`: the patient's line, or the tutor's reply once feedback has been given.
@@ -37,6 +37,22 @@ How it works (same as Voxio):
 - Error replies are still the same as Voxio's: 400 for no key, 500 for an unknown key, 404 `Session not found or expired`, and 422 for a missing field.
 
 `/api/sessions/feedback`, `/api/sessions/reasoning` and `/api/sessions/complete` are unchanged for the game.
+
+## Self-reflection (between End Session and feedback)
+
+When the learner presses **End Session**, the game calls:
+
+| Call | Body | Reply |
+|---|---|---|
+| `POST /agents/reflection/start` (also `/api/chat/reflection/start`) | `{"session_id": "..."}` | `{"speak": "<the guide's opening question>"}` |
+| `POST /agents/process_input` (as now) | `{"session_id": "...", "user_input": {"user_input": "learner's words"}}` | `{"speak": "<the guide's next question>"}` |
+| `POST /agents/process_input` | `{"session_id": "...", "user_input": {"user_input": "[END_OF_REFLECTION]"}}` | `{"speak": "Thanks. Your feedback is ready for you now."}` |
+
+- **The game decides when the reflection ends.** It sends `[END_OF_REFLECTION]` when the learner continues, skips or reaches the time limit (about 4 minutes). Skipping means sending it straight away.
+- **Grading starts in the background** at `reflection/start`, so `/api/sessions/feedback` answers straight away afterwards. The guide never sees the score or the feedback.
+- After `[END_OF_REFLECTION]`, `process_input` goes to the clinical-reasoning tutor as before.
+- The guide uses the client's prompt (`backend/ai/prompts/sim-reflection.md`). It speaks Japanese for Japanese scenarios and never uses the learner's name.
+- The result (self-rating 1–10, one-line summary, status, distress flag) is saved on the session. Educators see all of it; students never receive the distress flag.
 
 ## Tested against Voxio itself
 Before replies were trimmed to `speak` only, `node scripts/compareWithVoxio.mjs` sent the same requests to `chat.voxio.in` and to our backend, then compares the two. In 12 checks there were **no differences** in status codes, content type, number of lines, line structure, error bodies or JSON formatting. Those checks covered errors, starting a session with and without a session id, a turn with bad input, a patient turn, ending the session (with feedback and score), a tutor question, and a restart. Only the wording differed, because the AI writes it fresh each time. Since the trim, the script will report differences on successful replies on purpose; error replies still match.

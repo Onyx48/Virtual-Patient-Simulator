@@ -27,6 +27,8 @@ import {
   getConversation,
   patientTurn,
   reasoningTurn,
+  reflectionTurn,
+  startReflection,
   startSession,
   voxioStyleState,
 } from "../utils/simEngine.js";
@@ -68,6 +70,29 @@ router.post("/start_session", async (req, res) => {
   }
 });
 
+/*
+ * POST reflection/start {session_id} -> {"speak": "<the guide's opening>"}
+ *
+ * Called by the game when the learner presses End Session. Ends the
+ * consultation, starts grading in the background and opens the
+ * self-reflection-AI-guide. From here process_input goes to the guide until the
+ * game sends "[END_OF_REFLECTION]" (learner continues, skips or times out),
+ * which saves the reflection and returns the closing line. Feedback is then
+ * read from /api/sessions/feedback as before.
+ */
+router.post("/reflection/start", async (req, res) => {
+  const body = req.body && typeof req.body === "object" ? req.body : {};
+  if (body.session_id === undefined) return missingField(res, "session_id", body);
+  try {
+    res.json({ speak: await startReflection(String(body.session_id)) });
+  } catch (err) {
+    if (err.statusCode && err.statusCode < 500) {
+      return res.status(err.statusCode).json({ detail: err.message });
+    }
+    internalError(res, err);
+  }
+});
+
 router.post("/process_input", async (req, res) => {
   const body = req.body && typeof req.body === "object" ? req.body : {};
   if (body.session_id === undefined) return missingField(res, "session_id", body);
@@ -84,8 +109,12 @@ router.post("/process_input", async (req, res) => {
       return res.status(422).json({ detail: "user_input.user_input must be a non-empty string" });
     }
 
-    // Only what is said back: the patient's line, or the tutor's after feedback.
-    // Feedback and score are produced as before but read via /api/sessions/feedback.
+    // Only what is said back: the patient's line, the self-reflection guide's
+    // during the reflection, or the tutor's after feedback. Feedback and score
+    // are read via /api/sessions/feedback.
+    if (conv.phase === "reflection") {
+      return res.json({ speak: await reflectionTurn(sessionId, input) });
+    }
     if (conv.phase === "reasoning") {
       const { response } = await reasoningTurn(sessionId, input);
       return res.json({ speak: response });

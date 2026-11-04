@@ -307,6 +307,8 @@ function ScenarioFormPage() {
        */
       scenarioPrompt: "",
       questionsForFeedback: "",
+      // One objective per line; read by the self-reflection-AI-guide.
+      learningObjectives: "",
     },
   });
 
@@ -353,6 +355,7 @@ function ScenarioFormPage() {
           selectedScenario.questionsForFeedback ||
           "",
       );
+      setValue("learningObjectives", selectedScenario.learningObjectives || "");
 
       if (selectedScenario.animationTriggers || selectedScenario.movements) {
         setValue(
@@ -433,6 +436,9 @@ function ScenarioFormPage() {
         setValue("questionsForFeedback", questionsHtml);
       } else if (returnedJson.questions_for_feedback) {
         setValue("questionsForFeedback", returnedJson.questions_for_feedback);
+      }
+      if (Array.isArray(returnedJson.learning_objectives) && returnedJson.learning_objectives.length) {
+        setValue("learningObjectives", returnedJson.learning_objectives.join("\n"));
       }
 
       /*
@@ -836,6 +842,18 @@ function ScenarioFormPage() {
                     )}
                   />
                 </div>
+              </div>
+
+              <div className="pt-6">
+                <label className="block text-xs font-semibold text-gray-700 mb-1">
+                  Learning Objectives
+                </label>
+                <textarea
+                  {...register("learningObjectives")}
+                  rows={4}
+                  className="w-full border border-gray-300 p-2.5 rounded-md text-sm outline-none focus:ring-1 focus:ring-blue-500"
+                  placeholder="One per line, e.g. Explore how the pain affects the patient's work"
+                />
               </div>
             </form>
           </div>

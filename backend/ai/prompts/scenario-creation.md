@@ -71,6 +71,7 @@ Based on a user's query describing a patient case (**any body region or clinical
         }
     },
     "questions_for_feedback": [],
+    "learning_objectives": [],
     "difficulty_level": ""
 }
 
@@ -221,8 +222,8 @@ You must fill every string field **strictly** using one of the allowed categoric
 
 ### 4. `questions_for_feedback` (List of Strings)
 
-* This field **MUST** contain a list of exactly 23 questions formatted as standard JSON strings (using double quotes).
-* **Mandatory Core Questions (First 18 items):** The list must begin with these exact 18 questions, in this order:
+* This field **MUST** contain a list of exactly 29 questions formatted as standard JSON strings (using double quotes).
+* **Mandatory Core Questions (First 24 items):** The list must begin with these exact 24 questions, in this order:
 1. "Did the student inquire about the onset and duration of the pain?"
 2. "Did the student ask about aggravating and relieving factors?"
 3. "Did the student explore the impact of the pain on daily activities and hobbies?"
@@ -241,14 +242,27 @@ You must fill every string field **strictly** using one of the allowed categoric
 16. "Did the student ask about the relationship between the area of symptoms (e.g if patient has neck and arm pain, they should ask if the pain comes on together or is it not related)."
 17. "Did the student provide statement which shows empathy towards patient’s condition. (e.g when patient says they are worried about their condition/pain, student provide statement to reassure the patient)."
 18. "Did the student ask for any other painful area in the body. This is to clear the rest of the body."
+19. "Did the student communicate politely and respectfully throughout? For example: introducing themselves, using the patient’s name, saying please and thank you, and avoiding blunt, dismissive or judgemental remarks or tone."
+20. "Were the student’s questions clearly and concisely formulated? For example: one question at a time, no double or confusing questions, complete sentences, and rephrasing when the patient did not understand."
+21. "Did the student ask sensitive or personal questions tactfully? For example: explaining why a question is needed before asking about bladder, bowel, weight loss or mental health (“I need to ask a few routine questions to rule out anything serious”)."
+22. "Did the student explore the patient’s own beliefs, concerns and expectations? For example: “What do you think is causing this?” or “Is there anything you’re particularly worried about?”"
+23. "Did the student structure the interview and summarise back to the patient? For example: signposting (“Now I’d like to ask about your general health”), a logical flow, and checking understanding at the end (“So, to summarise…, have I got that right?”)."
+24. "Did the student explain the symptoms to the patient? For example, briefly at the end, linking the symptoms to the likely condition to reassure the patient (“It is normal to feel pain in the back of your heel, as this is likely due to early Achilles tendinopathy”)."
 
 
-* **Scenario-Specific Questions (Next 5 items):** Following the 18 core questions, you **MUST** generate **exactly 5 additional questions** that are tailored specifically to the unique details of the scenario you created within the `scenario_prompt`.
+* **Scenario-Specific Questions (Next 5 items):** Following the 24 core questions, you **MUST** generate **exactly 5 additional questions** that are tailored specifically to the unique details of the scenario you created within the `scenario_prompt`.
+* **Each scenario-specific question starts with the History Taking criterion it assesses, in square brackets, exactly as written here and always in English**, followed by one space and the question. The criterion must be one of: "Relevant History Gathering", "Follow-Up & Probing", "Psychosocial & Contextual Exploration", "Relevance & Prioritisation", "Red Flags & Safety Screening", "Questioning Technique & Communication", "Organisation & Adaptability", "Presenting Concern Exploration". Example: `"[Red Flags & Safety Screening] Did the student ask whether the pain wakes the patient at night?"`
 
 ### 5. `difficulty_level` (String)
 
 * Assign **one** level: `"Easy"`, `"Medium"`, or `"Hard"` (using double quotes). Base assessment on case complexity (comorbidities, presentation clarity, and psychosocial factors).
 
+### 6. `learning_objectives` (List of Strings)
+
+* 2 to 4 short learning objectives for this case: what the learner should achieve in the history-taking consultation, specific to this patient (for example `"Explore how the back pain affects her work as a nurse"` or `"Screen for cauda equina symptoms and explain why the questions are needed"`).
+* One sentence each, maximum 20 words, written as an action the learner takes. They match the `Simulation Objectives for Student` in the `scenario_prompt`.
+* Never name the diagnosis, and never copy a grading question word for word.
+
 ---
 
-**Final Check:** Ensure the entire output is *only* the generated JSON object, adhering strictly to JSON syntax (double quotes for keys and outer string values, including list items in `questions_for_feedback`), but using single quotes *only* within the `scenario_prompt` string value as instructed. Ensure a name is present, persona and life context are described, every key inside `movements` has a value, and `questions_for_feedback` contains exactly 23 items (18 core + 5 specific).
+**Final Check:** Ensure the entire output is *only* the generated JSON object, adhering strictly to JSON syntax (double quotes for keys and outer string values, including list items in `questions_for_feedback`), but using single quotes *only* within the `scenario_prompt` string value as instructed. Ensure a name is present, persona and life context are described, every key inside `movements` has a value, and `questions_for_feedback` contains exactly 29 items (24 core + 5 specific, each specific one starting with its [criterion] tag), and `learning_objectives` has 2 to 4 items.

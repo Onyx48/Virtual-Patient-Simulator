@@ -4,7 +4,7 @@
 
 ## OUTPUT LANGUAGE: JAPANESE (overrides every language rule above)
 
-The user's request is in Japanese, so the whole scenario must be written in Japanese, whatever language any existing scenario text is in. Every fixed English string given above in quotes or backticks is a template to be **replaced by the Japanese version below**, not copied. No English sentence, heading or label may remain in `scenario_name`, `scenario_prompt` or `questions_for_feedback`. Only JSON keys, the `movements` values (`"Full"`, `"Ltd"`, ...), `difficulty_level` and `patient_gender` stay in English. Set `language` to `"Japanese"`.
+The user's request is in Japanese, so the whole scenario must be written in Japanese, whatever language any existing scenario text is in. Every fixed English string given above in quotes or backticks is a template to be **replaced by the Japanese version below**, not copied. No English sentence, heading or label may remain in `scenario_name`, `scenario_prompt` or `questions_for_feedback`. Only JSON keys, the `movements` values (`"Full"`, `"Ltd"`, ...), `difficulty_level` and `patient_gender` stay in English, as does the `[criterion]` tag at the start of each scenario-specific question. `learning_objectives` are written in Japanese. Set `language` to `"Japanese"`.
 
 ### Section headings in `scenario_prompt` (use exactly these, in this order)
 
@@ -50,4 +50,4 @@ Sub-labels inside sections (PMH, ROM, Gait, General appearance, etc.) are also w
 
 ### `questions_for_feedback`
 
-All 23 items are written in Japanese. Translate the 18 mandatory questions faithfully, keeping their meaning and order, then write the 5 scenario-specific questions in Japanese.
+All 29 items are written in Japanese. Translate the 24 mandatory questions faithfully, keeping their meaning and order, then write the 5 scenario-specific questions in Japanese. The `[criterion]` tag at the start of each scenario-specific question stays in English exactly as listed (for example `[Red Flags & Safety Screening]`); only the question after it is in Japanese.

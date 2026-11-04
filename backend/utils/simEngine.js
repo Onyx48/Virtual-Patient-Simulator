@@ -1,8 +1,12 @@
 /**
- * The simulator's conversation engine: plays the patient, grades the
- * consultation and runs the clinical-reasoning tutor. Replaces the Voxio flow
- * (greeting -> patient -> judge -> feedback -> reasoning) with direct LLM calls,
- * using the same prompts.
+ * The simulator's conversation engine: plays the patient, runs the
+ * self-reflection-AI-guide, grades the consultation and runs the
+ * clinical-reasoning tutor, with direct LLM calls.
+ *
+ * Phases of one session:
+ *   consultation -> reflection (optional) -> reasoning
+ * Grading runs in the background from the moment the consultation ends, so the
+ * feedback is ready when the reflection is over; the reflection never sees it.
  *
  * State lives in SimConversation, keyed by the session_id that
  * POST /api/sessions/start or POST /api/scenarios/json mints. Results are also
@@ -31,6 +35,11 @@ const readPrompt = (file) =>
 const PATIENT_FIELDS = readPrompt("sim-patient.md").replaceAll("{{END_SESSION_INPUT}}", END_SESSION_INPUT);
 const FEEDBACK_PROMPT = readPrompt("sim-feedback.md");
 const REASONING_PROMPT = readPrompt("sim-reasoning.md");
+const REFLECTION_PROMPT = readPrompt("sim-reflection.md").replace(/^<!--[\s\S]*?-->\s*/, "");
+
+// Control messages from the game during the reflection (see simRoutes.js).
+export const START_OF_REFLECTION = "[START_OF_REFLECTION]";
+export const END_OF_REFLECTION = "[END_OF_REFLECTION]";
 
 const SCHEMAS = {
   patient: {
@@ -44,8 +53,38 @@ const SCHEMAS = {
   },
   feedback: {
     type: "OBJECT",
-    properties: { feedback: { type: "STRING" }, score: { type: "NUMBER" } },
-    required: ["feedback", "score"],
+    properties: {
+      feedback: { type: "STRING" },
+      score: { type: "NUMBER" },
+      questions: {
+        type: "ARRAY",
+        items: {
+          type: "OBJECT",
+          properties: {
+            number: { type: "INTEGER" },
+            observed: { type: "STRING", enum: ["yes", "partly", "no"] },
+            evidence: { type: "STRING" },
+          },
+          required: ["number", "observed", "evidence"],
+        },
+      },
+    },
+    required: ["feedback", "score", "questions"],
+  },
+  reflectionTurn: {
+    type: "OBJECT",
+    properties: { speak: { type: "STRING" } },
+    required: ["speak"],
+  },
+  reflectionResult: {
+    type: "OBJECT",
+    properties: {
+      self_rating: { type: "INTEGER", nullable: true },
+      summary: { type: "STRING", nullable: true },
+      status: { type: "STRING", enum: ["completed", "partial", "skipped", "ended_early_distress"] },
+      distress_flag: { type: "BOOLEAN" },
+    },
+    required: ["self_rating", "summary", "status", "distress_flag"],
   },
   reasoning: {
     type: "OBJECT",
@@ -56,24 +95,148 @@ const SCHEMAS = {
 
 export const httpError = (statusCode, message) => Object.assign(new Error(message), { statusCode });
 
+// ---- grading questions -----------------------------------------------------
+
+/*
+ * The client's eight History Taking criteria, named as in the VPS History
+ * Taking Feedback Report Template.
+ */
+export const HT_CRITERIA = [
+  "Relevant History Gathering",
+  "Follow-Up & Probing",
+  "Psychosocial & Contextual Exploration",
+  "Relevance & Prioritisation",
+  "Red Flags & Safety Screening",
+  "Questioning Technique & Communication",
+  "Organisation & Adaptability",
+  "Presenting Concern Exploration",
+];
+
+/*
+ * Criterion for each of the 24 mandatory questions, in their fixed order
+ * (Q1..Q24), as the report template assigns them. Translated (Japanese)
+ * scenarios keep the same order, so this holds for them too.
+ *
+ * Scenarios made before Q19-Q24 were added have 18 mandatory questions and
+ * then their 5 case-specific ones (23 in all), so Q19+ only take a fixed
+ * criterion in a list long enough to hold all 24 (see parseQuestion).
+ */
+const STANDARD_QUESTION_CRITERIA = [
+  "Presenting Concern Exploration", // 1 onset and duration
+  "Presenting Concern Exploration", // 2 aggravating and relieving factors
+  "Psychosocial & Contextual Exploration", // 3 impact on daily activities
+  "Relevant History Gathering", // 4 previous treatments or medications
+  "Red Flags & Safety Screening", // 5 red flag symptoms
+  "Presenting Concern Exploration", // 6 nature and quality of the pain
+  "Presenting Concern Exploration", // 7 associated symptoms
+  "Relevant History Gathering", // 8 medical history
+  "Psychosocial & Contextual Exploration", // 9 lifestyle factors
+  "Follow-Up & Probing", // 10 active listening and follow-up
+  "Questioning Technique & Communication", // 11 clear, empathetic communication
+  "Relevant History Gathering", // 12 radiological investigation
+  "Presenting Concern Exploration", // 13 24-hour behaviour
+  "Psychosocial & Contextual Exploration", // 14 goals for treatment
+  "Relevant History Gathering", // 15 effectiveness of previous treatment
+  "Follow-Up & Probing", // 16 relationship between symptom areas
+  "Questioning Technique & Communication", // 17 empathy statement
+  "Presenting Concern Exploration", // 18 other painful areas
+  "Questioning Technique & Communication", // 19 polite and respectful
+  "Questioning Technique & Communication", // 20 clear, concise questions
+  "Questioning Technique & Communication", // 21 sensitive questions tactfully
+  "Psychosocial & Contextual Exploration", // 22 beliefs, concerns, expectations
+  "Organisation & Adaptability", // 23 structure and summary
+  "Questioning Technique & Communication", // 24 explains the symptoms
+];
+const OLD_MANDATORY_COUNT = 18;
+
+/*
+ * The fixed criterion for a question by position, only for a list laid out
+ * the standard way: 18 + 5 (older scenarios) or 24 + 5. A hand-written list of
+ * a few questions follows no such order, so its questions get only a tag.
+ */
+const standardCriterion = (index, total) => {
+  if (total < OLD_MANDATORY_COUNT + 5) return null;
+  if (index < OLD_MANDATORY_COUNT) return STANDARD_QUESTION_CRITERIA[index];
+  return total > STANDARD_QUESTION_CRITERIA.length ? STANDARD_QUESTION_CRITERIA[index] ?? null : null;
+};
+
+/*
+ * A case-specific question carries its criterion as a leading tag, e.g.
+ * "[Red Flags & Safety Screening] Did the student ask about night pain?".
+ * The tag stays in English in every language, so it can be read here.
+ */
+const CRITERION_TAG = /^\s*\[([^\]]+)\]\s*/;
+
+const parseQuestion = (raw, index, all) => {
+  const text = String(raw).replace(/^\d+[.)]\s*/, "");
+  const tag = text.match(CRITERION_TAG);
+  const tagged = tag && HT_CRITERIA.find((c) => c.toLowerCase() === tag[1].trim().toLowerCase());
+  return {
+    number: index + 1,
+    question: tag ? text.slice(tag[0].length) : text,
+    criterion: tagged || standardCriterion(index, all.length),
+  };
+};
+
 // ---- scenario --------------------------------------------------------------
 
 const scenarioCache = new Map(); // id -> { at, brief, questions }
 const SCENARIO_TTL_MS = 60_000;
+
+/*
+ * The objectives a scenario was written with: the learningObjectives field
+ * when the educator or the AI filled it in, else the "Simulation Objectives
+ * for Student" section every AI-written scenario prompt has (older scenarios),
+ * else the eight History Taking criteria as general objectives.
+ */
+const OBJECTIVES_HEADING = /^(Simulation Objectives for Student|学生のシミュレーション目標)\s*[:：]\s*/m;
+const learningObjectivesOf = (scenario, brief) => {
+  const own = htmlToText(decodeEntities(scenario.learningObjectives || "")).trim();
+  if (own) return own;
+  const at = brief.search(OBJECTIVES_HEADING);
+  if (at !== -1) {
+    const rest = brief.slice(at).replace(OBJECTIVES_HEADING, "");
+    // The section runs until the next "Heading:" line or the instructions block.
+    const end = rest.search(/\n\s*(---|[^\n]{1,60}[:：]\s*(\n|$))/);
+    const section = (end === -1 ? rest : rest.slice(0, end)).trim();
+    if (section) return section;
+  }
+  return `Take a focused, well-sequenced history: ${HT_CRITERIA.join("; ")}.`;
+};
+
+/** A short description of the case: its title and the patient profile line. */
+const scenarioSummaryOf = (scenario, brief) => {
+  const lines = brief.split("\n").map((l) => l.trim()).filter(Boolean);
+  const head = lines.filter((l) => !l.startsWith("---")).slice(0, 2).join(" ");
+  return (head || scenario.scenarioName || "").slice(0, 400);
+};
+
+const JAPANESE_TEXT = /[぀-ヿ㐀-鿿ｦ-ﾟ]/;
+const isJapanese = (scenario, brief) =>
+  /japanese|日本語/i.test(scenario.language || "") || JAPANESE_TEXT.test(brief.slice(0, 500));
 
 /** The patient brief and grading questions, as plain text. */
 const scenarioFor = async (scenarioId) => {
   const hit = scenarioCache.get(scenarioId);
   if (hit && Date.now() - hit.at < SCENARIO_TTL_MS) return hit;
 
-  const scenario = await Scenario.findById(scenarioId).select("scenarioPrompt aiQuestions").lean();
+  const scenario = await Scenario.findById(scenarioId)
+    .select("scenarioName scenarioPrompt aiQuestions learningObjectives language")
+    .lean();
   if (!scenario) throw httpError(404, "The scenario for this session no longer exists.");
 
   const brief = htmlToText(decodeEntities(scenario.scenarioPrompt || ""));
-  const questions = questionsToArray(decodeEntities(scenario.aiQuestions || ""))
-    .map((q, i) => `${i + 1}. ${q.replace(/^\d+[.)]\s*/, "")}`)
-    .join(" ");
-  const entry = { at: Date.now(), brief, questions };
+  const questionList = questionsToArray(decodeEntities(scenario.aiQuestions || "")).map(parseQuestion);
+  const questions = questionList.map((q) => `${q.number}. ${q.question}`).join(" ");
+  const entry = {
+    at: Date.now(),
+    brief,
+    questions,
+    questionList,
+    objectives: learningObjectivesOf(scenario, brief),
+    summary: scenarioSummaryOf(scenario, brief),
+    japanese: isJapanese(scenario, brief),
+  };
   scenarioCache.set(scenarioId, entry);
   return entry;
 };
@@ -129,10 +292,13 @@ export const startSession = async (sessionId, apiKey) => {
         phase: "consultation",
         diagnosis_history: [],
         reasoning_history: [],
+        reflection_history: [],
         feedback: "",
         score: null,
+        question_results: [],
         end_diagnosis: "no",
       },
+      $unset: { reflection: "" },
     },
     { upsert: true, new: true },
   );
@@ -166,6 +332,8 @@ const saveToSession = async (conv) => {
         transcription: conv.diagnosis_history.map(({ role, content }) => ({ role, content })),
         feedback: conv.feedback || "",
         score: Number.isFinite(conv.score) ? conv.score : 0,
+        question_results: conv.question_results || [],
+        ...(conv.reflection?.status && { reflection: conv.reflection }),
       },
     },
   ).catch((err) => console.error(`[SIM] could not update Session ${conv.session_id}: ${err.message}`));
@@ -187,8 +355,29 @@ const toScore = (value) => {
  */
 const fixParagraphs = (text) => String(text || "").replace(/([.!?"'”])\s{3,}/g, "$1\n\n").trim();
 
+/**
+ * The grader's per-question verdicts, joined to the scenario's own question
+ * list: one entry per question, in order, whatever the model left out or
+ * repeated. A question the model did not return is recorded as "no" with no
+ * evidence rather than dropped, so the table always has every row.
+ */
+const questionResults = (questionList, returned) => {
+  const byNumber = new Map();
+  for (const r of Array.isArray(returned) ? returned : []) {
+    const n = Number(r?.number);
+    if (Number.isInteger(n) && !byNumber.has(n)) byNumber.set(n, r);
+  }
+  return questionList.map((q) => {
+    const r = byNumber.get(q.number);
+    const observed = ["yes", "partly", "no"].includes(String(r?.observed).toLowerCase())
+      ? String(r.observed).toLowerCase()
+      : "no";
+    return { ...q, observed, evidence: String(r?.evidence ?? "").trim() };
+  });
+};
+
 const grade = async (conv) => {
-  const { brief, questions } = await scenarioFor(conv.scenario_id);
+  const { brief, questions, questionList } = await scenarioFor(conv.scenario_id);
   const history = [
     { role: "system", content: brief },
     ...conv.diagnosis_history.map(({ role, content }) => ({ role, content })),
@@ -209,16 +398,51 @@ const grade = async (conv) => {
 
   conv.feedback = fixParagraphs(data.feedback);
   conv.score = toScore(data.score);
-  conv.phase = "reasoning";
-  await conv.save();
+  conv.question_results = questionResults(questionList, data.questions);
+  /*
+   * Written field by field rather than with conv.save(): grading runs in the
+   * background while the reflection is saving its own turns on the same
+   * document, and neither may overwrite the other. The phase is not touched;
+   * that belongs to the reflection and the feedback call.
+   */
+  await SimConversation.updateOne(
+    { session_id: conv.session_id },
+    { $set: { feedback: conv.feedback, score: conv.score, question_results: conv.question_results } },
+  );
   await saveToSession(conv);
   return { feedback: conv.feedback, score: conv.score, usage };
 };
 
+/*
+ * session_id -> the grading running for it. Kept outside the per-session turn
+ * queue on purpose: grading takes several seconds and must not hold up the
+ * reflection turns that run at the same time.
+ */
+const grading = new Map();
+
+/** Grade the consultation once; a second caller waits for the same result. */
+const startGrading = (sessionId) => {
+  if (grading.has(sessionId)) return grading.get(sessionId);
+  const run = (async () => {
+    const conv = await SimConversation.findOne({ session_id: sessionId });
+    if (!conv) throw httpError(404, "No simulator session with that session_id.");
+    if (conv.feedback) return { feedback: conv.feedback, score: conv.score, repeated: true };
+    return grade(conv);
+  })().finally(() => grading.delete(sessionId));
+  grading.set(sessionId, run);
+  return run;
+};
+
+const gradeInBackground = (sessionId) =>
+  startGrading(sessionId).catch((err) =>
+    // Not lost: /api/sessions/feedback grades again when it finds no feedback.
+    console.error(`[SIM] background grading failed session=${sessionId}: ${err.message}`),
+  );
+
 /**
  * One consultation turn: the student's words in, the patient's reply out.
- * When the patient ends the visit, the consultation is graded in the same turn
- * (as the Voxio flow did) and `result` carries the feedback.
+ * When the patient ends the visit, grading starts in the background; the
+ * goodbye goes back at once.
  */
 export const patientTurn = (sessionId, userInput, opts = {}) =>
   serial(sessionId, async () => {
@@ -252,27 +476,213 @@ export const patientTurn = (sessionId, userInput, opts = {}) =>
     await conv.save();
     await saveToSession(conv);
 
-    const reply = { speak, end_diagnosis: endDiagnosis, movement: [], usage };
-    if (endDiagnosis === "yes") reply.result = await grade(conv);
-    return reply;
+    if (endDiagnosis === "yes") gradeInBackground(sessionId);
+    return { speak, end_diagnosis: endDiagnosis, movement: [], usage };
   });
 
 /**
  * End the consultation and grade it. Idempotent: a repeat call returns the
  * feedback already produced instead of grading again.
  */
-export const endAndGrade = (sessionId, opts = {}) =>
+export const endAndGrade = async (sessionId, opts = {}) => {
+  const conv = await getConversation(sessionId, opts);
+  // Without a reflection, asking for feedback ends the consultation.
+  if (conv.phase === "consultation") {
+    await SimConversation.updateOne(
+      { session_id: sessionId, phase: "consultation" },
+      { $set: { phase: "reasoning" } },
+    );
+  }
+  return startGrading(sessionId);
+};
+
+// ---- self-reflection -------------------------------------------------------
+
+const CLOSING = {
+  en: "Thanks. Your feedback is ready for you now.",
+  ja: "ありがとうございました。フィードバックの準備ができました。",
+};
+
+const JAPANESE_OVERRIDE = `
+
+LANGUAGE (overrides the spelling rule above)
+
+This scenario is in Japanese. Hold the whole reflection in natural, polite spoken Japanese, and write the "summary" field in Japanese. Keep the JSON keys and the status values in English.`;
+
+/** The consultation as numbered turns, so the guide can point to a moment. */
+const numberedTranscript = (history) => {
+  let turn = 0;
+  return history
+    .map(({ role, content }) => {
+      if (role === "user") turn += 1;
+      return `Turn ${turn} ${role === "user" ? "Learner" : "Patient"}: ${content}`;
+    })
+    .join("\n");
+};
+
+const reflectionSystem = async (conv) => {
+  const sc = await scenarioFor(conv.scenario_id);
+  const fill = {
+    transcript: numberedTranscript(conv.diagnosis_history) || "(The learner did not speak.)",
+    learning_objectives: sc.objectives,
+    scenario_summary: sc.summary,
+    // Agreed with the client: the guide never uses the learner's name.
+    learner_name: "",
+  };
+  const prompt = REFLECTION_PROMPT.replace(/\{\{(\w+)\}\}/g, (m, key) => (key in fill ? fill[key] : m));
+  return { system: prompt + (sc.japanese ? JAPANESE_OVERRIDE : ""), japanese: sc.japanese };
+};
+
+const reflectionMessages = (conv, extra) => [
+  ...conv.reflection_history.map(({ role, content }) => ({ role, content })),
+  ...(extra ? [{ role: "user", content: extra }] : []),
+];
+
+const guideSays = async (conv, input) => {
+  const { system } = await reflectionSystem(conv);
+  const { data } = await chatJson({
+    label: `reflection session=${conv.session_id}`,
+    system,
+    messages: reflectionMessages(conv, input),
+    schema: SCHEMAS.reflectionTurn,
+    effort: "low",
+  });
+  const speak = String(data.speak ?? "").trim();
+  if (!speak) throw httpError(502, "The self-reflection guide returned no reply.");
+  return speak;
+};
+
+const lastGuideLine = (conv) =>
+  [...conv.reflection_history].reverse().find((t) => t.role === "assistant")?.content || "";
+
+/**
+ * The learner pressed End Session: the consultation is over, grading starts in
+ * the background, and the guide opens the reflection. Calling it again while
+ * the reflection is running repeats the guide's last line instead of starting
+ * over.
+ */
+export const startReflection = (sessionId) =>
   serial(sessionId, async () => {
-    const conv = await getConversation(sessionId, opts);
-    if (conv.feedback) return { feedback: conv.feedback, score: conv.score, repeated: true };
-    return grade(conv);
+    const conv = await getConversation(sessionId, { create: false });
+    if (!conv) throw httpError(404, "Session not found or expired");
+    // Finished, or ended with its summary still being written.
+    if (conv.reflection?.status || (conv.phase === "reasoning" && conv.reflection_history.length)) {
+      throw httpError(409, "The reflection for this session is already finished.");
+    }
+    if (conv.phase === "reflection" && conv.reflection_history.length) return lastGuideLine(conv);
+
+    gradeInBackground(sessionId);
+    conv.phase = "reflection";
+    conv.reflection_history = [];
+    const speak = await guideSays(conv, START_OF_REFLECTION);
+    conv.reflection_history.push(
+      { role: "user", content: START_OF_REFLECTION },
+      { role: "assistant", content: speak },
+    );
+    await conv.save();
+    return speak;
+  });
+
+const toSelfRating = (v) => {
+  const n = Math.round(Number(v));
+  return v === null || v === undefined || v === "" || !Number.isFinite(n) || n < 1 || n > 10 ? null : n;
+};
+const REFLECTION_STATUSES = ["completed", "partial", "skipped", "ended_early_distress"];
+
+/*
+ * [END_OF_REFLECTION]: turn the conversation into the dashboard result. A
+ * learner who never answered skipped it; no model call is needed for that.
+ *
+ * Runs after the closing line has gone back to the game (the model call takes
+ * several seconds), on a copy of the conversation taken at that moment. It is
+ * written field by field, like grading, so it cannot overwrite the tutor turns
+ * that may already be saving on the same document. If the model call fails,
+ * the reflection is still recorded, as "partial" with no rating or summary.
+ */
+const saveReflection = async (sessionId, conv) => {
+  const learnerTurns = conv.reflection_history.filter(
+    (t) => t.role === "user" && t.content !== START_OF_REFLECTION,
+  ).length;
+
+  let result = { self_rating: null, summary: null, status: "skipped", distress_flag: false };
+  if (learnerTurns > 0) {
+    try {
+      const { system } = await reflectionSystem(conv);
+      const { data } = await chatJson({
+        label: `reflection result session=${sessionId}`,
+        system,
+        messages: reflectionMessages(conv, END_OF_REFLECTION),
+        schema: SCHEMAS.reflectionResult,
+        effort: "low",
+      });
+      const summary = String(data.summary ?? "").trim();
+      result = {
+        self_rating: toSelfRating(data.self_rating),
+        summary: summary || null,
+        status: REFLECTION_STATUSES.includes(data.status) ? data.status : "partial",
+        distress_flag: data.distress_flag === true,
+      };
+    } catch (err) {
+      console.error(`[SIM] reflection summary failed session=${sessionId}: ${err.message}`);
+      result = { self_rating: null, summary: null, status: "partial", distress_flag: false };
+    }
+  }
+
+  const reflection = { ...result, completed_at: new Date() };
+  await SimConversation.updateOne({ session_id: sessionId }, { $set: { reflection } });
+  await Session.updateOne({ session_id: sessionId }, { $set: { reflection } }).catch((err) =>
+    console.error(`[SIM] could not update Session ${sessionId}: ${err.message}`),
+  );
+  console.log(
+    `[SIM] reflection finished session=${sessionId} status=${result.status} ` +
+      `self_rating=${result.self_rating} distress=${result.distress_flag} learnerTurns=${learnerTurns}`,
+  );
+  return result;
+};
+
+/**
+ * One reflection turn: the learner's words in, the guide's next question out.
+ * [END_OF_REFLECTION] (sent by the game when the learner continues, skips or
+ * times out) closes it and saves the result.
+ */
+export const reflectionTurn = (sessionId, input) =>
+  serial(sessionId, async () => {
+    const conv = await getConversation(sessionId, { create: false });
+    if (!conv) throw httpError(404, "Session not found or expired");
+    if (conv.phase !== "reflection") throw httpError(409, "No reflection is running for this session.");
+
+    const { japanese } = await reflectionSystem(conv);
+    if (String(input).trim() === END_OF_REFLECTION) {
+      // The closing line goes back now; the summary is written in the background.
+      conv.phase = "reasoning";
+      await conv.save();
+      const snapshot = conv.toObject();
+      saveReflection(sessionId, snapshot).catch((err) =>
+        console.error(`[SIM] could not save reflection session=${sessionId}: ${err.message}`),
+      );
+      return CLOSING[japanese ? "ja" : "en"];
+    }
+
+    const speak = await guideSays(conv, String(input));
+    conv.reflection_history.push(
+      { role: "user", content: String(input) },
+      { role: "assistant", content: speak },
+    );
+    await conv.save();
+    return speak;
   });
 
 /** One clinical-reasoning turn, after feedback. Resolves to { response, usage }. */
 export const reasoningTurn = (sessionId, input) =>
   serial(sessionId, async () => {
-    const conv = await getConversation(sessionId, { create: false });
+    let conv = await getConversation(sessionId, { create: false });
     if (!conv) throw httpError(404, "No simulator session with that session_id.");
+    // Grading may still be running in the background from the end of the
+    // consultation; wait for it rather than refusing the learner's question.
+    if (!conv.feedback && grading.has(sessionId)) {
+      await grading.get(sessionId).catch(() => {});
+      conv = await getConversation(sessionId, { create: false });
+    }
     if (!conv.feedback) {
       throw httpError(409, "Call /api/sessions/feedback for this session before clinical reasoning.");
     }

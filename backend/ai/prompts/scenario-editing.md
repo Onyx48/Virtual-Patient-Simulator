@@ -74,6 +74,7 @@ Update the provided JSON scenario based on the user's specific instructions. Thi
         }
     },
     "questions_for_feedback": [],
+    "learning_objectives": [],
     "difficulty_level": ""
 }
 
@@ -85,7 +86,7 @@ Update the provided JSON scenario based on the user's specific instructions. Thi
 
 1. **Scope:** Apply the modification whatever body region or presentation it moves the case to (e.g., elbow, wrist, hand, jaw). Never refuse a request because of the body part involved.
 2. **Single Quote Rule:** Within the `scenario_prompt` string value, you MUST use **single quotes (')** for all internal quotes, titles, dialogue, or names. Double quotes are strictly reserved for JSON keys and outer string boundaries.
-3. **Question Consistency:** The `questions_for_feedback` must always contain exactly 23 items. The first 18 are mandatory and fixed. The last 5 **must be updated** to reflect the specific details of the *newly modified* scenario.
+3. **Question Consistency:** The `questions_for_feedback` must always contain exactly 29 items. The first 24 are mandatory and fixed. The last 5 **must be updated** to reflect the specific details of the *newly modified* scenario.
 4. **Output Format:** Return ONLY the valid JSON object. No preamble, no explanation, no markdown text blocks around the JSON itself.
 5a. **Patient identity:** Set `patient_name` to the patient's name exactly as used in `scenario_prompt`, `patient_gender` to exactly `"Male"` or `"Female"`, and `language` to the English name of the language the scenario is written in (e.g. `"English"`, `"Japanese"`). These drive the simulator's avatar and voice, so they must agree with the persona in `scenario_prompt`.
 5. **Language:** Preserve the language the existing `scenario_prompt` and `scenario_name` are already written in (Japanese stays Japanese, English stays English), unless the modification request explicitly asks to translate it. Keep JSON keys, the categorical `movements` values and `difficulty_level` in English regardless of the scenario's language. If an `OUTPUT LANGUAGE` section appears at the end of these instructions, it takes precedence over this rule and over any other language guidance.
@@ -123,9 +124,22 @@ Update the provided JSON scenario based on the user's specific instructions. Thi
 
 ### 4. `questions_for_feedback`
 
-* Keep items 1 through 18 completely unchanged.
-* **Re-write items 19–23** to cleanly target the newly modified details of the scenario. If the user shifts a patient’s hobby from tennis to gardening, ensure the specific feedback check questions evaluate whether the student inquired about gardening movements or functional goals.
+* Items 1 through 24 are the mandatory core questions. Keep items 1 through 18 completely unchanged. If the existing scenario has only 23 items (an older scenario with 18 core questions), insert these six as items 19 to 24, before the scenario-specific questions:
+19. "Did the student communicate politely and respectfully throughout? For example: introducing themselves, using the patient’s name, saying please and thank you, and avoiding blunt, dismissive or judgemental remarks or tone."
+20. "Were the student’s questions clearly and concisely formulated? For example: one question at a time, no double or confusing questions, complete sentences, and rephrasing when the patient did not understand."
+21. "Did the student ask sensitive or personal questions tactfully? For example: explaining why a question is needed before asking about bladder, bowel, weight loss or mental health (“I need to ask a few routine questions to rule out anything serious”)."
+22. "Did the student explore the patient’s own beliefs, concerns and expectations? For example: “What do you think is causing this?” or “Is there anything you’re particularly worried about?”"
+23. "Did the student structure the interview and summarise back to the patient? For example: signposting (“Now I’d like to ask about your general health”), a logical flow, and checking understanding at the end (“So, to summarise…, have I got that right?”)."
+24. "Did the student explain the symptoms to the patient? For example, briefly at the end, linking the symptoms to the likely condition to reassure the patient (“It is normal to feel pain in the back of your heel, as this is likely due to early Achilles tendinopathy”)."
+* **Re-write items 25–29** (the 5 scenario-specific questions) to cleanly target the newly modified details of the scenario. If the user shifts a patient’s hobby from tennis to gardening, ensure the specific feedback check questions evaluate whether the student inquired about gardening movements or functional goals.
+* **Each scenario-specific question starts with the History Taking criterion it assesses, in square brackets, exactly as written here and always in English**, followed by one space and the question. The criterion must be one of: "Relevant History Gathering", "Follow-Up & Probing", "Psychosocial & Contextual Exploration", "Relevance & Prioritisation", "Red Flags & Safety Screening", "Questioning Technique & Communication", "Organisation & Adaptability", "Presenting Concern Exploration". Example: `"[Red Flags & Safety Screening] Did the student ask whether the pain wakes the patient at night?"`
 
 ### 5. `difficulty_level`
 
 * Re-evaluate and re-assign the difficulty designation (`"Easy"`, `"Medium"`, `"Hard"`) based on the complexity, red flags, or psychological overlays introduced by the modifications.
+
+### 6. `learning_objectives` (List of Strings)
+
+* Always return 2 to 4 short learning objectives for this case: what the learner should achieve in the history-taking consultation, specific to the updated patient (for example `"Explore how the back pain affects her work as a nurse"` or `"Screen for cauda equina symptoms and explain why the questions are needed"`).
+* One sentence each, maximum 20 words, written as an action the learner takes. They match the `Simulation Objectives for Student` in the `scenario_prompt`.
+* Never name the diagnosis, and never copy a grading question word for word.

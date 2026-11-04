@@ -38,6 +38,13 @@ const scenarioSchema = new mongoose.Schema(
     aiAvatarRole: { type: String },
     aiInstructions: { type: String },
     aiQuestions: { type: String },
+    /*
+     * What the learner should get out of this case, one per line. Written by
+     * the AI with the scenario and editable on the form; read by the
+     * self-reflection-AI-guide (utils/simEngine.js), which needs the objectives
+     * but must not see the grading questions.
+     */
+    learningObjectives: { type: String, default: "" },
     difficulty: { type: String, default: "Medium" },
 
     apiKey: { type: String },

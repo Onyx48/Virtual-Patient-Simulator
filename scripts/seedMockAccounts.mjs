@@ -29,6 +29,7 @@ const MOCK_SCHOOL_NAME = "Mock Physiotherapy Academy";
 const PASSWORD = "Demo@1234";
 
 const ACCOUNTS = {
+  superadmin: { name: "Mock Super Admin", email: `superadmin@${MOCK_DOMAIN}`, role: "superadmin" },
   admin: { name: "Priya Raman", email: `admin@${MOCK_DOMAIN}`, role: "school_admin" },
   educator: { name: "Dr. Marcus Lee", email: `educator@${MOCK_DOMAIN}`, role: "educator" },
   student: { name: "Aiko Tanaka", email: `student@${MOCK_DOMAIN}`, role: "student" },
@@ -141,6 +142,8 @@ const seedData = async () => {
   });
 
   // User.create (not insertMany) so the pre-save hook hashes the password.
+  await User.create({ ...ACCOUNTS.superadmin, password: PASSWORD, lastLoginAt: daysAgo(0) });
+
   const admin = await User.create({
     ...ACCOUNTS.admin,
     password: PASSWORD,
@@ -282,7 +285,7 @@ const seedData = async () => {
   await Session.insertMany(sessions, { timestamps: false });
 
   console.log(
-    `Seeded: 1 school, ${students.length + 2} users, ${groups.length} groups, ` +
+    `Seeded: 1 school, ${students.length + 3} users, ${groups.length} groups, ` +
       `${scenarios.length} scenarios, ${sessions.length} sessions`,
   );
 };

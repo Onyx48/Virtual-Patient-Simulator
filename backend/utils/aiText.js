@@ -13,6 +13,7 @@
  */
 import { generateText, GEMINI_MODEL } from "./geminiClient.js";
 import { generateGroqText, GROQ_MODEL, isGroqConfigured } from "./groqClient.js";
+import { generateOpenRouterText, isOpenRouterConfigured, OPENROUTER_MODEL } from "./openRouterClient.js";
 import { isProd } from "./appEnv.js";
 
 /**
@@ -58,7 +59,7 @@ const bothFailed = (geminiError, groqError) => {
  *   it, a silent failover is invisible until someone wonders why replies changed
  *   in style.
  */
-export const generateTextWithFallback = async ({ systemPrompt, userQuery }) => {
+const geminiThenGroqText = async ({ systemPrompt, userQuery }) => {
   try {
     const text = await generateText({ systemPrompt, userQuery });
     return { text, provider: "gemini", model: GEMINI_MODEL };
@@ -145,7 +146,7 @@ const generateJsonFrom = async (generate, { systemPrompt, userQuery }, provider)
  *
  * @returns {Promise<{json: object, provider: string, model: string}>}
  */
-export const generateJsonWithFallback = async ({ systemPrompt, userQuery }) => {
+const geminiThenGroqJson = async ({ systemPrompt, userQuery }) => {
   try {
     const json = await generateJsonFrom(generateText, { systemPrompt, userQuery }, "gemini");
     return { json, provider: "gemini", model: GEMINI_MODEL };
@@ -165,3 +166,38 @@ export const generateJsonWithFallback = async ({ systemPrompt, userQuery }) => {
     }
   }
 };
+
+/*
+ * OpenRouter, when its key is set, goes first: it is a paid account with no
+ * daily cap, unlike the free Gemini key. If it fails, the Gemini-then-Groq
+ * chain above runs as before.
+ */
+const openRouterFirst = (viaOpenRouter, fallback) => async (args) => {
+  if (!isOpenRouterConfigured()) return fallback(args);
+  try {
+    return await viaOpenRouter(args);
+  } catch (err) {
+    console.warn(`[AI] OpenRouter failed (${err.status || "no status"}: ${err.message}); falling back to Gemini`);
+    return fallback(args);
+  }
+};
+
+/** @returns {Promise<{text: string, provider: string, model: string}>} */
+export const generateTextWithFallback = openRouterFirst(
+  async ({ systemPrompt, userQuery }) => ({
+    text: await generateOpenRouterText({ systemPrompt, userQuery }),
+    provider: "openrouter",
+    model: OPENROUTER_MODEL,
+  }),
+  geminiThenGroqText,
+);
+
+/** @returns {Promise<{json: object, provider: string, model: string}>} */
+export const generateJsonWithFallback = openRouterFirst(
+  async ({ systemPrompt, userQuery }) => ({
+    json: await generateJsonFrom(generateOpenRouterText, { systemPrompt, userQuery }, "openrouter"),
+    provider: "openrouter",
+    model: OPENROUTER_MODEL,
+  }),
+  geminiThenGroqJson,
+);

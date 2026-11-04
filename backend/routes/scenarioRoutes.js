@@ -202,7 +202,7 @@ const LANGUAGE_SECTIONS = {
 
 ## OUTPUT LANGUAGE: ENGLISH (overrides every language rule above)
 
-Write scenario_name, all of scenario_prompt (headings, instructions and sample conversation) and all 23 questions_for_feedback in English, whatever language any existing scenario text is in. Set "language" to "English".`,
+Write scenario_name, all of scenario_prompt (headings, instructions and sample conversation) and all 29 questions_for_feedback in English, whatever language any existing scenario text is in. Set "language" to "English".`,
   ja: readPrompt("language-ja.md"),
 };
 // Any kana or kanji counts as Japanese, so a Japanese brief that mentions an
@@ -222,6 +222,9 @@ const shapeGenerated = (generated, apiKey) => ({
   scenario_name: generated.scenario_name || "",
   scenario_prompt: generated.scenario_prompt || "",
   questions_for_feedback: generated.questions_for_feedback || [],
+  learning_objectives: Array.isArray(generated.learning_objectives)
+    ? generated.learning_objectives.map(String).filter(Boolean)
+    : String(generated.learning_objectives || "").split("\n").map((l) => l.trim()).filter(Boolean),
   // The prompt asks for difficulty_level; difficulty_status is accepted because
   // the old service persisted it under that name.
   difficulty_level: generated.difficulty_level || generated.difficulty_status || "Medium",
@@ -427,6 +430,7 @@ router.post(
       aiAvatarRole,
       aiInstructions,
       aiQuestions,
+      learningObjectives,
       difficulty,
       animationTriggers,
       apiKey,
@@ -526,6 +530,7 @@ router.post(
         difficulty: difficulty || "Medium",
         animationTriggers: animationTriggers || emptyTriggers(),
         apiKey: apiKey || "",
+        learningObjectives: learningObjectives || "",
         patientName: patientName || "",
         patientGender: patientGender || "",
         language: language || "",
@@ -658,6 +663,7 @@ router.put(
       aiAvatarRole,
       aiInstructions,
       aiQuestions,
+      learningObjectives,
       difficulty,
       animationTriggers,
       apiKey,
@@ -738,7 +744,7 @@ router.put(
       const incoming = {
         scenarioName, description, status, permissions, assignedTo, assignedGroups,
         template, scenarioPrompt, aiAvatarRole, aiInstructions, aiQuestions,
-        difficulty, animationTriggers, apiKey, environment, avatarModel, html,
+        learningObjectives, difficulty, animationTriggers, apiKey, environment, avatarModel, html,
       };
       trace.log("fields in this update", {
         present: Object.keys(incoming).filter((k) => incoming[k] !== undefined),
@@ -772,6 +778,7 @@ router.put(
       if (animationTriggers !== undefined)
         scenario.animationTriggers = animationTriggers;
       if (apiKey !== undefined) scenario.apiKey = apiKey;
+      if (learningObjectives !== undefined) scenario.learningObjectives = learningObjectives;
       if (patientName !== undefined) scenario.patientName = patientName;
       if (patientGender !== undefined) scenario.patientGender = patientGender;
       if (language !== undefined) scenario.language = language;

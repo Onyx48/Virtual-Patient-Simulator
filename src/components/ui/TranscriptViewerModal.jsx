@@ -9,6 +9,102 @@ const getAuthHeaders = () => {
   return { headers: { Authorization: `Bearer ${token}` } };
 };
 
+const OBSERVED_STYLE = {
+  yes: ["Yes", "bg-green-50 text-green-700"],
+  partly: ["Partly", "bg-amber-50 text-amber-700"],
+  no: ["No", "bg-red-50 text-red-700"],
+};
+
+/**
+ * The grader's verdict on each grading question, grouped under the History
+ * Taking criterion it belongs to. Educators only: the student never receives
+ * question_results from the API.
+ */
+function QuestionResults({ results }) {
+  const groups = results.reduce((acc, r) => {
+    const key = r.criterion || "Other";
+    (acc[key] ||= []).push(r);
+    return acc;
+  }, {});
+  const met = results.filter((r) => r.observed === "yes").length;
+  const partly = results.filter((r) => r.observed === "partly").length;
+
+  return (
+    <div className="mb-4 bg-white rounded-xl border border-gray-100 p-4">
+      <div className="flex items-center justify-between mb-3">
+        <h5 className="text-sm font-medium text-gray-500">Grading questions</h5>
+        <span className="text-xs text-gray-500">
+          {met} yes · {partly} partly · {results.length - met - partly} no
+        </span>
+      </div>
+      <div className="space-y-4">
+        {Object.entries(groups).map(([criterion, rows]) => (
+          <div key={criterion}>
+            <div className="text-xs font-semibold text-gray-700 mb-1">{criterion}</div>
+            <table className="w-full text-xs">
+              <tbody>
+                {rows.map((r) => {
+                  const [label, style] = OBSERVED_STYLE[r.observed] || OBSERVED_STYLE.no;
+                  return (
+                    <tr key={r.number} className="border-t border-gray-100 align-top">
+                      <td className="py-1.5 pr-2 text-gray-400 w-8">Q{r.number}</td>
+                      <td className="py-1.5 pr-2 text-gray-700">
+                        {r.question}
+                        {r.evidence && (
+                          <div className="text-gray-500 italic mt-0.5">{r.evidence}</div>
+                        )}
+                      </td>
+                      <td className="py-1.5 w-16 text-right">
+                        <span className={`px-1.5 py-0.5 rounded font-medium ${style}`}>{label}</span>
+                      </td>
+                    </tr>
+                  );
+                })}
+              </tbody>
+            </table>
+          </div>
+        ))}
+      </div>
+    </div>
+  );
+}
+
+const REFLECTION_STATUS = {
+  completed: "Completed",
+  partial: "Partly completed",
+  skipped: "Skipped",
+  ended_early_distress: "Ended early",
+};
+
+/**
+ * The learner's self-reflection, given before they saw any feedback: their
+ * own 1-10 confidence rating and the one-line take-away. The distress marker
+ * is for educators only and is never sent to the learner.
+ */
+function SelfReflection({ reflection }) {
+  return (
+    <div className="mb-4 p-3 bg-white border border-gray-100 rounded-xl text-sm">
+      <div className="flex items-center justify-between mb-1">
+        <div className="font-medium text-gray-900">Self-reflection</div>
+        <div className="flex items-center gap-2 text-xs">
+          {reflection.distress_flag && (
+            <span className="px-1.5 py-0.5 rounded font-medium bg-red-50 text-red-700">
+              Distress noted
+            </span>
+          )}
+          <span className="text-gray-500">{REFLECTION_STATUS[reflection.status] || reflection.status}</span>
+        </div>
+      </div>
+      {reflection.self_rating != null && (
+        <div className="text-gray-700">
+          Self-rating: <span className="font-semibold">{reflection.self_rating}/10</span>
+        </div>
+      )}
+      {reflection.summary && <div className="text-gray-700 mt-1">{reflection.summary}</div>}
+    </div>
+  );
+}
+
 function TranscriptViewerModal({ isOpen, onClose, student }) {
   const { language } = useLanguage();
   const [sessions, setSessions] = useState([]);
@@ -171,11 +267,19 @@ function TranscriptViewerModal({ isOpen, onClose, student }) {
                   )}
                 </div>
 
+                {selectedSession.reflection?.status && (
+                  <SelfReflection reflection={selectedSession.reflection} />
+                )}
+
                 {selectedSession.feedback && (
                   <div className="mb-4 p-3 bg-yellow-50 border border-yellow-200 rounded-xl text-sm">
                     <div className="font-medium text-gray-900 mb-1">Feedback</div>
                     <div className="text-gray-700 whitespace-pre-line">{selectedSession.feedback}</div>
                   </div>
+                )}
+
+                {selectedSession.question_results?.length > 0 && (
+                  <QuestionResults results={selectedSession.question_results} />
                 )}
 
                 <div className="bg-white rounded-xl border border-gray-100 p-4">

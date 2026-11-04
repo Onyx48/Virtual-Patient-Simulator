@@ -264,6 +264,7 @@ router.post("/complete", async (req, res) => {
       transcription: (conv?.diagnosis_history || []).map(({ role, content }) => ({ role, content })),
       feedback: conv?.feedback || "",
       score: Number.isFinite(conv?.score) ? conv.score : 0,
+      question_results: conv?.question_results || [],
     };
     const session = await Session.findOneAndUpdate(
       { session_id },
@@ -359,8 +360,8 @@ router.get(
       const sessionQuery = { student_id: studentId };
       const [sessions, total] = await Promise.all([
         paging
-          ? Session.find(sessionQuery).sort(paging.sort).skip(paging.skip).limit(paging.limit)
-          : Session.find(sessionQuery).sort({ createdAt: -1 }).limit(20),
+          ? Session.find(sessionQuery).select("+question_results").sort(paging.sort).skip(paging.skip).limit(paging.limit)
+          : Session.find(sessionQuery).select("+question_results").sort({ createdAt: -1 }).limit(20),
         paging ? Session.countDocuments(sessionQuery) : null,
       ]);
 
@@ -407,7 +408,11 @@ router.get("/:sessionId", protect, async (req, res) => {
       return res.status(400).json({ message: "Session ID is required" });
     }
 
-    const session = await Session.findById(sessionId);
+    // Per-question results and the distress flag are for educators and admins,
+    // not the student.
+    const session = await Session.findById(sessionId).select(
+      req.user?.role === "student" ? "-reflection.distress_flag" : "+question_results",
+    );
 
     if (!session) {
       return res.status(404).json({ message: "Session not found" });
