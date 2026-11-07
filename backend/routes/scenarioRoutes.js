@@ -13,18 +13,21 @@ import { emptyMovements, emptyTriggers } from "../utils/bodyRegions.js";
 import { withStudentScope } from "../utils/scenarioAssignment.js";
 import { parsePagination, pageResponse, escapeRegex } from "../utils/pagination.js";
 import Group from "../models/groupModel.js";
-import { randomBytes } from "crypto";
 import { publicMessage } from "../utils/appEnv.js";
 import { patientInfoFrom } from "../utils/patientInfo.js";
+import { isSgLocale, sgCaseToGenerated, sgGeneratorPrompt } from "../utils/sgScenario.js";
 import {
   setLiveScenario,
   getLiveScenario,
   getLiveMeta,
 } from "../state/liveScenario.js";
 import { startTrace } from "../utils/routeTrace.js";
+import { normaliseProfession, withProfession } from "../utils/profession.js";
+import { ensureFlow, syncInBackground, roomCustoms } from "../utils/voxioSync.js";
+import { isFlowKey } from "../utils/voxioClient.js";
 // The educator Test button's destination, from the same place the student room
 // comes from.
-import { roomUrlFor } from "../utils/roomUrl.js";
+import { roomUrlFor, testRoomUrlFor } from "../utils/roomUrl.js";
 import {
   isScenarioTestable,
   NOT_TESTABLE_MESSAGE,
@@ -170,9 +173,9 @@ router.get("/", protect, checkAccess("viewScenarios"), async (req, res) => {
  *
  * Ported from the standalone FastAPI service that used to run on :8888. Gemini
  * turns a one-line brief into the structured scenario. The simulator runs it
- * from the saved scenarioPrompt/aiQuestions (utils/simEngine.js), so nothing is
- * published anywhere else; the api_key is a token of our own that the game is
- * handed and that marks the scenario as runnable.
+ * on Voxio: saving a scenario creates or updates its Voxio flow in the
+ * background (utils/voxioSync.js), and the flow's key becomes the api_key the
+ * game is handed.
  *
  * Difference from the Python original: nothing is written to a second database.
  * The generated fields come back to the form, and the existing POST/PUT
@@ -202,7 +205,7 @@ const LANGUAGE_SECTIONS = {
 
 ## OUTPUT LANGUAGE: ENGLISH (overrides every language rule above)
 
-Write scenario_name, all of scenario_prompt (headings, instructions and sample conversation) and all 29 questions_for_feedback in English, whatever language any existing scenario text is in. Set "language" to "English".`,
+Write scenario_name, all of scenario_prompt (headings, instructions and sample conversation) and all questions_for_feedback in English, whatever language any existing scenario text is in. Set "language" to "English".`,
   ja: readPrompt("language-ja.md"),
 };
 // Any kana or kanji counts as Japanese, so a Japanese brief that mentions an
@@ -233,11 +236,41 @@ const shapeGenerated = (generated, apiKey) => ({
   api_key: apiKey,
 });
 
+
 /*
- * The simulator key for a new scenario. "sim_" marks it as ours; scenarios made
- * before the switch keep their old Voxio key, which still works as a key.
+ * The model now and then returns a scenario with no feedback questions or no
+ * case text (seen with Japanese briefs). One more try fixes it in practice.
  */
-const newSimulatorKey = () => `sim_${randomBytes(24).toString("hex")}`;
+const generateComplete = async (args) => {
+  const first = await generateJsonWithFallback(args);
+  const ok = (j) => Array.isArray(j?.questions_for_feedback) && j.questions_for_feedback.length > 0 && String(j?.scenario_prompt || "").trim();
+  if (ok(first.json)) return first;
+  console.warn("[AI] scenario came back incomplete; trying once more");
+  const second = await generateJsonWithFallback(args);
+  return ok(second.json) ? second : first;
+};
+
+/*
+ * Singapore scenarios (utils/sgScenario.js): the model writes only the case, as JSON,
+ * which is converted to the usual fields (same 24 core questions + 5 specific, same
+ * movements). Used for physiotherapy briefs written in English when locale is "sg".
+ */
+const useSgGenerator = (body, query) =>
+  isSgLocale(body?.locale) && !JAPANESE_TEXT.test(query) &&
+  normaliseProfession(body?.profession) === "physiotherapy";
+
+const generateSg = async (query) => {
+  const attempt = async () => {
+    const out = await generateJsonWithFallback({ systemPrompt: sgGeneratorPrompt(), userQuery: query });
+    return { ...out, json: sgCaseToGenerated(out.json) };
+  };
+  const ok = (j) => j.scenario_name && j.patient_name && j.questions_for_feedback.length > 24;
+  const first = await attempt();
+  if (ok(first.json)) return first;
+  console.warn("[AI] Singapore case came back incomplete; trying once more");
+  const second = await attempt();
+  return ok(second.json) ? second : first;
+};
 
 // Generate a brand new scenario.
 router.post(
@@ -253,13 +286,16 @@ router.post(
     }
 
     try {
-      const { json: generated, provider, model } = await generateJsonWithFallback({
-        systemPrompt: withInputLanguage(CREATION_PROMPT, String(query)),
-        userQuery: String(query),
-      });
+      const { json: generated, provider, model } = useSgGenerator(req.body, String(query))
+        ? await generateSg(String(query))
+        : await generateComplete({
+            systemPrompt: withProfession(withInputLanguage(CREATION_PROMPT, String(query)), req.body?.profession),
+            userQuery: String(query),
+          });
       console.log(`[AI] scenario generated by ${provider} (${model})`);
 
-      res.json({ response: shapeGenerated(generated, newSimulatorKey()) });
+      // No key yet: the Voxio flow, and with it the key, is made when the scenario is saved.
+      res.json({ response: shapeGenerated(generated, "") });
     } catch (err) {
       console.error("[AI] generate failed:", err);
       res.status(503).json({
@@ -285,13 +321,15 @@ router.post(
     }
 
     try {
-      const { json: generated, provider, model } = await generateJsonWithFallback({
-        systemPrompt: withInputLanguage(EDITING_PROMPT, String(query)),
-        userQuery: String(query),
-      });
+      const { json: generated, provider, model } = useSgGenerator(req.body, String(query))
+        ? await generateSg(String(query))
+        : await generateComplete({
+            systemPrompt: withProfession(withInputLanguage(EDITING_PROMPT, String(query)), req.body?.profession),
+            userQuery: String(query),
+          });
       console.log(`[AI] scenario edited by ${provider} (${model})`);
 
-      res.json({ response: shapeGenerated(generated, apiKey || newSimulatorKey()) });
+      res.json({ response: shapeGenerated(generated, apiKey || "") });
     } catch (err) {
       console.error("[AI] edit failed:", err);
       res.status(503).json({
@@ -300,6 +338,15 @@ router.post(
     }
   },
 );
+
+// Test room sessions: sessionId -> the customs the room starts its Voxio session with.
+const roomSessions = new Map();
+
+router.get("/room/:sessionId", protect, (req, res) => {
+  const r = roomSessions.get(req.params.sessionId);
+  if (!r || r.userId !== String(req.user._id)) return res.status(404).json({ message: "Test session not found. Press Test again." });
+  res.json({ customs: r.customs });
+});
 
 router.post("/json", protect, async (req, res) => {
   try {
@@ -310,12 +357,18 @@ router.post("/json", protect, async (req, res) => {
         .json({ message: "Scenario not found (Invalid ID)." });
     }
 
-    const scenario = await Scenario.findById(scenarioId)
+    let scenario = await Scenario.findById(scenarioId)
       .populate("educator", "name email")
       .lean();
 
     if (!scenario)
       return res.status(404).json({ message: "Scenario not found." });
+
+    // The game is handed the Voxio flow key: make sure the flow exists first.
+    // Our Test room (TEST_ROOM_URL) uses one fixed flow plus this scenario's customs instead.
+    const testRoom = Boolean(process.env.TEST_ROOM_URL);
+    const flowKey = testRoom ? "" : await ensureFlow(scenario);
+    if (!testRoom && flowKey !== scenario.apiKey) scenario = { ...scenario, apiKey: flowKey };
 
     /*
      * Checked here and not only in the UI: this is what publishes the scenario to
@@ -331,6 +384,7 @@ router.post("/json", protect, async (req, res) => {
     // is minted here the same way a student's Start would.
     const sessionId = new mongoose.Types.ObjectId().toString();
     setLiveScenario(scenario, { userId: req.user._id, sessionId });
+    if (testRoom) roomSessions.set(sessionId, { customs: await roomCustoms(scenario._id), userId: String(req.user._id) });
 
     /*
      * The caller is told where to go rather than deciding for itself. The Test
@@ -340,7 +394,8 @@ router.post("/json", protect, async (req, res) => {
      */
     res.json({
       message: "Scenario JSON set.",
-      simulatorUrl: roomUrlFor(sessionId),
+      // TEST_ROOM_URL set: our Voxio room for this scenario's flow (Test only)
+      simulatorUrl: testRoomUrlFor({ sessionId, scenario }),
     });
   } catch (err) {
     console.error("Set Scenario JSON Error:", err);
@@ -365,6 +420,7 @@ router.get("/json", (req, res) => {
     language: liveScenario?.language || null,
     environment: liveScenario?.environment || null,
     model: liveScenario?.avatarModel || null,
+    profession: liveScenario?.profession || "physiotherapy",
   });
 });
 
@@ -434,6 +490,8 @@ router.post(
       difficulty,
       animationTriggers,
       apiKey,
+      profession,
+      locale,
       patientName,
       patientGender,
       language,
@@ -530,6 +588,8 @@ router.post(
         difficulty: difficulty || "Medium",
         animationTriggers: animationTriggers || emptyTriggers(),
         apiKey: apiKey || "",
+        profession: normaliseProfession(profession),
+        locale: isSgLocale(locale) ? "sg" : "",
         learningObjectives: learningObjectives || "",
         patientName: patientName || "",
         patientGender: patientGender || "",
@@ -550,6 +610,8 @@ router.post(
 
       const newScenario = new Scenario(scenarioData);
       await newScenario.save();
+      // Its Voxio flow is created in the background; the key lands on the scenario.
+      syncInBackground(newScenario._id);
       trace.log("saved", {
         _id: newScenario._id,
         status: newScenario.status,
@@ -667,6 +729,8 @@ router.put(
       difficulty,
       animationTriggers,
       apiKey,
+      profession,
+      locale,
       patientName,
       patientGender,
       language,
@@ -777,7 +841,10 @@ router.put(
       if (difficulty !== undefined) scenario.difficulty = difficulty;
       if (animationTriggers !== undefined)
         scenario.animationTriggers = animationTriggers;
-      if (apiKey !== undefined) scenario.apiKey = apiKey;
+      // A synced Voxio key is never replaced by a stale or empty one from the form.
+      if (apiKey !== undefined && !(isFlowKey(scenario.apiKey) && !isFlowKey(apiKey))) scenario.apiKey = apiKey;
+      if (profession !== undefined) scenario.profession = normaliseProfession(profession);
+      if (locale !== undefined) scenario.locale = isSgLocale(locale) ? "sg" : "";
       if (learningObjectives !== undefined) scenario.learningObjectives = learningObjectives;
       if (patientName !== undefined) scenario.patientName = patientName;
       if (patientGender !== undefined) scenario.patientGender = patientGender;
@@ -796,6 +863,8 @@ router.put(
 
       await scenario.save();
       trace.log("saved");
+      // Bring its Voxio flow up to date (background; the key does not change).
+      syncInBackground(scenario._id);
 
       await scenario.populate("educator", "name email");
       await scenario.populate("assignedTo", "name");

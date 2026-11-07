@@ -45,6 +45,12 @@ const schoolSchema = new mongoose.Schema(
       enum: ["Active", "Expired", "Pending"],
       default: "Active",
     },
+    // Pre-selected on this school's new scenarios (utils/profession.js).
+    defaultProfession: {
+      type: String,
+      enum: ["physiotherapy", "occupational_therapy"],
+      default: "physiotherapy",
+    },
     permissions: {
       type: String,
       enum: ["Read Only", "Write Only", "Both"],

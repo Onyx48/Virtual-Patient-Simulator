@@ -1,0 +1,123 @@
+# Shoulder - left
+
+17 clips. Save each video in this folder, named exactly as the heading (e.g. `shoulder_flexion_left_full.mp4`).
+Use the reference image as both the first and the last frame. 25 fps.
+
+## shoulder_flexion_left_full
+Shoulder flexion (left) - Full
+
+```
+The patient smoothly raises the left arm straight forward and up in front of the body, elbow straight, thumb pointing up, toward overhead beside the ear, through the full normal range, comfortably, face relaxed. Holds the end position for two seconds. Then slowly returns to the exact starting pose. The last frame must match the first frame exactly. Mouth closed and relaxed, no speaking. About 10 seconds long (at least 10 seconds), 25 fps, with the movement paced slowly to fill the time.
+```
+
+## shoulder_flexion_left_90
+Shoulder flexion (left) - Limited at 90 degrees
+
+```
+The patient slowly raises the left arm straight forward and up in front of the body, elbow straight, thumb pointing up, toward overhead beside the ear, but stops at about 90 degrees (arm level with the shoulder) with a wince of pain and cannot go higher. Holds for two seconds. Then slowly returns to the exact starting pose. The last frame must match the first frame exactly. Mouth closed and relaxed, no speaking. About 10 seconds long (at least 10 seconds), 25 fps, with the movement paced slowly to fill the time.
+```
+
+## shoulder_flexion_left_120
+Shoulder flexion (left) - Limited at 120 degrees
+
+```
+The patient slowly raises the left arm straight forward and up in front of the body, elbow straight, thumb pointing up, toward overhead beside the ear, but stops at about 120 degrees, a little above shoulder level, with a wince of pain and cannot go higher. Holds for two seconds. Then slowly returns to the exact starting pose. The last frame must match the first frame exactly. Mouth closed and relaxed, no speaking. About 10 seconds long (at least 10 seconds), 25 fps, with the movement paced slowly to fill the time.
+```
+
+## shoulder_extension_left_full
+Shoulder extension (left) - Full
+
+```
+The patient smoothly moves the left arm straight backward behind the body, elbow straight, palm facing the body, through the full normal range, comfortably, face relaxed. Holds the end position for two seconds. Then slowly returns to the exact starting pose. The last frame must match the first frame exactly. Mouth closed and relaxed, no speaking. About 10 seconds long (at least 10 seconds), 25 fps, with the movement paced slowly to fill the time.
+```
+
+## shoulder_extension_left_ltd
+Shoulder extension (left) - Limited
+
+```
+The patient slowly and stiffly moves the left arm straight backward behind the body, elbow straight, palm facing the body, but stops at about half of the normal range with a small wince of pain and cannot go further. Holds for two seconds. Then slowly returns to the exact starting pose. The last frame must match the first frame exactly. Mouth closed and relaxed, no speaking. About 10 seconds long (at least 10 seconds), 25 fps, with the movement paced slowly to fill the time.
+```
+
+## shoulder_abduction_left_full
+Shoulder abduction (left) - Full
+
+```
+The patient smoothly lifts the left arm out to the side, elbow straight, palm turning up, toward overhead beside the ear, through the full normal range, comfortably, face relaxed. Holds the end position for two seconds. Then slowly returns to the exact starting pose. The last frame must match the first frame exactly. Mouth closed and relaxed, no speaking. About 10 seconds long (at least 10 seconds), 25 fps, with the movement paced slowly to fill the time.
+```
+
+## shoulder_abduction_left_ltd
+Shoulder abduction (left) - Limited
+
+```
+The patient slowly and stiffly lifts the left arm out to the side, elbow straight, palm turning up, toward overhead beside the ear, but stops at about half of the normal range with a small wince of pain and cannot go further. Holds for two seconds. Then slowly returns to the exact starting pose. The last frame must match the first frame exactly. Mouth closed and relaxed, no speaking. About 10 seconds long (at least 10 seconds), 25 fps, with the movement paced slowly to fill the time.
+```
+
+## shoulder_external_rotation_left_full
+Shoulder external rotation (left) - Full
+
+```
+The patient smoothly keeps the left elbow tucked against the side, bent to 90 degrees, and swings the forearm outward away from the belly, through the full normal range, comfortably, face relaxed. Holds the end position for two seconds. Then slowly returns to the exact starting pose. The last frame must match the first frame exactly. Mouth closed and relaxed, no speaking. About 10 seconds long (at least 10 seconds), 25 fps, with the movement paced slowly to fill the time.
+```
+
+## shoulder_external_rotation_left_ltd
+Shoulder external rotation (left) - Limited
+
+```
+The patient slowly and stiffly keeps the left elbow tucked against the side, bent to 90 degrees, and swings the forearm outward away from the belly, but stops at about half of the normal range with a small wince of pain and cannot go further. Holds for two seconds. Then slowly returns to the exact starting pose. The last frame must match the first frame exactly. Mouth closed and relaxed, no speaking. About 10 seconds long (at least 10 seconds), 25 fps, with the movement paced slowly to fill the time.
+```
+
+## shoulder_internal_rotation_left_full
+Shoulder internal rotation (left) - Full
+
+```
+The patient smoothly keeps the left elbow tucked against the side, bent to 90 degrees, and swings the forearm inward across the belly, through the full normal range, comfortably, face relaxed. Holds the end position for two seconds. Then slowly returns to the exact starting pose. The last frame must match the first frame exactly. Mouth closed and relaxed, no speaking. About 10 seconds long (at least 10 seconds), 25 fps, with the movement paced slowly to fill the time.
+```
+
+## shoulder_internal_rotation_left_ltd
+Shoulder internal rotation (left) - Limited
+
+```
+The patient slowly and stiffly keeps the left elbow tucked against the side, bent to 90 degrees, and swings the forearm inward across the belly, but stops at about half of the normal range with a small wince of pain and cannot go further. Holds for two seconds. Then slowly returns to the exact starting pose. The last frame must match the first frame exactly. Mouth closed and relaxed, no speaking. About 10 seconds long (at least 10 seconds), 25 fps, with the movement paced slowly to fill the time.
+```
+
+## shoulder_horizontal_adduction_left_full
+Shoulder horizontal adduction (left) - Full
+
+```
+The patient smoothly lifts the left arm forward to shoulder height and sweeps it across the chest toward the opposite shoulder, through the full normal range, comfortably, face relaxed. Holds the end position for two seconds. Then slowly returns to the exact starting pose. The last frame must match the first frame exactly. Mouth closed and relaxed, no speaking. About 10 seconds long (at least 10 seconds), 25 fps, with the movement paced slowly to fill the time.
+```
+
+## shoulder_horizontal_adduction_left_ltd
+Shoulder horizontal adduction (left) - Limited
+
+```
+The patient slowly and stiffly lifts the left arm forward to shoulder height and sweeps it across the chest toward the opposite shoulder, but stops at about half of the normal range with a small wince of pain and cannot go further. Holds for two seconds. Then slowly returns to the exact starting pose. The last frame must match the first frame exactly. Mouth closed and relaxed, no speaking. About 10 seconds long (at least 10 seconds), 25 fps, with the movement paced slowly to fill the time.
+```
+
+## shoulder_hand_behind_back_left_full
+Hand behind back (left) - Full
+
+```
+The patient smoothly reaches the left hand behind the lower back and slides it up the spine as high as possible, through the full normal range, comfortably, face relaxed. Holds the end position for two seconds. Then slowly returns to the exact starting pose. The last frame must match the first frame exactly. Mouth closed and relaxed, no speaking. About 10 seconds long (at least 10 seconds), 25 fps, with the movement paced slowly to fill the time.
+```
+
+## shoulder_hand_behind_back_left_ltd
+Hand behind back (left) - Limited
+
+```
+The patient slowly and stiffly reaches the left hand behind the lower back and slides it up the spine as high as possible, but stops at about half of the normal range with a small wince of pain and cannot go further. Holds for two seconds. Then slowly returns to the exact starting pose. The last frame must match the first frame exactly. Mouth closed and relaxed, no speaking. About 10 seconds long (at least 10 seconds), 25 fps, with the movement paced slowly to fill the time.
+```
+
+## shoulder_hand_behind_neck_left_full
+Hand behind neck (left) - Full
+
+```
+The patient smoothly lifts the left hand and places it behind the head at the back of the neck, elbow pointing out to the side, through the full normal range, comfortably, face relaxed. Holds the end position for two seconds. Then slowly returns to the exact starting pose. The last frame must match the first frame exactly. Mouth closed and relaxed, no speaking. About 10 seconds long (at least 10 seconds), 25 fps, with the movement paced slowly to fill the time.
+```
+
+## shoulder_hand_behind_neck_left_ltd
+Hand behind neck (left) - Limited
+
+```
+The patient slowly and stiffly lifts the left hand and places it behind the head at the back of the neck, elbow pointing out to the side, but stops at about half of the normal range with a small wince of pain and cannot go further. Holds for two seconds. Then slowly returns to the exact starting pose. The last frame must match the first frame exactly. Mouth closed and relaxed, no speaking. About 10 seconds long (at least 10 seconds), 25 fps, with the movement paced slowly to fill the time.
+```

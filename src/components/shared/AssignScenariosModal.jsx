@@ -1,3 +1,4 @@
+import { getAccessToken } from "../../lib/authToken.js";
 import React, { useState, useEffect } from "react";
 import axios from "axios";
 import { useDispatch } from "react-redux";
@@ -23,7 +24,7 @@ function AssignScenariosModal({ onClose, onAssignSuccess }) {
   const [assignmentSummary, setAssignmentSummary] = useState([]);
 
   const getAuthHeaders = () => {
-    const token = localStorage.getItem("token");
+    const token = getAccessToken();
     return { headers: { Authorization: `Bearer ${token}` } };
   };
 

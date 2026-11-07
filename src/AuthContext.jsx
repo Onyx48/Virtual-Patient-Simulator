@@ -9,69 +9,78 @@ import axios from "axios";
 import { useDispatch } from "react-redux";
 import { clearSessions } from "./redux/slices/sessionSlice.js";
 import { identifyUser } from "./lib/monitoring";
+import { refreshSession, setAccessToken } from "./lib/authToken.js";
 
 const AuthContext = createContext(null);
 
+// Older builds kept the token here; it is memory-only now (lib/authToken.js).
+localStorage.removeItem("token");
+
+const PUBLIC_PATHS = ["/login", "/signup", "/forgot-password", "/verify-otp", "/reset-password"];
+
+/*
+ * A 401 usually means the 15-minute access token ran out: get a new one from the
+ * refresh cookie and replay the request once. Only when the refresh itself fails
+ * (logged out, 90 days unused, password changed) does the user go to the login page.
+ * A 401 from /login is a wrong password and is left to the LoginPage.
+ */
 axios.interceptors.response.use(
   (response) => response,
-  (error) => {
-    const requestUrl = error.config?.url || "";
-    // A 401 from the login request itself is a wrong email/password, not an
-    // expired session — let the LoginPage handle it instead of redirecting.
-    const isLoginRequest = requestUrl.includes("/api/auth/login");
-    if (error.response && error.response.status === 401 && !isLoginRequest) {
-      console.log("Token expired or invalid, logging out...");
-      localStorage.removeItem("token");
-      localStorage.removeItem("currentUser");
-      delete axios.defaults.headers.common["Authorization"];
-      window.location.href = "/login";
+  async (error) => {
+    const config = error.config || {};
+    const url = config.url || "";
+    const skip = config._skipAuthRefresh || config._retried || url.includes("/api/auth/login") || url.includes("/api/auth/logout");
+    if (error.response?.status !== 401 || skip) return Promise.reject(error);
+
+    const session = await refreshSession();
+    if (session?.token) {
+      config._retried = true;
+      config.headers = { ...config.headers, Authorization: `Bearer ${session.token}` };
+      return axios(config);
     }
+    localStorage.removeItem("currentUser");
+    if (!PUBLIC_PATHS.includes(window.location.pathname)) window.location.href = "/login";
     return Promise.reject(error);
   },
 );
 
 export const AuthProvider = ({ children }) => {
   const dispatch = useDispatch();
-  const [user, setUser] = useState(() => {
-    const stored = localStorage.getItem("currentUser");
-    if (stored) {
-      try {
-        const parsed = JSON.parse(stored);
-        const token = localStorage.getItem("token");
-        if (token) {
-          axios.defaults.headers.common["Authorization"] = `Bearer ${token}`;
-        }
-        return parsed;
-      } catch {
-        return null;
-      }
-    }
-    return null;
-  });
-  const [loading, setLoading] = useState(false);
+  const [user, setUser] = useState(null);
+  // true until the refresh cookie has been checked, so routes wait instead of
+  // bouncing a logged-in user to /login on every page load
+  const [loading, setLoading] = useState(true);
 
   // Tag Sentry errors and PostHog events with who is logged in.
   useEffect(() => {
     identifyUser(user);
   }, [user]);
+  // currentUser in localStorage is only the profile (no token), for pages that read it.
   const processUserSession = useCallback((userData) => {
     if (userData && userData._id) {
-      setUser(userData);
-      localStorage.setItem("currentUser", JSON.stringify(userData));
-      if (userData.token) {
-        localStorage.setItem("token", userData.token);
-        axios.defaults.headers.common["Authorization"] =
-          `Bearer ${userData.token}`;
-      }
+      const { token, ...profile } = userData;
+      if (token) setAccessToken(token);
+      setUser(profile);
+      localStorage.setItem("currentUser", JSON.stringify(profile));
     } else {
+      setAccessToken("");
       setUser(null);
       localStorage.removeItem("currentUser");
-      if (localStorage.getItem("token")) {
-        localStorage.removeItem("token");
-        delete axios.defaults.headers.common["Authorization"];
-      }
     }
   }, []);
+
+  // Page load: the access token is gone (memory only), so swap the refresh cookie for one.
+  useEffect(() => {
+    let alive = true;
+    refreshSession().then((session) => {
+      if (!alive) return;
+      processUserSession(session);
+      setLoading(false);
+    });
+    return () => {
+      alive = false;
+    };
+  }, [processUserSession]);
 
   const login = async (email, password) => {
     setLoading(true);
@@ -142,6 +151,8 @@ export const AuthProvider = ({ children }) => {
   const logout = () => {
     console.log("Logging out user...");
     dispatch(clearSessions());
+    // Cancels the refresh token on the server and clears the cookie.
+    axios.post("/api/auth/logout", {}, { _skipAuthRefresh: true }).catch(() => {});
     processUserSession(null);
   };
 

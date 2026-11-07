@@ -16,6 +16,12 @@ export default defineConfig({
       },
     },
   },
+  build: {
+    rollupOptions: {
+      // room.html = standalone Voxio patient room (no login)
+      input: { main: resolve(__dirname, "index.html"), room: resolve(__dirname, "room.html") },
+    },
+  },
   resolve: {
     alias: {
       "@": resolve(__dirname, "./src"),

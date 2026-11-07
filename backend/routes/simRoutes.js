@@ -1,6 +1,8 @@
 /**
- * The conversation API the Unreal simulator talks to during a consultation: a
- * drop-in copy of Voxio's chat.voxio.in, which this backend replaced.
+ * The conversation API the Unreal simulator talks to during a consultation.
+ * On this branch every call is run on Voxio (utils/voxioEngine.js): the game
+ * keeps calling this server exactly as before, and this server drives the
+ * scenario's Voxio flow and records the results for the dashboards.
  *
  * Mounted at /agents (Voxio's own paths, so the game changes only its base
  * URL) and at /api/chat (the same two calls under the API prefix).
@@ -13,7 +15,9 @@
  *     400 {"detail": "either api_key or workflow required , received : dict_keys([...])"}
  *     500 text "Internal Server Error" for an unknown api_key
  *   POST process_input  {session_id, user_input: {user_input: "..."}}
- *     200 {"speak": "..."}: the patient, or the tutor once feedback exists
+ *     200 {"speak": "..."}: the patient, or the tutor once feedback exists.
+ *         Send "avatar": true to also get the patient's 3D avatar cues:
+ *         {"speak", "movement": ["shoulder.flexion"], "expression": "pain"}.
  *     404 {"detail": "Session not found or expired"}
  *     422 FastAPI validation body when session_id or user_input is missing
  *
@@ -23,15 +27,14 @@
 import express from "express";
 import { randomUUID } from "crypto";
 import {
-  GREETING,
   getConversation,
   patientTurn,
   reasoningTurn,
   reflectionTurn,
+  sessionState,
   startReflection,
   startSession,
-  voxioStyleState,
-} from "../utils/simEngine.js";
+} from "../utils/voxioEngine.js";
 
 const router = express.Router();
 
@@ -61,10 +64,10 @@ router.post("/start_session", async (req, res) => {
 
   const sessionId = body.session_id ? String(body.session_id) : randomUUID();
   try {
-    const conv = await startSession(sessionId, String(apiKey));
-    if (!conv) return internalError(res, new Error(`start_session: no scenario has api_key ${String(apiKey).slice(0, 8)}…`));
-    console.log(`[SIM] session ${sessionId} started for scenario ${conv.scenario_id}`);
-    res.json({ speak: GREETING });
+    const started = await startSession(sessionId, String(apiKey));
+    if (!started) return internalError(res, new Error(`start_session: no scenario has api_key ${String(apiKey).slice(0, 8)}…`));
+    console.log(`[SIM] session ${sessionId} started on Voxio for scenario ${started.conv.scenario_id}`);
+    res.json({ speak: started.speak });
   } catch (err) {
     internalError(res, err);
   }
@@ -120,6 +123,9 @@ router.post("/process_input", async (req, res) => {
       return res.json({ speak: response });
     }
     const reply = await patientTurn(sessionId, input);
+    if (body.avatar === true) {
+      return res.json({ speak: reply.speak, movement: reply.movement, expression: reply.expression });
+    }
     res.json({ speak: reply.speak });
   } catch (err) {
     // A turn refused by the engine (e.g. 409) is reported, not hidden as a 500.
@@ -134,7 +140,7 @@ router.get("/session", async (req, res) => {
   const sessionId = String(req.query?.session_id ?? "");
   try {
     const conv = sessionId && (await getConversation(sessionId, { create: false }));
-    res.json({ "session-data": { state: conv ? voxioStyleState(conv) : null } });
+    res.json({ "session-data": { state: conv ? await sessionState(sessionId) : null } });
   } catch (err) {
     internalError(res, err);
   }

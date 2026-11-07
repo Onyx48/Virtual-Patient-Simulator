@@ -3,7 +3,8 @@ import mongoose from "mongoose";
 import { jwtDecrypt } from "jose";
 import { createSecretKey } from "crypto";
 import { startTrace } from "../utils/routeTrace.js";
-import { endAndGrade, reasoningTurn } from "../utils/simEngine.js";
+import { endAndGrade, reasoningTurn, syncFromVoxio } from "../utils/voxioEngine.js";
+import { ensureFlow } from "../utils/voxioSync.js";
 import SimConversation from "../models/simConversationModel.js";
 import { publicMessage } from "../utils/appEnv.js";
 import { setLiveScenario } from "../state/liveScenario.js";
@@ -120,7 +121,11 @@ router.post(
       // The student and session ids travel with it as `Id` / `StreamSessionId`,
       // which is how they come back to posta's /get-results as user_id and
       // session_id.
-      setLiveScenario(scenario, { userId: req.user._id, sessionId });
+      const flowKey = await ensureFlow(scenario);
+      setLiveScenario(flowKey === scenario.apiKey ? scenario : { ...(scenario.toObject?.() ?? scenario), apiKey: flowKey }, {
+        userId: req.user._id,
+        sessionId,
+      });
 
       const redirectUrl = roomUrlFor(sessionId);
       console.log(
@@ -259,6 +264,8 @@ router.post("/complete", async (req, res) => {
   }
 
   try {
+    // Pull Voxio's latest state first, so the record holds the final results.
+    await syncFromVoxio(session_id).catch((err) => trace.warn("Voxio sync before complete failed", err.message));
     const conv = await SimConversation.findOne({ session_id }).lean();
     const result = {
       transcription: (conv?.diagnosis_history || []).map(({ role, content }) => ({ role, content })),

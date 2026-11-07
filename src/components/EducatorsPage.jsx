@@ -1,3 +1,4 @@
+import { getAccessToken } from "../lib/authToken.js";
 import React, { useState, useEffect, useMemo, useRef } from "react";
 import axios from "axios";
 import * as XLSX from "xlsx";
@@ -27,7 +28,7 @@ import { usePagination } from "../lib/hooks/usePagination";
 import { useLoading, Spinner } from "../lib/hooks/useLoading";
 
 const getAuthHeaders = () => {
-  const token = localStorage.getItem("token");
+  const token = getAccessToken();
   return { headers: { Authorization: `Bearer ${token}` } };
 };
 

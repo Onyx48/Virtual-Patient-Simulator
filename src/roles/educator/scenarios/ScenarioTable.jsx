@@ -28,19 +28,11 @@ function ScenarioTable({ data, onEditClick, canEdit = true }) {
    * this scenario to that endpoint and only then open the simulator, or the
    * simulator loads the previous tester's scenario.
    *
-   * The blank tab is opened synchronously, before the await, because a
-   * window.open() that happens after an async gap has lost the user's click
-   * gesture and gets blocked as a popup.
+   * Opens in the same tab (the room has a Back button), so no popup blocking.
    */
   const handleTest = async (scenario) => {
     const scenarioId = scenario._id || scenario.id;
     if (!scenarioId || publishingId || !isTestable(scenario)) return;
-
-    const tab = window.open("", "_blank");
-    if (!tab) {
-      toast.error("Allow popups for this site to test a scenario.");
-      return;
-    }
 
     setPublishingId(scenarioId);
     try {
@@ -53,9 +45,8 @@ function ScenarioTable({ data, onEditClick, canEdit = true }) {
       if (!data?.simulatorUrl) {
         throw new Error("The server did not say where the simulator is.");
       }
-      tab.location = data.simulatorUrl;
+      window.location.assign(data.simulatorUrl); // same tab; the room has a Back button
     } catch (error) {
-      tab.close();
       toast.error(
         error.response?.data?.message ||
           error.message ||

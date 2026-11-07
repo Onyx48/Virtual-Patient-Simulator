@@ -12,6 +12,7 @@
  * POST /api/sessions/start or POST /api/scenarios/json mints. Results are also
  * written onto the matching Session row, which is what the dashboards read.
  */
+import { isSgLocale, withSgStandard } from "./sgScenario.js";
 import { readFileSync } from "fs";
 import Scenario from "../models/scenarioModel.js";
 import Session from "../models/sessionModel.js";
@@ -20,6 +21,7 @@ import { getLiveScenario, getLiveMeta } from "../state/liveScenario.js";
 import { htmlToText, questionsToArray } from "./bubbleScenario.js";
 import { decodeEntities } from "./richText.js";
 import { chatJson } from "./simLlm.js";
+import { normaliseProfession, otStandardCriterion } from "./profession.js";
 
 /*
  * The exact turn that ends the consultation. The game sends it through the
@@ -167,14 +169,16 @@ const standardCriterion = (index, total) => {
  */
 const CRITERION_TAG = /^\s*\[([^\]]+)\]\s*/;
 
-const parseQuestion = (raw, index, all) => {
+const parseQuestion = (raw, index, all, profession) => {
   const text = String(raw).replace(/^\d+[.)]\s*/, "");
   const tag = text.match(CRITERION_TAG);
   const tagged = tag && HT_CRITERIA.find((c) => c.toLowerCase() === tag[1].trim().toLowerCase());
   return {
     number: index + 1,
     question: tag ? text.slice(tag[0].length) : text,
-    criterion: tagged || standardCriterion(index, all.length),
+    criterion:
+      tagged ||
+      (profession === "occupational_therapy" ? otStandardCriterion(index, all.length) : standardCriterion(index, all.length)),
   };
 };
 
@@ -182,6 +186,9 @@ const parseQuestion = (raw, index, all) => {
 
 const scenarioCache = new Map(); // id -> { at, brief, questions }
 const SCENARIO_TTL_MS = 60_000;
+
+/** Forget a scenario's cached brief after it is edited. */
+export const forgetScenario = (scenarioId) => scenarioCache.delete(String(scenarioId));
 
 /*
  * The objectives a scenario was written with: the learningObjectives field
@@ -216,26 +223,33 @@ const isJapanese = (scenario, brief) =>
   /japanese|日本語/i.test(scenario.language || "") || JAPANESE_TEXT.test(brief.slice(0, 500));
 
 /** The patient brief and grading questions, as plain text. */
-const scenarioFor = async (scenarioId) => {
+export const scenarioFor = async (scenarioId) => {
   const hit = scenarioCache.get(scenarioId);
   if (hit && Date.now() - hit.at < SCENARIO_TTL_MS) return hit;
 
   const scenario = await Scenario.findById(scenarioId)
-    .select("scenarioName scenarioPrompt aiQuestions learningObjectives language")
+    .select("scenarioName scenarioPrompt aiQuestions learningObjectives language profession locale patientGender patientName animationTriggers")
     .lean();
   if (!scenario) throw httpError(404, "The scenario for this session no longer exists.");
 
   const brief = htmlToText(decodeEntities(scenario.scenarioPrompt || ""));
-  const questionList = questionsToArray(decodeEntities(scenario.aiQuestions || "")).map(parseQuestion);
+  const profession = normaliseProfession(scenario.profession);
+  const questionList = questionsToArray(decodeEntities(scenario.aiQuestions || "")).map((q, i, all) =>
+    parseQuestion(q, i, all, profession),
+  );
   const questions = questionList.map((q) => `${q.number}. ${q.question}`).join(" ");
   const entry = {
     at: Date.now(),
     brief,
+    // what the PATIENT is given: the case, plus the fixed Singapore standard for sg scenarios
+    patientBrief: isSgLocale(scenario.locale) ? withSgStandard(brief) : brief,
     questions,
     questionList,
     objectives: learningObjectivesOf(scenario, brief),
     summary: scenarioSummaryOf(scenario, brief),
     japanese: isJapanese(scenario, brief),
+    profession,
+    scenario,
   };
   scenarioCache.set(scenarioId, entry);
   return entry;
@@ -246,7 +260,7 @@ const scenarioFor = async (scenarioId) => {
  * live slot (an educator's Test run), else a scenario looked up by the api_key
  * the game was handed.
  */
-const resolveScenarioId = async (sessionId, apiKey) => {
+export const resolveScenarioId = async (sessionId, apiKey) => {
   const row = await Session.findOne({ session_id: sessionId }).select("scenario_id").lean();
   if (row?.scenario_id) return row.scenario_id;
 
@@ -324,7 +338,7 @@ const serial = (sessionId, work) => {
 
 // ---- dashboard record ------------------------------------------------------
 
-const saveToSession = async (conv) => {
+export const saveToSession = async (conv) => {
   await Session.updateOne(
     { session_id: conv.session_id },
     {
@@ -342,7 +356,7 @@ const saveToSession = async (conv) => {
 // ---- the three phases ------------------------------------------------------
 
 /** Clamp the grader's score into [0, 1]; null when it gave none. */
-const toScore = (value) => {
+export const toScore = (value) => {
   const n = Number(value);
   return value === null || value === undefined || value === "" || !Number.isFinite(n)
     ? null
@@ -353,7 +367,7 @@ const toScore = (value) => {
  * Models sometimes return the paragraphs joined by spaces despite the prompt.
  * Three or more spaces between sentences is where a blank line was meant.
  */
-const fixParagraphs = (text) => String(text || "").replace(/([.!?"'”])\s{3,}/g, "$1\n\n").trim();
+export const fixParagraphs = (text) => String(text || "").replace(/([.!?"'”])\s{3,}/g, "$1\n\n").trim();
 
 /**
  * The grader's per-question verdicts, joined to the scenario's own question
@@ -361,7 +375,7 @@ const fixParagraphs = (text) => String(text || "").replace(/([.!?"'”])\s{3,}/g
  * repeated. A question the model did not return is recorded as "no" with no
  * evidence rather than dropped, so the table always has every row.
  */
-const questionResults = (questionList, returned) => {
+export const questionResults = (questionList, returned) => {
   const byNumber = new Map();
   for (const r of Array.isArray(returned) ? returned : []) {
     const n = Number(r?.number);
@@ -454,14 +468,14 @@ export const patientTurn = (sessionId, userInput, opts = {}) =>
     const text = String(userInput || "").trim();
     if (!text) throw httpError(400, "user_input is empty.");
 
-    const { brief } = await scenarioFor(conv.scenario_id);
+    const { patientBrief } = await scenarioFor(conv.scenario_id);
     const messages = [
       ...conv.diagnosis_history.map(({ role, content }) => ({ role, content })),
       { role: "user", content: text },
     ];
     const { data, usage } = await chatJson({
       label: `patient session=${sessionId}`,
-      system: brief + PATIENT_FIELDS,
+      system: patientBrief + PATIENT_FIELDS,
       messages,
       schema: SCHEMAS.patient,
       effort: "low",
@@ -498,19 +512,19 @@ export const endAndGrade = async (sessionId, opts = {}) => {
 
 // ---- self-reflection -------------------------------------------------------
 
-const CLOSING = {
+export const CLOSING = {
   en: "Thanks. Your feedback is ready for you now.",
   ja: "ありがとうございました。フィードバックの準備ができました。",
 };
 
-const JAPANESE_OVERRIDE = `
+export const JAPANESE_OVERRIDE = `
 
 LANGUAGE (overrides the spelling rule above)
 
 This scenario is in Japanese. Hold the whole reflection in natural, polite spoken Japanese, and write the "summary" field in Japanese. Keep the JSON keys and the status values in English.`;
 
 /** The consultation as numbered turns, so the guide can point to a moment. */
-const numberedTranscript = (history) => {
+export const numberedTranscript = (history) => {
   let turn = 0;
   return history
     .map(({ role, content }) => {
@@ -583,11 +597,11 @@ export const startReflection = (sessionId) =>
     return speak;
   });
 
-const toSelfRating = (v) => {
+export const toSelfRating = (v) => {
   const n = Math.round(Number(v));
   return v === null || v === undefined || v === "" || !Number.isFinite(n) || n < 1 || n > 10 ? null : n;
 };
-const REFLECTION_STATUSES = ["completed", "partial", "skipped", "ended_early_distress"];
+export const REFLECTION_STATUSES = ["completed", "partial", "skipped", "ended_early_distress"];
 
 /*
  * [END_OF_REFLECTION]: turn the conversation into the dashboard result. A

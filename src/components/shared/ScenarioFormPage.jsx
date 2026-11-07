@@ -309,6 +309,10 @@ function ScenarioFormPage() {
       questionsForFeedback: "",
       // One objective per line; read by the self-reflection-AI-guide.
       learningObjectives: "",
+      // Physiotherapy or occupational therapy; the school's default for a new one.
+      profession: user?.schoolId?.defaultProfession || "physiotherapy",
+      // new scenarios default to a Singapore patient (backend/utils/sgScenario.js)
+      locale: "sg",
     },
   });
 
@@ -356,6 +360,8 @@ function ScenarioFormPage() {
           "",
       );
       setValue("learningObjectives", selectedScenario.learningObjectives || "");
+      setValue("profession", selectedScenario.profession || "physiotherapy");
+      setValue("locale", selectedScenario.locale || "");
 
       if (selectedScenario.animationTriggers || selectedScenario.movements) {
         setValue(
@@ -402,6 +408,8 @@ function ScenarioFormPage() {
 
       const response = await axios.post(url, {
         scenario_prompt: aiInput,
+        profession: getValues("profession"),
+        locale: getValues("locale"),
         ...(existingApiKey && { api_key: existingApiKey }),
       });
 
@@ -481,27 +489,12 @@ function ScenarioFormPage() {
     };
 
     /*
-     * A published scenario has to be runnable, and a run needs the simulator key
-     * the AI creates — its key. Without one, "Published" is a label on something
-     * a student would open into nothing, so it is saved as a draft instead.
+     * No simulator-key check here any more: the key used to come back from AI
+     * generation, but the scenario's Voxio flow (and its key) is now created by
+     * the backend when the scenario is saved (utils/voxioSync.js), so a new
+     * scenario never has one at this point and the check always forced a draft.
      */
-    const hasSimulatorFlow = !!(apiKey || selectedScenario?.apiKey);
-    const wantsPublish = data.status === "Published";
-
     try {
-      if (wantsPublish && !hasSimulatorFlow) {
-        await save("Draft");
-        setErrorPopup({
-          open: true,
-          leaveOnClose: true,
-          message:
-            "Saved as a draft. This scenario has no simulator flow yet, so it " +
-            "cannot be published — use the AI prompt at the top of the form to " +
-            "generate one, then publish.",
-        });
-        return;
-      }
-
       await save(data.status);
       navigate("/scenarios");
     } catch (err) {
@@ -655,6 +648,34 @@ function ScenarioFormPage() {
           </div>
 
           <div className="p-6 pt-0 overflow-y-auto max-h-[85vh]">
+            <div className="mb-3 flex items-center gap-3">
+              <label htmlFor="profession" className="text-xs font-semibold text-gray-700">
+                Profession
+              </label>
+              <select
+                id="profession"
+                {...register("profession")}
+                className="border border-gray-300 rounded-md text-sm px-2 py-1.5 outline-none focus:ring-1 focus:ring-blue-500"
+              >
+                <option value="physiotherapy">Physiotherapy (PT)</option>
+                <option value="occupational_therapy">Occupational therapy (OT)</option>
+              </select>
+              <span className="text-xs text-gray-500">Sets the AI's case style and the standard feedback questions.</span>
+            </div>
+            <div className="mb-3 flex items-center gap-3">
+              <label htmlFor="locale" className="text-xs font-semibold text-gray-700">
+                Patient setting
+              </label>
+              <select
+                id="locale"
+                {...register("locale")}
+                className="border border-gray-300 rounded-md text-sm px-2 py-1.5 outline-none focus:ring-1 focus:ring-blue-500"
+              >
+                <option value="sg">Singapore</option>
+                <option value="">General</option>
+              </select>
+              <span className="text-xs text-gray-500">Singapore: a local patient with Singapore speech and context. A few words are enough, e.g. "50s hawker, shoulder".</span>
+            </div>
             <div className="mb-6 p-1 rounded-lg border border-orange-300 bg-white shadow-sm flex items-center relative z-0">
               <div className="pl-3 text-orange-400">
                 {isAiLoading ? (

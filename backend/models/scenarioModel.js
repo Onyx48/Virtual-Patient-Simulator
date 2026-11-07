@@ -49,6 +49,32 @@ const scenarioSchema = new mongoose.Schema(
 
     apiKey: { type: String },
 
+    // Physiotherapy or occupational therapy (utils/profession.js). Decides the
+    // simulator's wording and the standard feedback questions.
+    profession: {
+      type: String,
+      enum: ["physiotherapy", "occupational_therapy"],
+      default: "physiotherapy",
+    },
+
+    // "sg": a Singapore patient (utils/sgScenario.js). The fixed Singapore speaking
+    // standard is added in front of scenarioPrompt for the patient at session time.
+    locale: { type: String, enum: ["", "sg"], default: "" },
+
+    // Key of this scenario's flow in Voxio's gpu environment, used by the educator's
+    // Test room (/room.html). Separate from apiKey, the standard flow the game uses.
+    roomFlowKey: { type: String, default: "" },
+
+    /*
+     * The state of this scenario's Voxio flow (utils/voxioSync.js): written each
+     * time the scenario is saved and the flow is created or updated to match.
+     */
+    voxioSync: {
+      status: { type: String, enum: ["pending", "synced", "failed"], default: undefined },
+      at: { type: Date },
+      error: { type: String },
+    },
+
     /*
      * Who the simulator plays, served by GET /api/scenarios/json so the avatar's
      * voice and look match the patient. The AI routes extract them from the

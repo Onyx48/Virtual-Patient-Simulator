@@ -33,3 +33,18 @@ export const emptyTriggers = () =>
 /** `{ shoulder: {}, neck: {}, ... }` — the AI payload's shape, keyed movement maps. */
 export const emptyMovements = () =>
   Object.fromEntries(BODY_REGIONS.map((region) => [region, {}]));
+
+/*
+ * The movements the simulator can animate in each region, as named in the
+ * scenario prompts' `movements` object. The Voxio patient returns them as
+ * "region.movement" when the student asks the patient to move.
+ */
+export const REGION_MOVEMENTS = {
+  shoulder: ["flexion", "extension", "abduction", "external_rotation", "internal_rotation", "horizontal_adduction", "hand_behind_back", "hand_behind_neck"],
+  neck: ["flexion", "extension", "left_rotation", "right_rotation", "protraction", "retraction", "right_lateral_flexion", "left_lateral_flexion"],
+  lower_back: ["flexion", "extension", "left_lateral_flexion", "right_lateral_flexion", "left_rotation", "right_rotation"],
+  hip: ["flexion", "extension", "abduction", "adduction", "internal_rotation", "external_rotation"],
+  knee: ["flexion", "extension"],
+  ankle: ["dorsiflexion", "plantarflexion", "inversion", "eversion"],
+  foot: ["great_toe_extension", "great_toe_flexion", "forefoot_pronation", "forefoot_supination"],
+};

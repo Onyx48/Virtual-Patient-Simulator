@@ -12,6 +12,9 @@ import { protect } from "../middleware/authMiddleware.js";
 import { sendWelcomeEmail } from "../utils/emailService.js";
 import { canonicalizeEmail, findUserByEmail } from "../utils/emailLookup.js";
 import { capture } from "../utils/analytics.js";
+import {
+  clearRefreshCookie, issueRefreshToken, revokeRefreshToken, rotateRefreshToken, signAccessToken,
+} from "../utils/authTokens.js";
 
 const router = express.Router();
 
@@ -257,11 +260,10 @@ router.post(
       if (!isMatch)
         return res.status(401).json({ message: "Invalid credentials." });
 
-      const token = jwt.sign(
-        { id: user._id, role: user.role },
-        process.env.JWT_SECRET,
-        { expiresIn: "24h" },
-      );
+      // Short access token in the body (the browser keeps it in memory only), long
+      // refresh token in an httpOnly cookie (utils/authTokens.js).
+      const token = signAccessToken(user);
+      await issueRefreshToken(res, user._id, req);
 
       /*
        * Stamped without awaiting and without failing the login: this only feeds
@@ -291,6 +293,40 @@ router.post(
     }
   },
 );
+
+// The user's profile as the frontend keeps it (same fields as /login).
+const publicUser = (user) => ({
+  _id: user._id, name: user.name, email: user.email, role: user.role, schoolId: user.schoolId,
+  groupId: user.groupId, phoneNumber: user.phoneNumber, profilePicture: user.profilePicture,
+});
+
+// Swaps the refresh cookie for a new access token and a new cookie. Called on page
+// load, by the Test room, and whenever an API call comes back 401.
+router.post("/refresh", async (req, res) => {
+  try {
+    const userId = await rotateRefreshToken(req, res);
+    const user = userId && (await User.findById(userId));
+    if (!user) {
+      clearRefreshCookie(res);
+      return res.status(401).json({ message: "Session expired. Please log in again." });
+    }
+    res.json({ ...publicUser(user), token: signAccessToken(user) });
+  } catch (err) {
+    console.error("Refresh Error:", err);
+    res.status(500).json({ message: "Server Error" });
+  }
+});
+
+// Logs this browser out by cancelling its refresh token. Needs no access token.
+router.post("/logout", async (req, res) => {
+  try {
+    await revokeRefreshToken(req);
+  } catch (err) {
+    console.error("Logout Error:", err);
+  }
+  clearRefreshCookie(res);
+  res.json({ message: "Logged out." });
+});
 
 router.post(
   "/forgot-password",
@@ -496,7 +532,8 @@ router.put(
       }
 
       user.password = newPassword;
-      await user.save();
+      await user.save(); // cancels every session (userModel post-save)
+      await issueRefreshToken(res, user._id, req); // but keeps this browser logged in
 
       res.json({ message: "Password updated successfully" });
     } catch (error) {

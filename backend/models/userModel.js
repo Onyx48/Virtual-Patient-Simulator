@@ -1,5 +1,6 @@
 // WHOLE_PROJECT/models/userModel.js
 import mongoose from "mongoose";
+import "./refreshTokenModel.js";
 import bcrypt from "bcryptjs";
 
 const userSchema = new mongoose.Schema(
@@ -94,6 +95,8 @@ userSchema.pre("save", async function (next) {
   if (!this.isModified("password")) {
     return next();
   }
+  // Remembered for post-save: a new password logs the account out everywhere.
+  this.$locals.passwordChanged = !this.isNew;
   try {
     const salt = await bcrypt.genSalt(10);
     this.password = await bcrypt.hash(this.password, salt);
@@ -101,6 +104,14 @@ userSchema.pre("save", async function (next) {
   } catch (error) {
     next(error);
   }
+});
+
+// Every password change or reset (self-service, OTP reset, admin resend) cancels all
+// refresh tokens, so other devices have to log in again with the new password.
+userSchema.post("save", async function () {
+  if (!this.$locals.passwordChanged) return;
+  this.$locals.passwordChanged = false;
+  await mongoose.model("RefreshToken").deleteMany({ user: this._id });
 });
 
 userSchema.methods.matchPassword = async function (enteredPassword) {

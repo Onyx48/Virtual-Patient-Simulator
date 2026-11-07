@@ -1,0 +1,102 @@
+# Hip - right
+
+14 clips. Save each video in this folder, named exactly as the heading (e.g. `hip_flexion_right_full.mp4`).
+Use the reference image as both the first and the last frame. 25 fps.
+
+## hip_flexion_right_full
+Hip flexion (right) - Full
+
+```
+The patient smoothly lifts the right knee up toward the chest, knee bent, through the full normal range, comfortably, face relaxed. Holds the end position for two seconds. Then slowly returns to the exact starting pose. The last frame must match the first frame exactly. Mouth closed and relaxed, no speaking. About 10 seconds long (at least 10 seconds), 25 fps, with the movement paced slowly to fill the time.
+```
+
+## hip_flexion_right_ltd
+Hip flexion (right) - Limited
+
+```
+The patient slowly and stiffly lifts the right knee up toward the chest, knee bent, but stops at about half of the normal range with a small wince of pain and cannot go further. Holds for two seconds. Then slowly returns to the exact starting pose. The last frame must match the first frame exactly. Mouth closed and relaxed, no speaking. About 10 seconds long (at least 10 seconds), 25 fps, with the movement paced slowly to fill the time.
+```
+
+## hip_flexion_right_90
+Hip flexion (right) - Limited at 90 degrees
+
+```
+The patient slowly lifts the right knee up toward the chest, knee bent, but stops at about 90 degrees (arm level with the shoulder) with a wince of pain and cannot go higher. Holds for two seconds. Then slowly returns to the exact starting pose. The last frame must match the first frame exactly. Mouth closed and relaxed, no speaking. About 10 seconds long (at least 10 seconds), 25 fps, with the movement paced slowly to fill the time.
+```
+
+## hip_flexion_right_120
+Hip flexion (right) - Limited at 120 degrees
+
+```
+The patient slowly lifts the right knee up toward the chest, knee bent, but stops at about 120 degrees, a little above shoulder level, with a wince of pain and cannot go higher. Holds for two seconds. Then slowly returns to the exact starting pose. The last frame must match the first frame exactly. Mouth closed and relaxed, no speaking. About 10 seconds long (at least 10 seconds), 25 fps, with the movement paced slowly to fill the time.
+```
+
+## hip_extension_right_full
+Hip extension (right) - Full
+
+```
+The patient smoothly stands holding a chair and moves the straight right leg backward behind the body, through the full normal range, comfortably, face relaxed. Holds the end position for two seconds. Then slowly returns to the exact starting pose. The last frame must match the first frame exactly. Mouth closed and relaxed, no speaking. About 10 seconds long (at least 10 seconds), 25 fps, with the movement paced slowly to fill the time.
+```
+
+## hip_extension_right_ltd
+Hip extension (right) - Limited
+
+```
+The patient slowly and stiffly stands holding a chair and moves the straight right leg backward behind the body, but stops at about half of the normal range with a small wince of pain and cannot go further. Holds for two seconds. Then slowly returns to the exact starting pose. The last frame must match the first frame exactly. Mouth closed and relaxed, no speaking. About 10 seconds long (at least 10 seconds), 25 fps, with the movement paced slowly to fill the time.
+```
+
+## hip_abduction_right_full
+Hip abduction (right) - Full
+
+```
+The patient smoothly stands holding a chair and lifts the straight right leg out to the side, away from the other leg, through the full normal range, comfortably, face relaxed. Holds the end position for two seconds. Then slowly returns to the exact starting pose. The last frame must match the first frame exactly. Mouth closed and relaxed, no speaking. About 10 seconds long (at least 10 seconds), 25 fps, with the movement paced slowly to fill the time.
+```
+
+## hip_abduction_right_ltd
+Hip abduction (right) - Limited
+
+```
+The patient slowly and stiffly stands holding a chair and lifts the straight right leg out to the side, away from the other leg, but stops at about half of the normal range with a small wince of pain and cannot go further. Holds for two seconds. Then slowly returns to the exact starting pose. The last frame must match the first frame exactly. Mouth closed and relaxed, no speaking. About 10 seconds long (at least 10 seconds), 25 fps, with the movement paced slowly to fill the time.
+```
+
+## hip_adduction_right_full
+Hip adduction (right) - Full
+
+```
+The patient smoothly stands holding a chair and moves the straight right leg inward, across in front of the other leg, through the full normal range, comfortably, face relaxed. Holds the end position for two seconds. Then slowly returns to the exact starting pose. The last frame must match the first frame exactly. Mouth closed and relaxed, no speaking. About 10 seconds long (at least 10 seconds), 25 fps, with the movement paced slowly to fill the time.
+```
+
+## hip_adduction_right_ltd
+Hip adduction (right) - Limited
+
+```
+The patient slowly and stiffly stands holding a chair and moves the straight right leg inward, across in front of the other leg, but stops at about half of the normal range with a small wince of pain and cannot go further. Holds for two seconds. Then slowly returns to the exact starting pose. The last frame must match the first frame exactly. Mouth closed and relaxed, no speaking. About 10 seconds long (at least 10 seconds), 25 fps, with the movement paced slowly to fill the time.
+```
+
+## hip_internal_rotation_right_full
+Hip internal rotation (right) - Full
+
+```
+The patient smoothly sits with the right knee bent at 90 degrees and swings the foot outward so the thigh rolls inward, through the full normal range, comfortably, face relaxed. Holds the end position for two seconds. Then slowly returns to the exact starting pose. The last frame must match the first frame exactly. Mouth closed and relaxed, no speaking. About 10 seconds long (at least 10 seconds), 25 fps, with the movement paced slowly to fill the time.
+```
+
+## hip_internal_rotation_right_ltd
+Hip internal rotation (right) - Limited
+
+```
+The patient slowly and stiffly sits with the right knee bent at 90 degrees and swings the foot outward so the thigh rolls inward, but stops at about half of the normal range with a small wince of pain and cannot go further. Holds for two seconds. Then slowly returns to the exact starting pose. The last frame must match the first frame exactly. Mouth closed and relaxed, no speaking. About 10 seconds long (at least 10 seconds), 25 fps, with the movement paced slowly to fill the time.
+```
+
+## hip_external_rotation_right_full
+Hip external rotation (right) - Full
+
+```
+The patient smoothly sits with the right knee bent at 90 degrees and swings the foot inward so the thigh rolls outward, through the full normal range, comfortably, face relaxed. Holds the end position for two seconds. Then slowly returns to the exact starting pose. The last frame must match the first frame exactly. Mouth closed and relaxed, no speaking. About 10 seconds long (at least 10 seconds), 25 fps, with the movement paced slowly to fill the time.
+```
+
+## hip_external_rotation_right_ltd
+Hip external rotation (right) - Limited
+
+```
+The patient slowly and stiffly sits with the right knee bent at 90 degrees and swings the foot inward so the thigh rolls outward, but stops at about half of the normal range with a small wince of pain and cannot go further. Holds for two seconds. Then slowly returns to the exact starting pose. The last frame must match the first frame exactly. Mouth closed and relaxed, no speaking. About 10 seconds long (at least 10 seconds), 25 fps, with the movement paced slowly to fill the time.
+```

@@ -119,6 +119,9 @@ importers:
       tailwindcss-animate:
         specifier: ^1.0.7
         version: 1.0.7(tailwindcss@3.4.19)
+      voxioagent:
+        specifier: 3.1.2
+        version: 3.1.2(react@19.2.7)
       xlsx:
         specifier: ^0.18.5
         version: 0.18.5
@@ -1867,6 +1870,11 @@ packages:
   magic-string@1.4.4:
     resolution: {integrity: sha512-jQz9sVhrZuphH4NrAIHSgkDJCluQO7Ioi4KGRLa7aTUjAODQ13hENX0YIytqYE/rIkO485gQG2LeBxJaW53kkQ==}
 
+  marked@17.0.6:
+    resolution: {integrity: sha512-gB0gkNafnonOw0obSTEGZTT86IuhILt2Wfx0mWH/1Au83kybTayroZ/V6nS25mN7u8ASy+5fMhgB3XPNrOZdmA==}
+    engines: {node: '>= 20'}
+    hasBin: true
+
   math-intrinsics@1.1.0:
     resolution: {integrity: sha512-/IXtbwEk5HTPyEwyKX6hGkYXxM9nbj64B+ilVJnC/R6B0pH5G4V3b0pVbL7DBj4tkhBAppbQUlf6F6Xl9LHu1g==}
     engines: {node: '>= 0.4'}
@@ -2602,6 +2610,15 @@ packages:
       sugarss:
         optional: true
       terser:
+        optional: true
+
+  voxioagent@3.1.2:
+    resolution: {integrity: sha512-BhgMTeT4neEyZaC6fJp74MyutUaMrhMfz1h8XJU/L3wlbkwZ5JX9om5dqlFP7N8LseP3PoHZK739cIll0BGj3A==}
+    engines: {node: '>=18'}
+    peerDependencies:
+      react: '>=18'
+    peerDependenciesMeta:
+      react:
         optional: true
 
   web-vitals@6.2.1:
@@ -4366,6 +4383,8 @@ snapshots:
     dependencies:
       '@jridgewell/sourcemap-codec': 1.6.0
 
+  marked@17.0.6: {}
+
   math-intrinsics@1.1.0: {}
 
   media-typer@0.3.0: {}
@@ -5089,6 +5108,13 @@ snapshots:
     optionalDependencies:
       '@types/node': 22.20.0
       fsevents: 2.3.3
+
+  voxioagent@3.1.2(react@19.2.7):
+    dependencies:
+      dompurify: 3.4.17
+      marked: 17.0.6
+    optionalDependencies:
+      react: 19.2.7
 
   web-vitals@6.2.1: {}
 

@@ -1,3 +1,4 @@
+import { getAccessToken } from "../../lib/authToken.js";
 import React, { useState, useEffect, useMemo } from "react";
 import axios from "axios";
 import { XMarkIcon, ClockIcon, PlusIcon, MinusIcon } from "@heroicons/react/24/outline";
@@ -5,7 +6,7 @@ import { useLanguage } from "../../i18n/LanguageContext";
 import { toScorePercent } from "../../lib/utils.js";
 
 const getAuthHeaders = () => {
-  const token = localStorage.getItem("token");
+  const token = getAccessToken();
   return { headers: { Authorization: `Bearer ${token}` } };
 };
 

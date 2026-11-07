@@ -38,3 +38,23 @@ export const roomUrlFor = (roomId) => {
   const base = simulatorBaseUrl();
   return `${base}${base.includes("?") ? "&" : "?"}room=${encodeURIComponent(roomId)}`;
 };
+
+/**
+ * Where an educator's Test button goes. With TEST_ROOM_URL set, normally the
+ * path "/room.html" so the browser opens it on whatever origin the app is served
+ * from (dev 5173, preview 4173, a real domain), never a hardcoded host or port. Test then opens our Voxio room for this scenario
+ * flow; without it, Test falls back to the simulator above. Students' Start is
+ * not affected (it always uses roomUrlFor).
+ *
+ * The room fetches this session's customs from GET /api/scenarios/room/:sessionId.
+ */
+export const testRoomUrlFor = ({ sessionId, scenario }) => {
+  const base = (process.env.TEST_ROOM_URL || "").replace(/\/+$/, "");
+  if (!base) return roomUrlFor(sessionId);
+  const q = new URLSearchParams({
+    session: sessionId,
+    name: scenario?.scenarioName || "",
+    patient: scenario?.patientName || "",
+  });
+  return `${base}${base.includes("?") ? "&" : "?"}${q}`;
+};

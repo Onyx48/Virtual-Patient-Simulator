@@ -1,0 +1,299 @@
+{
+  "neck_extension_full": {
+    "uuid": "90b803f5-e83a-48b9-95bc-bef5eafd5f66",
+    "boxIndex": 0,
+    "name": "Neck extension",
+    "description": "neck extension - Full",
+    "frames": 239,
+    "detector": "s3fd",
+    "file": "Neck/extension/full.mp4"
+  },
+  "neck_extension_ltd": {
+    "uuid": "273ae9c4-6705-4352-9553-a1c6ee7d1514",
+    "boxIndex": 0,
+    "name": "Neck extension",
+    "description": "neck extension - Limited",
+    "frames": 239,
+    "detector": "s3fd",
+    "file": "Neck/extension/ltd.mp4"
+  },
+  "neck_flexion_full": {
+    "uuid": "10be8ada-596f-433f-b635-909ced9151ec",
+    "boxIndex": 0,
+    "name": "Neck flexion",
+    "description": "neck flexion - Full",
+    "frames": 239,
+    "detector": "s3fd",
+    "file": "Neck/flexion/full.mp4"
+  },
+  "neck_flexion_ltd": {
+    "uuid": "88f7353d-5846-40bd-a3e5-610e65bf972c",
+    "boxIndex": 0,
+    "name": "Neck flexion",
+    "description": "neck flexion - Limited",
+    "frames": 239,
+    "detector": "s3fd",
+    "file": "Neck/flexion/ltd.mp4"
+  },
+  "neck_left_lateral_flexion_full": {
+    "uuid": "08ae26cb-efe7-4d6d-b0b6-41a615ecd0fa",
+    "boxIndex": 0,
+    "name": "Neck side bend to the left",
+    "description": "neck left lateral flexion - Full",
+    "frames": 239,
+    "detector": "s3fd",
+    "file": "Neck/left_lateral_flexion/full.mp4"
+  },
+  "neck_left_lateral_flexion_ltd": {
+    "uuid": "f2b1a41d-18f2-4154-92fe-f7647c173b90",
+    "boxIndex": 0,
+    "name": "Neck side bend to the left",
+    "description": "neck left lateral flexion - Limited",
+    "frames": 239,
+    "detector": "s3fd",
+    "file": "Neck/left_lateral_flexion/ltd.mp4"
+  },
+  "neck_left_rotation_full": {
+    "uuid": "bde3bad0-d70d-457f-8d92-fc8f595c04a3",
+    "boxIndex": 0,
+    "name": "Neck rotation to the left",
+    "description": "neck left rotation - Full",
+    "frames": 239,
+    "detector": "s3fd",
+    "file": "Neck/left_rotation/full.mp4"
+  },
+  "neck_left_rotation_ltd": {
+    "uuid": "a1bf1389-fd33-47d8-a7fc-8ee90eff3e80",
+    "boxIndex": 0,
+    "name": "Neck rotation to the left",
+    "description": "neck left rotation - Limited",
+    "frames": 239,
+    "detector": "s3fd",
+    "file": "Neck/left_rotation/ltd.mp4"
+  },
+  "neck_protraction_full": {
+    "uuid": "a42acd2d-41ea-4628-b1d3-a67aa343fdbe",
+    "boxIndex": 0,
+    "name": "Neck protraction",
+    "description": "neck protraction - Full",
+    "frames": 239,
+    "detector": "s3fd",
+    "file": "Neck/protraction/full.mp4"
+  },
+  "neck_protraction_ltd": {
+    "uuid": "15a0fc91-7b94-4193-beb8-cd255d09e5b8",
+    "boxIndex": 0,
+    "name": "Neck protraction",
+    "description": "neck protraction - Limited",
+    "frames": 239,
+    "detector": "s3fd",
+    "file": "Neck/protraction/ltd.mp4"
+  },
+  "neck_retraction_full": {
+    "uuid": "03c53fe2-5656-4837-8012-183a982e4883",
+    "boxIndex": 0,
+    "name": "Neck retraction",
+    "description": "neck retraction - Full",
+    "frames": 239,
+    "detector": "s3fd",
+    "file": "Neck/retraction/full.mp4"
+  },
+  "neck_retraction_ltd": {
+    "uuid": "576f113e-c22f-4f6f-a81a-a03900b7ad8b",
+    "boxIndex": 0,
+    "name": "Neck retraction",
+    "description": "neck retraction - Limited",
+    "frames": 239,
+    "detector": "s3fd",
+    "file": "Neck/retraction/ltd.mp4"
+  },
+  "neck_right_lateral_flexion_full": {
+    "uuid": "df48d99c-e3f4-4955-9c33-ac6e43ed330f",
+    "boxIndex": 0,
+    "name": "Neck side bend to the right",
+    "description": "neck right lateral flexion - Full",
+    "frames": 239,
+    "detector": "s3fd",
+    "file": "Neck/right_lateral_flexion/full.mp4"
+  },
+  "neck_right_rotation_full": {
+    "uuid": "c9d34348-3269-420e-b262-c55bc8ee1ce6",
+    "boxIndex": 0,
+    "name": "Neck rotation to the right",
+    "description": "neck right rotation - Full",
+    "frames": 239,
+    "detector": "s3fd",
+    "file": "Neck/right_rotation/full.mp4"
+  },
+  "neck_right_rotation_ltd": {
+    "uuid": "f7632ada-30a6-438d-b139-554b8bc9e9af",
+    "boxIndex": 0,
+    "name": "Neck rotation to the right",
+    "description": "neck right rotation - Limited",
+    "frames": 239,
+    "detector": "s3fd",
+    "file": "Neck/right_rotation/ltd.mp4"
+  },
+  "main": {
+    "uuid": "c399cbc3-544c-414b-9db3-8da854a74c90",
+    "boxIndex": 0,
+    "name": "Resting pose",
+    "description": "Idle/rest clip; the avatar returns here after every movement.",
+    "frames": 239,
+    "detector": "s3fd",
+    "file": "Rest.mp4"
+  },
+  "shoulder_abduction_left_full": {
+    "uuid": "60fabe1a-b37e-459f-9917-33d35d26a427",
+    "boxIndex": 0,
+    "name": "Shoulder abduction (left)",
+    "description": "shoulder left abduction - Full",
+    "frames": 239,
+    "detector": "s3fd",
+    "file": "Shoulder/left/abduction/full.mp4"
+  },
+  "shoulder_abduction_left_ltd": {
+    "uuid": "30b5e27d-5894-4907-be21-a2ca36033b9a",
+    "boxIndex": 0,
+    "name": "Shoulder abduction (left)",
+    "description": "shoulder left abduction - Limited",
+    "frames": 239,
+    "detector": "s3fd",
+    "file": "Shoulder/left/abduction/ltd.mp4"
+  },
+  "shoulder_extension_left_full": {
+    "uuid": "db3f915b-ec9b-4382-8e42-3b3bb53f56ab",
+    "boxIndex": 0,
+    "name": "Shoulder extension (left)",
+    "description": "shoulder left extension - Full",
+    "frames": 239,
+    "detector": "s3fd",
+    "file": "Shoulder/left/extension/full.mp4"
+  },
+  "shoulder_extension_left_ltd": {
+    "uuid": "5c5a1636-ed6e-4be8-a3ab-b7997a185267",
+    "boxIndex": 0,
+    "name": "Shoulder extension (left)",
+    "description": "shoulder left extension - Limited",
+    "frames": 239,
+    "detector": "s3fd",
+    "file": "Shoulder/left/extension/ltd.mp4"
+  },
+  "shoulder_external_rotation_left_full": {
+    "uuid": "798f5c84-eb2f-47ff-a870-85018d568d7b",
+    "boxIndex": 0,
+    "name": "Shoulder external rotation (left)",
+    "description": "shoulder left external rotation - Full",
+    "frames": 239,
+    "detector": "s3fd",
+    "file": "Shoulder/left/external_rotation/full.mp4"
+  },
+  "shoulder_external_rotation_left_ltd": {
+    "uuid": "74afd163-8898-4dc2-a883-4847b8146916",
+    "boxIndex": 0,
+    "name": "Shoulder external rotation (left)",
+    "description": "shoulder left external rotation - Limited",
+    "frames": 239,
+    "detector": "s3fd",
+    "file": "Shoulder/left/external_rotation/ltd.mp4"
+  },
+  "shoulder_flexion_left_120": {
+    "uuid": "f5ea7a2d-0265-494d-9ad6-82323c3f7606",
+    "boxIndex": 0,
+    "name": "Shoulder flexion (left)",
+    "description": "shoulder left flexion - Limited at 120 degrees",
+    "frames": 239,
+    "detector": "s3fd",
+    "file": "Shoulder/left/flexion/120.mp4"
+  },
+  "shoulder_flexion_left_90": {
+    "uuid": "dba41989-dd17-4f5c-8764-87b5ebf0a40a",
+    "boxIndex": 0,
+    "name": "Shoulder flexion (left)",
+    "description": "shoulder left flexion - Limited at 90 degrees",
+    "frames": 239,
+    "detector": "s3fd",
+    "file": "Shoulder/left/flexion/90.mp4"
+  },
+  "shoulder_flexion_left_full": {
+    "uuid": "71069d6f-65c0-4340-a198-f8c615dbdf8b",
+    "boxIndex": 0,
+    "name": "Shoulder flexion (left)",
+    "description": "shoulder left flexion - Full",
+    "frames": 239,
+    "detector": "s3fd",
+    "file": "Shoulder/left/flexion/full.mp4"
+  },
+  "shoulder_hand_behind_back_left_full": {
+    "uuid": "2333d3a7-17e4-4889-be9f-565f38f86905",
+    "boxIndex": 0,
+    "name": "Hand behind back (left)",
+    "description": "shoulder left hand behind back - Full",
+    "frames": 239,
+    "detector": "s3fd",
+    "file": "Shoulder/left/hand_behind_back/full.mp4"
+  },
+  "shoulder_hand_behind_back_left_ltd": {
+    "uuid": "35f99594-2cf0-4cee-a511-656cb248e123",
+    "boxIndex": 0,
+    "name": "Hand behind back (left)",
+    "description": "shoulder left hand behind back - Limited",
+    "frames": 239,
+    "detector": "s3fd",
+    "file": "Shoulder/left/hand_behind_back/ltd.mp4"
+  },
+  "shoulder_hand_behind_neck_left_full": {
+    "uuid": "929ad8d8-e047-478b-8230-1ec61381f449",
+    "boxIndex": 0,
+    "name": "Hand behind neck (left)",
+    "description": "shoulder left hand behind neck - Full",
+    "frames": 239,
+    "detector": "s3fd",
+    "file": "Shoulder/left/hand_behind_neck/full.mp4"
+  },
+  "shoulder_hand_behind_neck_left_ltd": {
+    "uuid": "471f70a7-6598-4f90-933d-1cbe1e588e5d",
+    "boxIndex": 0,
+    "name": "Hand behind neck (left)",
+    "description": "shoulder left hand behind neck - Limited",
+    "frames": 239,
+    "detector": "s3fd",
+    "file": "Shoulder/left/hand_behind_neck/ltd.mp4"
+  },
+  "shoulder_horizontal_adduction_left_full": {
+    "uuid": "e62037f6-406f-4e85-b36f-c65a2a249069",
+    "boxIndex": 0,
+    "name": "Shoulder horizontal adduction (left)",
+    "description": "shoulder left horizontal adduction - Full",
+    "frames": 239,
+    "detector": "s3fd",
+    "file": "Shoulder/left/horizontal_adduction/full.mp4"
+  },
+  "shoulder_horizontal_adduction_left_ltd": {
+    "uuid": "5f381dba-9d41-476b-8a46-b8897807af25",
+    "boxIndex": 0,
+    "name": "Shoulder horizontal adduction (left)",
+    "description": "shoulder left horizontal adduction - Limited",
+    "frames": 239,
+    "detector": "s3fd",
+    "file": "Shoulder/left/horizontal_adduction/ltd.mp4"
+  },
+  "shoulder_internal_rotation_left_full": {
+    "uuid": "a32d66e1-d476-410b-bacd-b117d21085eb",
+    "boxIndex": 0,
+    "name": "Shoulder internal rotation (left)",
+    "description": "shoulder left internal rotation - Full",
+    "frames": 239,
+    "detector": "s3fd",
+    "file": "Shoulder/left/internal_rotation/full.mp4"
+  },
+  "shoulder_internal_rotation_left_ltd": {
+    "uuid": "f7f91fd1-2e3a-41f9-b66a-b1fa612370c0",
+    "boxIndex": 0,
+    "name": "Shoulder internal rotation (left)",
+    "description": "shoulder left internal rotation - Limited",
+    "frames": 239,
+    "detector": "s3fd",
+    "file": "Shoulder/left/internal_rotation/ltd.mp4"
+  }
+}

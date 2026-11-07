@@ -1,14 +1,15 @@
+import "./loadEnv.js";
 import { Sentry } from "./instrument.js";
 import express from "express";
 import cors from "cors";
 import connectDB from "./db.js";
-import "dotenv/config";
 import authRoutes from "./routes/authRoutes.js";
 import userRoutes from "./routes/users.js";
 import studentRoutes from "./routes/studentRoutes.js";
 import schoolRoutes from "./routes/schoolRoutes.js";
 import scenarioRoutes from "./routes/scenarioRoutes.js";
 import sessionRoutes from "./routes/sessionRoutes.js";
+import voxioWebhookRoutes from "./routes/voxioWebhookRoutes.js";
 import simRoutes from "./routes/simRoutes.js";
 import dashboardRoutes from "./routes/dashboardRoutes.js";
 import importRoutes from "./routes/importRoutes.js";
@@ -58,6 +59,9 @@ app.use(
     credentials: true,
   }),
 );
+// Session events from Voxio (voice sessions that bypass /agents). Before the
+// global JSON parser: a finished session's payload is far over its 100kb limit.
+app.use("/api/voxio", voxioWebhookRoutes);
 app.use(express.json());
 app.use(express.urlencoded({ extended: true }));
 
@@ -69,8 +73,8 @@ app.use("/api/students", studentRoutes);
 app.use("/api/schools", schoolRoutes);
 app.use("/api/scenarios", scenarioRoutes);
 app.use("/api/sessions", sessionRoutes);
-// The simulator's conversation API, a drop-in copy of Voxio's chat.voxio.in.
-// /agents keeps Voxio's paths so the game only changes its base URL.
+// The simulator's conversation API (Voxio's paths). On this branch each call
+// is run on the scenario's Voxio flow (utils/voxioEngine.js).
 app.use("/agents", simRoutes);
 app.use("/api/chat", simRoutes);
 app.use("/api/dashboard", dashboardRoutes);

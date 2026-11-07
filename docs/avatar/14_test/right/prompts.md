@@ -1,0 +1,88 @@
+# Test - right
+
+12 clips. Save each video in this folder, named exactly as the heading (e.g. `test_phalens_right_no_pain.mp4`).
+Use the reference image as both the first and the last frame. 25 fps.
+
+## test_phalens_right_no_pain
+Phalen's test (right) - No pain
+
+```
+The patient presses the backs of both hands together in front of the chest, fingers pointing down, so both wrists are fully bent, and holds the position. Face relaxed, no pain. Holds for two seconds. Then slowly returns to the exact starting pose. The last frame must match the first frame exactly. Mouth closed and relaxed, no speaking. About 10 seconds long (at least 10 seconds), 25 fps, with the movement paced slowly to fill the time.
+```
+
+## test_phalens_right_painful
+Phalen's test (right) - Painful
+
+```
+The patient presses the backs of both hands together in front of the chest, fingers pointing down, so both wrists are fully bent, and holds the position. After a moment shows clear discomfort, wincing from tingling and numbness in the right thumb and fingers. Holds for two seconds. Then slowly returns to the exact starting pose. The last frame must match the first frame exactly. Mouth closed and relaxed, no speaking. About 10 seconds long (at least 10 seconds), 25 fps, with the movement paced slowly to fill the time.
+```
+
+## test_reverse_phalens_right_no_pain
+Reverse Phalen's test (right) - No pain
+
+```
+The patient presses both palms together in front of the chest in a prayer position, fingers pointing up, elbows lifted, so both wrists are bent back, and holds. Face relaxed, no pain. Holds for two seconds. Then slowly returns to the exact starting pose. The last frame must match the first frame exactly. Mouth closed and relaxed, no speaking. About 10 seconds long (at least 10 seconds), 25 fps, with the movement paced slowly to fill the time.
+```
+
+## test_reverse_phalens_right_painful
+Reverse Phalen's test (right) - Painful
+
+```
+The patient presses both palms together in front of the chest in a prayer position, fingers pointing up, elbows lifted, so both wrists are bent back, and holds. After a moment shows clear discomfort, wincing from tingling and numbness in the right thumb and fingers. Holds for two seconds. Then slowly returns to the exact starting pose. The last frame must match the first frame exactly. Mouth closed and relaxed, no speaking. About 10 seconds long (at least 10 seconds), 25 fps, with the movement paced slowly to fill the time.
+```
+
+## test_finkelstein_right_no_pain
+Finkelstein test (right) - No pain
+
+```
+The patient tucks the right thumb into the palm, closes the fingers over it to make a fist, then bends the wrist down toward the little-finger side. Face relaxed, no pain. Holds for two seconds. Then slowly returns to the exact starting pose. The last frame must match the first frame exactly. Mouth closed and relaxed, no speaking. About 10 seconds long (at least 10 seconds), 25 fps, with the movement paced slowly to fill the time.
+```
+
+## test_finkelstein_right_painful
+Finkelstein test (right) - Painful
+
+```
+The patient tucks the right thumb into the palm, closes the fingers over it to make a fist, then bends the wrist down toward the little-finger side. After a moment shows clear discomfort, wincing from sharp pain at the base of the right thumb. Holds for two seconds. Then slowly returns to the exact starting pose. The last frame must match the first frame exactly. Mouth closed and relaxed, no speaking. About 10 seconds long (at least 10 seconds), 25 fps, with the movement paced slowly to fill the time.
+```
+
+## test_grip_right_no_pain
+Grip strength (right) - No pain
+
+```
+The patient squeezes a hand-grip dynamometer hard in the right hand, arm by the side, elbow bent at 90 degrees. Face relaxed, no pain. Holds for two seconds. Then slowly returns to the exact starting pose. The last frame must match the first frame exactly. Mouth closed and relaxed, no speaking. About 10 seconds long (at least 10 seconds), 25 fps, with the movement paced slowly to fill the time.
+```
+
+## test_grip_right_painful
+Grip strength (right) - Painful
+
+```
+The patient squeezes a hand-grip dynamometer hard in the right hand, arm by the side, elbow bent at 90 degrees. After a moment shows clear discomfort, wincing from pain in the right forearm or wrist. Holds for two seconds. Then slowly returns to the exact starting pose. The last frame must match the first frame exactly. Mouth closed and relaxed, no speaking. About 10 seconds long (at least 10 seconds), 25 fps, with the movement paced slowly to fill the time.
+```
+
+## test_pinch_right_no_pain
+Pinch strength (right) - No pain
+
+```
+The patient pinches a small pinch gauge firmly between the right thumb and index finger. Face relaxed, no pain. Holds for two seconds. Then slowly returns to the exact starting pose. The last frame must match the first frame exactly. Mouth closed and relaxed, no speaking. About 10 seconds long (at least 10 seconds), 25 fps, with the movement paced slowly to fill the time.
+```
+
+## test_pinch_right_painful
+Pinch strength (right) - Painful
+
+```
+The patient pinches a small pinch gauge firmly between the right thumb and index finger. After a moment shows clear discomfort, wincing from pain at the base of the right thumb. Holds for two seconds. Then slowly returns to the exact starting pose. The last frame must match the first frame exactly. Mouth closed and relaxed, no speaking. About 10 seconds long (at least 10 seconds), 25 fps, with the movement paced slowly to fill the time.
+```
+
+## test_cozens_right_no_pain
+Resisted wrist extension (Cozen's) (right) - No pain
+
+```
+The patient makes a fist with the right hand, forearm out in front palm down, and pushes the wrist up against resistance. Face relaxed, no pain. Holds for two seconds. Then slowly returns to the exact starting pose. The last frame must match the first frame exactly. Mouth closed and relaxed, no speaking. About 10 seconds long (at least 10 seconds), 25 fps, with the movement paced slowly to fill the time.
+```
+
+## test_cozens_right_painful
+Resisted wrist extension (Cozen's) (right) - Painful
+
+```
+The patient makes a fist with the right hand, forearm out in front palm down, and pushes the wrist up against resistance. After a moment shows clear discomfort, wincing from sharp pain at the outer right elbow. Holds for two seconds. Then slowly returns to the exact starting pose. The last frame must match the first frame exactly. Mouth closed and relaxed, no speaking. About 10 seconds long (at least 10 seconds), 25 fps, with the movement paced slowly to fill the time.
+```
