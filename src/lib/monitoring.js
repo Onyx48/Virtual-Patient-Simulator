@@ -23,8 +23,17 @@ export function initMonitoring() {
     Sentry.init({
       dsn: SENTRY_DSN,
       environment: APP_ENV,
-      integrations: [Sentry.browserTracingIntegration()],
+      integrations: [Sentry.browserTracingIntegration(), Sentry.replayIntegration()],
       tracesSampleRate: 0.1,
+      // Send trace headers to our own API only, so the backend's spans join the
+      // browser's in one trace.
+      tracePropagationTargets: [
+        "localhost",
+        import.meta.env.VITE_API_BASE_URL || "http://localhost:5001",
+      ],
+      // Session Replay: 10% of sessions, and every session that hits an error.
+      replaysSessionSampleRate: 0.1,
+      replaysOnErrorSampleRate: 1.0,
     });
   }
   if (POSTHOG_KEY) {

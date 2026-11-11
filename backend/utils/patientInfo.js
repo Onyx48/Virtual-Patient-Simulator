@@ -1,3 +1,5 @@
+import { languageCodeFor } from "./languageCode.js";
+
 /**
  * The patient identity the simulator needs (name, gender, language), read out of
  * an AI response. Shared by the AI create/edit routes and
@@ -10,5 +12,6 @@ export const patientInfoFrom = (generated = {}) => {
     patient_name: String(generated.patient_name || "").trim(),
     patient_gender: gender === "male" ? "Male" : gender === "female" ? "Female" : "",
     language: String(generated.language || "").trim(),
+    language_code: languageCodeFor(generated.language),
   };
 };

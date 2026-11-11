@@ -1,5 +1,6 @@
 import mongoose from "mongoose";
 import { BODY_REGIONS } from "../utils/bodyRegions.js";
+import { languageCodeFor } from "../utils/languageCode.js";
 
 const scenarioSchema = new mongoose.Schema(
   {
@@ -50,6 +51,9 @@ const scenarioSchema = new mongoose.Schema(
     patientName: { type: String, trim: true },
     patientGender: { type: String, enum: ["Male", "Female", ""], default: "" },
     language: { type: String, trim: true },
+    // ISO 639-1 code for `language` ("en", "ja", "hi"). Derived on save — see
+    // the pre("validate") hook below — so callers only ever set `language`.
+    languageCode: { type: String, trim: true, lowercase: true, default: "" },
 
     // Ids from src/lib/scenarioOptions.js, picked on the scenario form.
     environment: { type: String, trim: true, default: "" },
@@ -72,6 +76,13 @@ const scenarioSchema = new mongoose.Schema(
     timestamps: true,
   },
 );
+
+scenarioSchema.pre("validate", function (next) {
+  if (this.isModified("language") || !this.languageCode) {
+    this.languageCode = languageCodeFor(this.language);
+  }
+  next();
+});
 
 const Scenario = mongoose.model("Scenario", scenarioSchema);
 export default Scenario;

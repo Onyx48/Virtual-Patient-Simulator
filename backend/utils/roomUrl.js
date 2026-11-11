@@ -34,7 +34,11 @@ export const simulatorBaseUrl = () =>
  * Appended rather than assumed to be the first parameter, so a ROOM_BASE_URL that
  * already carries a query string is not silently broken by a second '?'.
  */
-export const roomUrlFor = (roomId) => {
+export const roomUrlFor = (roomId, { language } = {}) => {
   const base = simulatorBaseUrl();
-  return `${base}${base.includes("?") ? "&" : "?"}room=${encodeURIComponent(roomId)}`;
+  const params = new URLSearchParams({ room: roomId });
+  // ISO 639-1 code ("en", "ja", "hi") so the simulator knows the scenario's
+  // language from the URL. Left off when unknown.
+  if (language) params.set("language", language);
+  return `${base}${base.includes("?") ? "&" : "?"}${params}`;
 };

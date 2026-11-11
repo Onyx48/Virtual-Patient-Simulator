@@ -25,6 +25,7 @@ import { startTrace } from "../utils/routeTrace.js";
 // The educator Test button's destination, from the same place the student room
 // comes from.
 import { roomUrlFor } from "../utils/roomUrl.js";
+import { languageCodeFor } from "../utils/languageCode.js";
 import {
   isScenarioTestable,
   NOT_TESTABLE_MESSAGE,
@@ -337,7 +338,9 @@ router.post("/json", protect, async (req, res) => {
      */
     res.json({
       message: "Scenario JSON set.",
-      simulatorUrl: roomUrlFor(sessionId),
+      simulatorUrl: roomUrlFor(sessionId, {
+        language: scenario.languageCode || languageCodeFor(scenario.language),
+      }),
     });
   } catch (err) {
     console.error("Set Scenario JSON Error:", err);

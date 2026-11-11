@@ -17,6 +17,7 @@ import { parsePagination, pageResponse } from "../utils/pagination.js";
 // Where a student is sent to run a scenario. Shared with the educator's Test
 // button so the two cannot point at different simulator builds.
 import { roomUrlFor } from "../utils/roomUrl.js";
+import { languageCodeFor } from "../utils/languageCode.js";
 import {
   isScenarioTestable,
   NOT_TESTABLE_MESSAGE,
@@ -122,7 +123,9 @@ router.post(
       // session_id.
       setLiveScenario(scenario, { userId: req.user._id, sessionId });
 
-      const redirectUrl = roomUrlFor(sessionId);
+      const redirectUrl = roomUrlFor(sessionId, {
+        language: scenario.languageCode || languageCodeFor(scenario.language),
+      });
       console.log(
         `[SESSION] started session=${sessionId} student=${req.user._id} ` +
           `scenario=${scenario._id} room=${redirectUrl}`,

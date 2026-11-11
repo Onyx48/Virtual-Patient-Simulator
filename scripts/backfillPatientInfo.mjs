@@ -78,6 +78,7 @@ const run = async () => {
         patientName: info.patient_name,
         patientGender: info.patient_gender,
         language: info.language,
+        languageCode: info.language_code,
       };
       const summary = `${update.patientName || "?"} / ${update.patientGender || "?"} / ${update.language || "?"}`;
 

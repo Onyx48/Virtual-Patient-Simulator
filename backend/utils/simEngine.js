@@ -16,6 +16,7 @@ import { getLiveScenario, getLiveMeta } from "../state/liveScenario.js";
 import { htmlToText, questionsToArray } from "./bubbleScenario.js";
 import { decodeEntities } from "./richText.js";
 import { chatJson } from "./simLlm.js";
+import { MOVEMENT_IDS, normalizeAction } from "./movements.js";
 
 /*
  * The exact turn that ends the consultation. The game sends it through the
@@ -28,7 +29,9 @@ export const GREETING = "Hi";
 const readPrompt = (file) =>
   readFileSync(new URL(`../ai/prompts/${file}`, import.meta.url), "utf8");
 
-const PATIENT_FIELDS = readPrompt("sim-patient.md").replaceAll("{{END_SESSION_INPUT}}", END_SESSION_INPUT);
+const PATIENT_FIELDS = readPrompt("sim-patient.md")
+  .replaceAll("{{END_SESSION_INPUT}}", END_SESSION_INPUT)
+  .replaceAll("{{MOVEMENT_IDS}}", MOVEMENT_IDS.join(", "));
 const FEEDBACK_PROMPT = readPrompt("sim-feedback.md");
 const REASONING_PROMPT = readPrompt("sim-reasoning.md");
 
@@ -37,7 +40,8 @@ const SCHEMAS = {
     type: "OBJECT",
     properties: {
       speak: { type: "STRING" },
-      movement: { type: "ARRAY", items: { type: "STRING" } },
+      // One movement id or null; checked against MOVEMENT_IDS in patientTurn.
+      action: { type: "STRING", nullable: true },
       end_diagnosis: { type: "STRING", enum: ["yes", "no"] },
     },
     required: ["speak", "end_diagnosis"],
@@ -252,7 +256,11 @@ export const patientTurn = (sessionId, userInput, opts = {}) =>
     await conv.save();
     await saveToSession(conv);
 
-    const reply = { speak, end_diagnosis: endDiagnosis, movement: [], usage };
+    const action = normalizeAction(data.action ?? data.movement);
+    if (data.action && !action) console.warn(`[SIM] dropped unknown action ${JSON.stringify(data.action)}`);
+
+    // `movement` kept as the one-item list it used to be, for older readers.
+    const reply = { speak, action, end_diagnosis: endDiagnosis, movement: action ? [action] : [], usage };
     if (endDiagnosis === "yes") reply.result = await grade(conv);
     return reply;
   });

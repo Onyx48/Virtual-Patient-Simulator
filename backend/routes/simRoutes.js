@@ -13,7 +13,9 @@
  *     400 {"detail": "either api_key or workflow required , received : dict_keys([...])"}
  *     500 text "Internal Server Error" for an unknown api_key
  *   POST process_input  {session_id, user_input: {user_input: "..."}}
- *     200 {"speak": "..."}: the patient, or the tutor once feedback exists
+ *     200 {"speak": "...", "action": "right-neck-flexion" | null}: the patient
+ *         (action = the movement to animate), or {"speak"} from the tutor once
+ *         feedback exists
  *     404 {"detail": "Session not found or expired"}
  *     422 FastAPI validation body when session_id or user_input is missing
  *
@@ -91,7 +93,8 @@ router.post("/process_input", async (req, res) => {
       return res.json({ speak: response });
     }
     const reply = await patientTurn(sessionId, input);
-    res.json({ speak: reply.speak });
+    // action: the one movement the avatar performs with this line, or null.
+    res.json({ speak: reply.speak, action: reply.action });
   } catch (err) {
     // A turn refused by the engine (e.g. 409) is reported, not hidden as a 500.
     if (err.statusCode && err.statusCode < 500) {
