@@ -1,15 +1,14 @@
 import { getAccessToken } from "../lib/authToken.js";
+import { fetchCached, useData } from "../lib/query";
 import React, { useState, useEffect, useMemo, useRef } from "react";
 import axios from "axios";
 import * as XLSX from "xlsx";
-import {
-  MagnifyingGlassIcon,
-  PlusIcon,
-  PencilSquareIcon,
-  TrashIcon,
-  ArrowUpTrayIcon,
-  ArrowDownTrayIcon,
-} from "@heroicons/react/24/outline";
+import { Plus, Pencil, Trash2, Upload, Download, Loader2, FileSpreadsheet, Mail, ArrowUp, ArrowDown } from "lucide-react";
+import { Button, ButtonGroup, RowActions } from "./vx/ui";
+import { ListToolbar, Pagination } from "./vx/list";
+import { CopyButton, Ago, Select, downloadCsv } from "./vx/bits";
+import { cn } from "../lib/utils";
+import "./vx/vx.css";
 
 import {
   ACCEPTED_EXTENSIONS,
@@ -21,11 +20,9 @@ import {
 
 import EducatorModal from "./EducatorModal";
 import ConfirmationModal from "./ui/ConfirmationModal.jsx";
-import PaginationBar from "./ui/PaginationBar";
 import { toast } from "react-hot-toast";
 import { useAuth } from "../AuthContext";
-import { usePagination } from "../lib/hooks/usePagination";
-import { useLoading, Spinner } from "../lib/hooks/useLoading";
+import { useLoading } from "../lib/hooks/useLoading";
 
 const getAuthHeaders = () => {
   const token = getAccessToken();
@@ -51,10 +48,7 @@ function EducatorsPage() {
 
   const fetchEducators = async () => {
     await withLoading(async () => {
-      const response = await axios.get(
-        "/api/users?role=educator",
-        getAuthHeaders(),
-      );
+      const response = { data: await fetchCached("/api/users", { role: "educator" }) };
       const mappedData = response.data.map((user) => ({
         id: user._id,
         visualId: `VS${user._id.slice(-6).toUpperCase()}`,
@@ -243,234 +237,148 @@ function EducatorsPage() {
     }
   };
 
-  const filteredData = useMemo(() => {
-    return educators
-      .filter(
-        (e) =>
-          e.name.toLowerCase().includes(searchTerm.toLowerCase()) ||
-          e.email.toLowerCase().includes(searchTerm.toLowerCase()),
-      )
-      .filter(
-        (e) => departmentFilter === "" || e.department === departmentFilter,
-      );
-  }, [educators, searchTerm, departmentFilter]);
+  // Adoption numbers per educator (GET /api/dashboard/educators-overview), merged by id.
+  // Shared with the school admin dashboard's cached copy.
+  const overview = useData("/api/dashboard/educators-overview", { fallback: { educators: [] } });
+  const stats = React.useMemo(() => Object.fromEntries((overview?.educators || []).map((e) => [String(e._id), e])), [overview]);
 
-  const {
-    paginatedData,
-    currentPage,
-    totalPages,
-    totalItems,
-    pageNumbers,
-    handlePageChange,
-    nextPage,
-    prevPage,
-    isFirstPage,
-    isLastPage,
-    rangeStart,
-    rangeEnd,
-    resetPage,
-  } = usePagination(filteredData, 8);
+  const [sort, setSort] = useState({ key: "sessions30", dir: "desc" });
+  const [page, setPage] = useState(1);
+  const [pageSize, setPageSize] = useState(8);
+  const muted = "text-[rgb(var(--vx-muted))]";
 
-  useEffect(() => {
-    resetPage();
-  }, [searchTerm, departmentFilter]);
+  const rows = useMemo(() => {
+    const q = searchTerm.trim().toLowerCase();
+    const list = educators
+      .map((e) => ({ ...e, ...(stats[e.id] || {}), id: e.id }))
+      .filter((e) => !q || `${e.name} ${e.email}`.toLowerCase().includes(q))
+      .filter((e) => departmentFilter === "" || e.department === departmentFilter);
+    const val = (e) => {
+      const v = e[sort.key];
+      if (sort.key === "lastSessionAt" || sort.key === "lastLoginAt") return v ? new Date(v).getTime() : 0;
+      return typeof v === "string" ? v.toLowerCase() : v ?? -1;
+    };
+    return list.sort((a, b) => (val(a) < val(b) ? -1 : val(a) > val(b) ? 1 : 0) * (sort.dir === "asc" ? 1 : -1));
+  }, [educators, stats, searchTerm, departmentFilter, sort]);
+
+  useEffect(() => setPage(1), [searchTerm, departmentFilter, pageSize]);
+  const shown = rows.slice((page - 1) * pageSize, page * pageSize);
+  const departments = [...new Set(educators.map((e) => e.department).filter(Boolean))].sort();
+
+  const Head = ({ k, children, right }) => (
+    <th className={cn("whitespace-nowrap px-5 py-3 text-sm font-medium", muted, right ? "text-right" : "text-left")}>
+      {k ? (
+        <button type="button" className="inline-flex items-center gap-1 hover:text-[rgb(var(--vx-ink))]"
+          onClick={() => setSort((s) => ({ key: k, dir: s.key === k && s.dir === "desc" ? "asc" : "desc" }))}>
+          {children}{sort.key === k && (sort.dir === "asc" ? <ArrowUp size={14} /> : <ArrowDown size={14} />)}
+        </button>
+      ) : children}
+    </th>
+  );
+
+  const exportCsv = () => downloadCsv(`educators-${new Date().toISOString().slice(0, 10)}.csv`, [
+    { label: "Name", value: (r) => r.name }, { label: "Email", value: (r) => r.email }, { label: "Department", value: (r) => r.department || "" },
+    { label: "Students", value: (r) => r.students ?? "" }, { label: "Scenarios", value: (r) => r.scenarios ?? "" },
+    { label: "Published", value: (r) => r.published ?? "" }, { label: "Sessions (30 days)", value: (r) => r.sessions30 ?? "" },
+    { label: "Sessions (all)", value: (r) => r.sessions ?? "" }, { label: "Average score", value: (r) => (r.avgScore != null ? `${r.avgScore}%` : "") },
+    { label: "Last session", value: (r) => (r.lastSessionAt ? new Date(r.lastSessionAt).toISOString().slice(0, 10) : "") },
+    { label: "Last sign-in", value: (r) => (r.lastLoginAt ? new Date(r.lastLoginAt).toISOString().slice(0, 10) : "") },
+  ], rows);
 
   return (
-    <div className="p-8 bg-white min-h-screen font-sans">
-      <div className="flex justify-between items-center mb-8">
-        <h1 className="text-2xl font-bold text-gray-900">
-          Educators Management
-        </h1>
-      </div>
+    <div className="vx min-h-full px-4 pb-16 pt-6 md:px-6">
+      <div className="flex flex-col gap-5">
+        <header className="flex flex-wrap items-end justify-between gap-3">
+          <h1 className="flex items-baseline gap-3 text-3xl font-semibold tracking-tight">
+            Educators {educators.length > 0 && <span className={cn("tabular-nums", muted)}>{educators.length}</span>}
+          </h1>
+          <ButtonGroup>
+            <Button variant="secondary" className="h-11" onClick={handleDownloadTemplate} title="Download the .xlsx template for bulk upload"><Download /> Template</Button>
+            <Button variant="secondary" className="h-11" onClick={handleBulkUploadClick} disabled={isUploading}>
+              {isUploading ? <Loader2 className="animate-spin" /> : <Upload />} {isUploading ? "Uploading" : "Upload educators"}
+            </Button>
+            <Button variant="secondary" className="h-11" onClick={exportCsv} disabled={!rows.length}><FileSpreadsheet /> Export</Button>
+          </ButtonGroup>
+          <input type="file" ref={fileInputRef} onChange={handleFileChange} accept={ACCEPTED_EXTENSIONS.join(",")} className="hidden" disabled={isUploading} />
+        </header>
 
-      <div className="flex flex-wrap justify-between items-center mb-6 gap-4">
-        <div className="flex gap-3 flex-1">
-          <div className="relative w-full max-w-md">
-            <div className="absolute inset-y-0 left-0 pl-3 flex items-center pointer-events-none">
-              <MagnifyingGlassIcon className="h-5 w-5 text-gray-400" />
+        <ListToolbar
+          search={{ value: searchTerm, onChange: setSearchTerm, placeholder: "Search name or email" }}
+          filters={departments.length > 1 && (
+            <div className="px-1">
+              <Select variant="ghost" label="Department" value={departmentFilter} onChange={setDepartmentFilter}
+                options={[{ value: "", label: "All departments" }, ...departments.map((d) => ({ value: d, label: d }))]} />
             </div>
-            <input
-              type="text"
-              placeholder="Search for an educator"
-              className="block w-full pl-10 pr-3 py-2.5 border border-gray-200 rounded-lg bg-gray-50 text-sm focus:ring-2 focus:ring-orange-500 focus:border-transparent outline-none transition-all"
-              value={searchTerm}
-              onChange={(e) => setSearchTerm(e.target.value)}
-            />
-          </div>
-          <div className="relative">
-            <select
-              value={departmentFilter}
-              onChange={(e) => setDepartmentFilter(e.target.value)}
-              className="flex items-center gap-2 px-4 py-2.5 border border-gray-200 rounded-lg text-sm font-medium text-gray-600 hover:bg-gray-50 transition-colors appearance-none bg-white cursor-pointer"
-            >
-              <option value="">All Departments</option>
-              <option value="Science">Science</option>
-              <option value="History">History</option>
-              <option value="English">English</option>
-              <option value="Mathematics">Mathematics</option>
-            </select>
-            <div className="pointer-events-none absolute inset-y-0 right-0 flex items-center px-3 text-gray-500">
-              <svg
-                className="h-4 w-4"
-                fill="none"
-                stroke="currentColor"
-                viewBox="0 0 24 24"
-              >
-                <path
-                  strokeLinecap="round"
-                  strokeLinejoin="round"
-                  strokeWidth="2"
-                  d="M19 9l-7 7-7-7"
-                />
-              </svg>
-            </div>
-          </div>
-        </div>
+          )}
+          actions={<Button size="lg" className="h-11 rounded-[22px]" onClick={handleAddNew}><Plus /> New educator</Button>}
+        />
 
-        <div className="flex items-center gap-3">
-          <input
-            type="file"
-            ref={fileInputRef}
-            onChange={handleFileChange}
-            accept={ACCEPTED_EXTENSIONS.join(",")}
-            style={{ display: "none" }}
-            disabled={isUploading}
-          />
-          <button
-            onClick={handleDownloadTemplate}
-            title="Download the .xlsx template for bulk upload"
-            className="flex items-center gap-2 px-5 py-2.5 bg-white border border-gray-200 text-gray-700 hover:bg-gray-50 text-sm font-bold rounded-lg transition-colors shadow-sm"
-          >
-            <ArrowDownTrayIcon className="h-5 w-5" />
-            Template
-          </button>
-          <button
-            onClick={handleBulkUploadClick}
-            disabled={isUploading}
-            className="flex items-center gap-2 px-5 py-2.5 bg-white border border-gray-200 text-gray-700 hover:bg-gray-50 text-sm font-bold rounded-lg transition-colors shadow-sm disabled:opacity-50"
-          >
-            <ArrowUpTrayIcon className="h-5 w-5" />
-            {isUploading ? "Uploading..." : "Upload Bulk Educators"}
-          </button>
-          <button
-            onClick={handleAddNew}
-            className="flex items-center gap-2 px-5 py-2.5 bg-black hover:bg-gray-800 text-white text-sm font-bold rounded-lg transition-colors shadow-sm"
-          >
-            <PlusIcon className="h-5 w-5" />
-            New Educator
-          </button>
-        </div>
-      </div>
-
-      <div className="border border-gray-100 rounded-xl overflow-hidden shadow-sm">
-        <table className="min-w-full divide-y divide-gray-100">
-          <thead className="bg-gray-50/50">
-            <tr>
-              <th className="px-6 py-4 text-left text-xs font-semibold text-gray-500 uppercase tracking-wider">
-                ID
-              </th>
-              <th className="px-6 py-4 text-left text-xs font-semibold text-gray-500 uppercase tracking-wider">
-                Educator Name
-              </th>
-              <th className="px-6 py-4 text-left text-xs font-semibold text-gray-500 uppercase tracking-wider">
-                Email Address
-              </th>
-              <th className="px-6 py-4 text-left text-xs font-semibold text-gray-500 uppercase tracking-wider">
-                Department
-              </th>
-              <th className="px-6 py-4 text-left text-xs font-semibold text-gray-500 uppercase tracking-wider">
-                Action
-              </th>
-            </tr>
-          </thead>
-          <tbody className="bg-white divide-y divide-gray-100">
-            {isLoading ? (
-              <tr>
-                <td colSpan="5" className="px-6 py-12 text-center">
-                  <Spinner size={32} />
-                </td>
-              </tr>
-            ) : paginatedData.length === 0 ? (
-              <tr>
-                <td
-                  colSpan="5"
-                  className="px-6 py-12 text-center text-gray-500"
-                >
-                  No educators found.
-                </td>
-              </tr>
-            ) : (
-              paginatedData.map((educator) => (
-                <tr
-                  key={educator.id}
-                  className="hover:bg-gray-50/50 transition-colors"
-                >
-                  <td className="px-6 py-4 whitespace-nowrap text-sm font-medium text-gray-900">
-                    {educator.visualId}
-                  </td>
-                  <td className="px-6 py-4 whitespace-nowrap text-sm font-semibold text-gray-800">
-                    {educator.name}
-                  </td>
-                  <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-600">
-                    {educator.email}
-                  </td>
-                  <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-600">
-                    {educator.department}
-                  </td>
-                  <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500">
-                    <div className="flex items-center gap-4">
-                      <button
-                        onClick={() => handleEdit(educator)}
-                        className="flex items-center gap-1 text-gray-500 hover:text-gray-900 transition-colors"
-                      >
-                        <PencilSquareIcon className="w-4 h-4" />
-                        Edit
-                      </button>
-                      <button
-                        onClick={() => handleDelete(educator.id)}
-                        className="flex items-center gap-1 text-red-400 hover:text-red-600 transition-colors"
-                      >
-                        <TrashIcon className="w-4 h-4" />
-                        Delete
-                      </button>
-                    </div>
-                  </td>
+        <div className="overflow-hidden rounded-2xl border border-[rgb(var(--vx-line)/0.7)] bg-[rgb(var(--vx-card))]">
+          <div className="overflow-x-auto">
+            <table className="w-full border-collapse">
+              <thead className="border-b border-[rgb(var(--vx-line)/0.7)] bg-[rgb(var(--vx-cell)/0.5)]">
+                <tr>
+                  <Head k="name">Educator</Head>
+                  <Head k="department">Department</Head>
+                  <Head k="students" right>Students</Head>
+                  <Head k="scenarios" right>Scenarios</Head>
+                  <Head k="sessions30" right>Sessions (30 d)</Head>
+                  <Head k="lastSessionAt">Last session</Head>
+                  <Head k="lastLoginAt">Last sign-in</Head>
+                  <Head><span className="sr-only">Actions</span></Head>
                 </tr>
-              ))
-            )}
-          </tbody>
-        </table>
-        <PaginationBar
-        currentPage={currentPage}
-        totalPages={totalPages}
-        totalItems={totalItems}
-        pageNumbers={pageNumbers}
-        onPageChange={handlePageChange}
-        onPrevPage={prevPage}
-        onNextPage={nextPage}
-        isFirstPage={isFirstPage}
-        isLastPage={isLastPage}
-        rangeStart={rangeStart}
-        rangeEnd={rangeEnd}
-      />
+              </thead>
+              <tbody className="divide-y divide-[rgb(var(--vx-line)/0.7)]">
+                {isLoading ? (
+                  Array.from({ length: 5 }).map((_, i) => <tr key={i}><td colSpan={8} className="px-5 py-3"><div className="h-10 animate-pulse rounded-xl bg-[rgb(var(--vx-cell)/0.7)]" /></td></tr>)
+                ) : shown.length === 0 ? (
+                  <tr><td colSpan={8} className="px-5 py-16 text-center">
+                    <p className={cn("text-base", muted)}>{searchTerm || departmentFilter ? "No educators match." : "No educators yet. Add one, or upload a list from a spreadsheet."}</p>
+                  </td></tr>
+                ) : shown.map((e) => {
+                  const quiet = stats[e.id] && !e.sessions30;
+                  return (
+                    <tr key={e.id} className="group/row transition-colors hover:bg-[rgb(var(--vx-accent)/0.05)]">
+                      <td className="max-w-xs px-5 py-3">
+                        <div className="flex items-center gap-2 text-base font-semibold">
+                          <span className="truncate">{e.name}</span>
+                          {quiet && <span className="shrink-0 rounded-full bg-[rgb(var(--vx-cell))] px-2 py-0.5 text-xs font-medium text-[rgb(var(--vx-muted))]" title="No sessions on their scenarios in 30 days">quiet</span>}
+                        </div>
+                        <div className={cn("flex items-center gap-0.5 text-sm", muted)}>
+                          <span className="truncate">{e.email}</span>
+                          <CopyButton value={e.email} label="Copy email" className="size-6 opacity-0 focus:opacity-100 group-hover/row:opacity-100" size={13} />
+                        </div>
+                      </td>
+                      <td className={cn("whitespace-nowrap px-5 py-3 text-base", !e.department && muted)}>{e.department || "—"}</td>
+                      <td className="px-5 py-3 text-right text-base tabular-nums">{e.students ?? "…"}</td>
+                      <td className="whitespace-nowrap px-5 py-3 text-right text-base tabular-nums">{e.scenarios ?? "…"}{e.published != null && <span className={cn("text-sm", muted)}> · {e.published} live</span>}</td>
+                      <td className="px-5 py-3 text-right text-base font-semibold tabular-nums">{e.sessions30 ?? "…"}</td>
+                      <td className={cn("whitespace-nowrap px-5 py-3 text-base", !e.lastSessionAt && muted)}><Ago date={e.lastSessionAt} fallback="None yet" /></td>
+                      <td className={cn("whitespace-nowrap px-5 py-3 text-base", !e.lastLoginAt && muted)}><Ago date={e.lastLoginAt} fallback="Never" /></td>
+                      <td className="whitespace-nowrap px-5 py-3 text-right">
+                        <RowActions items={[
+                          { icon: Mail, label: "Email", onClick: () => { window.location.href = `mailto:${e.email}`; } },
+                          { icon: Pencil, label: "Edit", onClick: () => handleEdit(e) },
+                          { icon: Trash2, label: "Delete", danger: true, onClick: () => handleDelete(e.id) },
+                        ]} />
+                      </td>
+                    </tr>
+                  );
+                })}
+              </tbody>
+            </table>
+          </div>
+          <div className="px-5">
+            <Pagination page={page} pageSize={pageSize} total={rows.length} onPage={setPage} onPageSize={setPageSize} />
+          </div>
+        </div>
       </div>
 
-      {isModalOpen && (
-        <div className="fixed inset-0 z-50 bg-black/40 backdrop-blur-sm flex justify-center items-center p-4">
-          <EducatorModal
-            educatorData={editingEducator}
-            onSave={handleSave}
-            onClose={() => setIsModalOpen(false)}
-          />
-        </div>
-      )}
+      {isModalOpen && <EducatorModal educatorData={editingEducator} onSave={handleSave} onClose={() => setIsModalOpen(false)} />}
       <ConfirmationModal
         isOpen={isConfirmModalOpen}
         onClose={() => setIsConfirmModalOpen(false)}
-        onConfirm={() => {
-          onConfirmAction();
-          setIsConfirmModalOpen(false);
-        }}
+        onConfirm={() => { onConfirmAction(); setIsConfirmModalOpen(false); }}
         title={confirmTitle}
         message={confirmMessage}
       />

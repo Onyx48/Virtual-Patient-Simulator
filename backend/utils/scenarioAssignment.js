@@ -124,31 +124,12 @@ export const assignedStudentIdsByScenario = async (scenarios) => {
  * in an assigned group is still counted once.
  */
 export const assignedScenarioCountStages = () => [
-  {
-    $lookup: {
-      from: "scenarios",
-      let: { uid: "$_id", gid: "$groupId" },
-      pipeline: [
-        {
-          $match: {
-            $expr: {
-              $or: [
-                { $in: ["$$uid", { $ifNull: ["$assignedTo", []] }] },
-                {
-                  $and: [
-                    { $ne: [{ $ifNull: ["$$gid", null] }, null] },
-                    { $in: ["$$gid", { $ifNull: ["$assignedGroups", []] }] },
-                  ],
-                },
-              ],
-            },
-          },
-        },
-        { $project: { _id: 1 } },
-      ],
-      as: "_assigned",
-    },
-  },
-  { $addFields: { assignedScenariosCount: { $size: "$_assigned" } } },
-  { $project: { _assigned: 0 } },
+  // Two equality lookups (indexable on scenarios.assignedTo / assignedGroups) instead of one
+  // $expr lookup, which scanned every scenario per student. The union of ids keeps a scenario
+  // reached both ways counted once. A student with no group looks up a value no scenario holds.
+  { $lookup: { from: "scenarios", localField: "_id", foreignField: "assignedTo", pipeline: [{ $project: { _id: 1 } }], as: "_aDirect" } },
+  { $addFields: { _gidKey: { $ifNull: ["$groupId", "__no_group__"] } } },
+  { $lookup: { from: "scenarios", localField: "_gidKey", foreignField: "assignedGroups", pipeline: [{ $project: { _id: 1 } }], as: "_aGroup" } },
+  { $addFields: { assignedScenariosCount: { $size: { $setUnion: ["$_aDirect._id", "$_aGroup._id"] } } } },
+  { $project: { _aDirect: 0, _aGroup: 0, _gidKey: 0 } },
 ];

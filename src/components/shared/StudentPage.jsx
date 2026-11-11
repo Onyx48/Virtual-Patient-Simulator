@@ -1,16 +1,20 @@
 import { getAccessToken } from "../../lib/authToken.js";
+import { useCached, fetchCached } from "../../lib/query";
 import React, { useState, useEffect, useRef } from "react";
+import { useSearchParams } from "../../lib/router";
 import axios from "axios";
 import * as XLSX from "xlsx";
-import {
-  MagnifyingGlassIcon,
-  FunnelIcon,
-  PlusIcon,
-  PencilSquareIcon,
-  TrashIcon,
-  ArrowUpTrayIcon,
-  ArrowDownTrayIcon,
-} from "@heroicons/react/24/outline";
+import { Plus, Pencil, Trash2, Upload, Download, ClipboardList, FileText, Loader2, ArrowUp, ArrowDown, Bell, KeyRound, Mail, Copy, X, FileSpreadsheet } from "lucide-react";
+import { CopyButton, Ago, copyText, downloadCsv, mailto, Tick, Menu, Select, MiniRing, Intro, ActivityDot } from "../vx/bits";
+import { Dialog } from "../vx/ui";
+import StudentDrawer from "./StudentDrawer";
+import ComposeEmail from "./ComposeEmail";
+import GroupsPanel from "./GroupsPanel";
+import { Layers, PenLine } from "lucide-react";
+import { Users as UsersIcon, ChevronDown } from "lucide-react";
+import { Button, ButtonGroup, RowActions } from "../vx/ui";
+import { ListToolbar, ToolbarToggle, Pagination } from "../vx/list";
+import { cn } from "../../lib/utils";
 
 import {
   ACCEPTED_EXTENSIONS,
@@ -24,11 +28,10 @@ import StudentModal from "../StudentModal";
 import AssignScenariosModal from "./AssignScenariosModal";
 import TranscriptViewerModal from "../ui/TranscriptViewerModal";
 import ConfirmationModal from "../ui/ConfirmationModal";
-import PaginationBar from "../ui/PaginationBar";
 import { toast } from "react-hot-toast";
 import { useAuth } from "../../AuthContext";
 import { useServerPagination } from "../../lib/hooks/useServerPagination";
-import { Spinner, FullPageSpinner } from "../../lib/hooks/useLoading";
+import { snapSize } from "../../lib/hooks/usePagedRows";
 
 const getAuthHeaders = () => {
   const token = getAccessToken();
@@ -41,9 +44,9 @@ const getAuthHeaders = () => {
  * a way to log in, which is a problem to fix, not a stage to wait out.
  */
 const INVITE_BADGES = {
-  active: { label: "Active", className: "bg-green-100 text-green-800" },
-  invited: { label: "Invited", className: "bg-blue-100 text-blue-800" },
-  pending: { label: "Pending", className: "bg-amber-100 text-amber-800" },
+  active: { label: "Active", className: "bg-[rgb(var(--vx-ok)/0.12)] text-[rgb(var(--vx-ok))]" },
+  invited: { label: "Invited", className: "bg-[rgb(var(--vx-cell))] text-[rgb(var(--vx-ink))]" },
+  pending: { label: "Pending", className: "bg-[rgb(var(--vx-warn)/0.14)] text-[rgb(var(--vx-warn))]" },
 };
 
 function InviteStatusCell({ student, canResend, isBusy, onResend }) {
@@ -63,21 +66,20 @@ function InviteStatusCell({ student, canResend, isBusy, onResend }) {
     <div className="flex flex-col items-start gap-1">
       <span
         title={title}
-        className={`inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium ${badge.className}`}
+        className={`inline-flex items-center rounded-full px-3 py-0.5 text-sm font-medium ${badge.className}`}
       >
         {badge.label}
       </span>
       {canResend && (
         <button
-          onClick={onResend}
+          onClick={(e) => { e.stopPropagation(); onResend(); }}
+          title={student.inviteStatus === "pending" ? "Email their login details" : "Email a new password. Their current password stops working."}
           disabled={isBusy}
-          className="text-xs font-semibold text-orange-600 hover:text-orange-700 underline decoration-orange-300 underline-offset-2 disabled:opacity-50 disabled:no-underline"
+          className="text-sm font-medium text-[rgb(var(--vx-accent-text))] hover:underline underline-offset-2 disabled:opacity-50 disabled:no-underline"
         >
-          {isBusy
-            ? "Sending…"
-            : student.inviteStatus === "pending"
-              ? "Send login"
-              : "Resend"}
+          {isBusy ? "Sending…" : student.inviteStatus === "pending" ? "Send login" : (
+            <span className="inline-flex items-center gap-1"><KeyRound size={13} /> New password</span>
+          )}
         </button>
       )}
     </div>
@@ -94,34 +96,31 @@ function StudentPage({ role }) {
   const showGroupColumn = role === "educator" || role === "school_admin";
   const showScenariosColumn = role !== "school_admin";
   const canManageStudents = role !== "school_admin";
-  // ID, Name, Email, School, Progress, Login, Transcript, Action are always present.
-  const columnCount =
-    8 + (showGroupColumn ? 1 : 0) + (showScenariosColumn ? 1 : 0);
 
-  const [groups, setGroups] = useState([]);
-  const [searchTerm, setSearchTerm] = useState("");
+
 
   const [isUploading, setIsUploading] = useState(false);
   const fileInputRef = useRef(null);
 
-  const [isFilterOpen, setIsFilterOpen] = useState(false);
-  const [filterAssigned, setFilterAssigned] = useState("");
-  const [filterProgress, setFilterProgress] = useState("");
-  const filterRef = useRef(null);
 
-  useEffect(() => {
-    if (!isFilterOpen) return;
-    const handleClickOutside = (e) => {
-      if (filterRef.current && !filterRef.current.contains(e.target)) {
-        setIsFilterOpen(false);
-      }
-    };
-    document.addEventListener("mousedown", handleClickOutside);
-    return () => document.removeEventListener("mousedown", handleClickOutside);
-  }, [isFilterOpen]);
+  // The dashboard links here with ?progress=notstarted or ?assign=1.
+  const [params, setParams] = useSearchParams();
+  const [searchTerm, setSearchTerm] = useState(() => params.get("q") || "");
+  // Header search links here with ?q=; follow it when it changes while already on this page.
+  useEffect(() => { const q = params.get("q"); if (q !== null) setSearchTerm(q); }, [params]);
+  const [filterAssigned, setFilterAssigned] = useState("");
+  const [filterGroup, setFilterGroup] = useState(() => params.get("group") || "");
+  const [drawer, setDrawer] = useState(null);
+  const [assignFor, setAssignFor] = useState("");
+  const [bulkDelete, setBulkDelete] = useState(false);
+  const [confirmText, setConfirmText] = useState("");
+  const [bulkBusy, setBulkBusy] = useState(false);
+  const [compose, setCompose] = useState(null); // { students } or { group }
+  const [groupsOpen, setGroupsOpen] = useState(false);
+  const [filterProgress, setFilterProgress] = useState(() => params.get("progress") || "");
 
   const [isStudentModalOpen, setIsStudentModalOpen] = useState(false);
-  const [isAssignModalOpen, setIsAssignModalOpen] = useState(false);
+  const [isAssignModalOpen, setIsAssignModalOpen] = useState(() => params.get("assign") === "1" && role !== "school_admin");
   const [selectedStudent, setSelectedStudent] = useState(null);
   const [editingStudent, setEditingStudent] = useState(null);
 
@@ -159,21 +158,14 @@ function StudentPage({ role }) {
     totalSessions: student.totalSessions || 0,
     inviteStatus: student.inviteStatus || "pending",
     credentialsSentAt: student.credentialsSentAt || null,
+    lastSessionAt: student.lastSessionAt || null,
+    lastLoginAt: student.lastLoginAt || null,
     originalData: student,
   });
 
-  const fetchGroups = async () => {
-    try {
-      const response = await axios.get("/api/groups", getAuthHeaders());
-      setGroups(response.data);
-    } catch {
-      // groups are optional; silently ignore
-    }
-  };
-
-  useEffect(() => {
-    if (showGroupColumn) fetchGroups();
-  }, []);
+  // Groups are optional; a failed read leaves the list empty.
+  const [cachedGroups, setGroups, fetchGroups] = useCached("/api/groups", { enabled: !!showGroupColumn, fallback: [] });
+  const groups = cachedGroups || [];
 
   useEffect(() => {
     const handleScenarioAssignmentsChanged = () => {
@@ -431,6 +423,7 @@ function StudentPage({ role }) {
   };
 
   const [sortConfig, setSortConfig] = useState(null);
+  const [pageSize, setPageSize] = useState(() => { try { return snapSize(Number(localStorage.getItem("vps.pageSize")) || 10); } catch { return 10; } });
   const handleSort = (key) => {
     setSortConfig((prev) => {
       if (prev?.key === key) {
@@ -441,24 +434,6 @@ function StudentPage({ role }) {
   };
 
 
-  /*
-   * The active column's arrow is orange and the idle ones are grey, so the
-   * column the table is actually sorted by is findable at a glance. Returns JSX
-   * rather than a string because the two need different colours.
-   */
-  const getSortIcon = (key) => {
-    const isActive = sortConfig && sortConfig.key === key;
-    return (
-      <span
-        className={`ml-1.5 align-middle text-base font-bold leading-none ${
-          isActive ? "text-orange-600" : "text-orange-400"
-        }`}
-        aria-hidden="true"
-      >
-        {!isActive ? "⇅" : sortConfig.direction === "asc" ? "↑" : "↓"}
-      </span>
-    );
-  };
 
   // Only the visible page is fetched; search, filters and sort run server-side.
   const {
@@ -467,357 +442,354 @@ function StudentPage({ role }) {
     isLoading,
     refetch: fetchStudents,
     currentPage,
-    totalPages,
     totalItems,
-    pageNumbers,
     handlePageChange,
-    nextPage,
-    prevPage,
-    isFirstPage,
-    isLastPage,
-    rangeStart,
-    rangeEnd,
   } = useServerPagination("/api/students", {
-    params: { searchTerm, assigned: filterAssigned, progress: filterProgress },
-    pageSize: 8,
+    params: { searchTerm, assigned: filterAssigned, progress: filterProgress, groupId: filterGroup },
+    pageSize,
     sortConfig,
     mapItem: toRow,
   });
 
+  const muted = "text-[rgb(var(--vx-muted))]";
+  const filtersOn = !!(filterAssigned || filterProgress || filterGroup);
+  // Filters live in the URL, so Back and a shared link return to the same list.
+  useEffect(() => {
+    const next = new URLSearchParams();
+    if (searchTerm) next.set("q", searchTerm);
+    if (filterProgress) next.set("progress", filterProgress);
+    if (filterGroup) next.set("group", filterGroup);
+    if (next.toString() !== params.toString()) setParams(next, { replace: true });
+  }, [searchTerm, filterProgress, filterGroup]); // eslint-disable-line react-hooks/exhaustive-deps
+
+  // Move one or many students to a group (null = no group). Uses the same endpoint as the edit form.
+  const moveToGroup = async (rows, groupId) => {
+    setBulkBusy(true);
+    const results = await Promise.allSettled(rows.map((r) => axios.put(`/api/users/${r.user_id}`, { groupId }, getAuthHeaders())));
+    const failed = results.filter((x) => x.status === "rejected").length;
+    const g = groups.find((x) => x._id === groupId);
+    if (failed) toast.error(`${failed} of ${rows.length} could not be moved.`);
+    else toast.success(`${rows.length === 1 ? rows[0].name : `${rows.length} students`} moved to ${g ? g.name : "no group"}.`);
+    setBulkBusy(false);
+    setPicked({});
+    fetchStudents();
+  };
+  const groupItems = (rows) => [
+    ...groups.map((g) => ({ label: g.name, icon: UsersIcon, onClick: () => moveToGroup(rows, g._id) })),
+    "sep",
+    { label: "No group", onClick: () => moveToGroup(rows, null) },
+  ];
+  const deleteMany = async () => {
+    setBulkBusy(true);
+    const rows = pickedList;
+    const results = await Promise.allSettled(rows.map((r) => axios.delete(`/api/users/${r.id}`, getAuthHeaders())));
+    const failed = results.filter((x) => x.status === "rejected").length;
+    if (failed) toast.error(`${failed} of ${rows.length} could not be deleted.`);
+    else toast.success(`Deleted ${rows.length} student${rows.length === 1 ? "" : "s"}.`);
+    setBulkBusy(false);
+    setBulkDelete(false);
+    setConfirmText("");
+    setPicked({});
+    fetchStudents();
+  };
+
+  // Selection survives paging (keyed by id, value is the row) so a cohort can be picked across pages.
+  const [picked, setPicked] = useState({});
+  const lastClicked = useRef(null);
+  const pickedList = Object.values(picked);
+  const pageIds = paginatedData.map((r) => r.id);
+  const pagePicked = pageIds.filter((id) => picked[id]).length;
+  const togglePick = (row, e) => {
+    setPicked((prev) => {
+      const next = { ...prev };
+      // Shift-click picks the range from the last clicked row on this page.
+      if (e?.shiftKey && lastClicked.current != null) {
+        const a = pageIds.indexOf(lastClicked.current), b = pageIds.indexOf(row.id);
+        if (a > -1 && b > -1) {
+          const on = !prev[row.id];
+          paginatedData.slice(Math.min(a, b), Math.max(a, b) + 1).forEach((r) => { if (on) next[r.id] = r; else delete next[r.id]; });
+          return next;
+        }
+      }
+      if (next[row.id]) delete next[row.id]; else next[row.id] = row;
+      return next;
+    });
+    lastClicked.current = row.id;
+  };
+  const togglePage = () => setPicked((prev) => {
+    const next = { ...prev };
+    if (pagePicked === pageIds.length) pageIds.forEach((id) => delete next[id]);
+    else paginatedData.forEach((r) => { next[r.id] = r; });
+    return next;
+  });
+
+  const first = (name) => String(name || "").split(" ")[0];
+  const reminder = (rows) => mailto({
+    to: rows.length === 1 ? [rows[0].email] : [],
+    bcc: rows.length > 1 ? rows.map((r) => r.email) : [],
+    subject: "Reminder: practise your virtual patient scenarios",
+    body: `Hi ${rows.length === 1 ? first(rows[0].name) : "everyone"},\n\n` +
+      "A reminder to practise the scenarios assigned to you on the Virtual Patient Simulator. " +
+      "Each session takes about 15 minutes and you can repeat it as often as you like.\n\n" +
+      `Sign in here: ${window.location.origin}/login\n\nThanks,\n${user?.name || ""}`,
+  });
+
+  const [exporting, setExporting] = useState(false);
+  const exportCsv = async () => {
+    setExporting(true);
+    try {
+      // Same filters as the table, fetched 100 at a time.
+      const all = [];
+      for (let page = 1; ; page++) {
+        const data = await fetchCached("/api/students", {
+          searchTerm, assigned: filterAssigned, progress: filterProgress, groupId: filterGroup, page, limit: 100,
+          ...(sortConfig && { sortBy: sortConfig.key, sortDir: sortConfig.direction }),
+        });
+        all.push(...data.items.map(toRow));
+        if (page >= data.totalPages) break;
+      }
+      const iso = (d) => (d ? new Date(d).toISOString().slice(0, 10) : "");
+      downloadCsv(`students-${new Date().toISOString().slice(0, 10)}.csv`, [
+        { label: "Name", value: (r) => r.name },
+        { label: "Email", value: (r) => r.email },
+        { label: "Group", value: (r) => r.groupName || "" },
+        { label: "Sessions", value: (r) => r.totalSessions },
+        { label: "Average", value: (r) => (r.progress === "N/A" ? "" : r.progress) },
+        { label: "Best", value: (r) => r.bestScore || "" },
+        { label: "Scenarios assigned", value: (r) => r.assignedScenariosCount },
+        { label: "Last session", value: (r) => iso(r.lastSessionAt) },
+        { label: "Login", value: (r) => r.inviteStatus },
+        { label: "ID", value: (r) => r.visualId },
+      ], all);
+      toast.success(`Exported ${all.length} student${all.length === 1 ? "" : "s"}.`);
+    } catch (e) {
+      toast.error(e.response?.data?.message || "Could not export the list.");
+    } finally {
+      setExporting(false);
+    }
+  };
+  const Head = ({ k, children, className }) => {
+    const on = sortConfig?.key === k;
+    return (
+      <th className={cn("whitespace-nowrap px-5 py-3 text-left text-sm font-medium", muted, className)}>
+        {k ? (
+          <button type="button" onClick={() => handleSort(k)} className="inline-flex items-center gap-1 hover:text-[rgb(var(--vx-ink))]">
+            {children}
+            {on && (sortConfig.direction === "asc" ? <ArrowUp size={14} /> : <ArrowDown size={14} />)}
+          </button>
+        ) : children}
+      </th>
+    );
+  };
+  const showSchoolColumn = role === "superadmin";
+  const cols = 8 + (showSchoolColumn ? 1 : 0) + (showGroupColumn ? 1 : 0) + (showScenariosColumn ? 1 : 0);
+
   return (
-    <div className="p-8 bg-white min-h-screen font-sans">
-      <div className="flex justify-between items-center mb-8">
-        <h1 className="text-2xl font-bold text-gray-900">
-          Students Management
-        </h1>
-      </div>
-
-      <div className="flex flex-wrap justify-between items-center mb-6 gap-4">
-        <div className="flex gap-3 flex-1">
-          <div className="relative w-full max-w-md">
-            <div className="absolute inset-y-0 left-0 pl-3 flex items-center pointer-events-none">
-              <MagnifyingGlassIcon className="h-5 w-5 text-gray-400" />
-            </div>
-            <input
-              type="text"
-              placeholder="Search student name or email"
-              className="block w-full pl-10 pr-3 py-2.5 border border-gray-200 rounded-lg bg-gray-50 text-sm focus:ring-2 focus:ring-orange-500 focus:border-transparent outline-none transition-all"
-              value={searchTerm}
-              onChange={(e) => setSearchTerm(e.target.value)}
-            />
-          </div>
-          <div className="relative" ref={filterRef}>
-            <button
-              onClick={() => setIsFilterOpen((v) => !v)}
-              className={`flex items-center gap-2 px-4 py-2.5 border rounded-lg text-sm font-medium transition-colors ${
-                filterAssigned || filterProgress
-                  ? "border-orange-400 bg-orange-50 text-orange-700"
-                  : "border-gray-200 text-gray-600 hover:bg-gray-50"
-              }`}
-            >
-              <FunnelIcon className="h-5 w-5" />
-              Filters
-              {(filterAssigned || filterProgress) && (
-                <span className="ml-1 px-1.5 py-0.5 text-xs bg-orange-400 text-white rounded-full">
-                  {[filterAssigned, filterProgress].filter(Boolean).length}
-                </span>
-              )}
-            </button>
-
-            {isFilterOpen && (
-              <div className="absolute left-0 top-full mt-2 w-56 bg-white border border-gray-200 rounded-xl shadow-lg z-20 p-3 space-y-3">
-                {showScenariosColumn && (
-                  <div>
-                    <p className="text-xs font-semibold text-gray-500 uppercase mb-1.5">Scenarios</p>
-                    <select
-                      value={filterAssigned}
-                      onChange={(e) => setFilterAssigned(e.target.value)}
-                      className="w-full text-sm border border-gray-200 rounded-lg px-3 py-2 bg-white focus:outline-none focus:ring-2 focus:ring-orange-400"
-                    >
-                      <option value="">All students</option>
-                      <option value="assigned">Has assigned scenarios</option>
-                      <option value="unassigned">Not assigned</option>
-                    </select>
-                  </div>
-                )}
-                <div>
-                  <p className="text-xs font-semibold text-gray-500 uppercase mb-1.5">Progress</p>
-                  <select
-                    value={filterProgress}
-                    onChange={(e) => setFilterProgress(e.target.value)}
-                    className="w-full text-sm border border-gray-200 rounded-lg px-3 py-2 bg-white focus:outline-none focus:ring-2 focus:ring-orange-400"
-                  >
-                    <option value="">All progress</option>
-                    <option value="active">Has sessions</option>
-                    <option value="inactive">No sessions yet</option>
-                  </select>
-                </div>
-                {(filterAssigned || filterProgress) && (
-                  <button
-                    onClick={() => { setFilterAssigned(""); setFilterProgress(""); }}
-                    className="w-full text-xs text-gray-500 hover:text-gray-800 underline"
-                  >
-                    Clear filters
-                  </button>
-                )}
-              </div>
-            )}
-          </div>
-        </div>
-
-        <div className="flex gap-3">
-          {showScenariosColumn && (
-            <button
-              onClick={() => setIsAssignModalOpen(true)}
-              className="px-5 py-2.5 bg-gray-100 hover:bg-gray-200 text-gray-800 text-sm font-semibold rounded-lg transition-colors"
-            >
-              Assign Scenarios
-            </button>
-          )}
-          <input
-            type="file"
-            ref={fileInputRef}
-            onChange={handleFileChange}
-            accept={ACCEPTED_EXTENSIONS.join(",")}
-            style={{ display: "none" }}
-            disabled={isUploading}
-          />
-          <button
-            onClick={handleDownloadTemplate}
-            title="Download the .xlsx template for bulk upload"
-            className="flex items-center gap-2 px-5 py-2.5 bg-white border border-gray-200 text-gray-700 hover:bg-gray-50 text-sm font-bold rounded-lg transition-colors shadow-sm"
-          >
-            <ArrowDownTrayIcon className="h-5 w-5" />
-            Template
-          </button>
-          <button
-            onClick={handleBulkUploadClick}
-            disabled={isUploading}
-            className="flex items-center gap-2 px-5 py-2.5 bg-white border border-gray-200 text-gray-700 hover:bg-gray-50 text-sm font-bold rounded-lg transition-colors shadow-sm disabled:opacity-50"
-          >
-            <ArrowUpTrayIcon className="h-5 w-5" />
-            {isUploading ? "Uploading..." : "Upload Bulk Students"}
-          </button>
-          <button
-            onClick={handleAddNew}
-            className="flex items-center gap-2 px-5 py-2.5 bg-black hover:bg-gray-800 text-white text-sm font-bold rounded-lg transition-colors shadow-sm"
-          >
-            <PlusIcon className="h-5 w-5" />
-            New Student
-          </button>
-        </div>
-      </div>
-
-      <div className="border border-gray-100 rounded-xl overflow-hidden shadow-sm">
-        <div className="overflow-x-auto">
-        <table className="min-w-full divide-y divide-gray-100">
-          <thead className="bg-gray-50/50">
-            <tr>
-              <th
-                className="px-6 py-4 text-left text-xs font-semibold text-gray-500 uppercase tracking-wider cursor-pointer select-none hover:text-gray-700"
-                onClick={() => handleSort("visualId")}
-              >
-                ID{getSortIcon("visualId")}
-              </th>
-              <th
-                className="px-6 py-4 text-left text-xs font-semibold text-gray-500 uppercase tracking-wider cursor-pointer select-none hover:text-gray-700"
-                onClick={() => handleSort("name")}
-              >
-                Student Name{getSortIcon("name")}
-              </th>
-              <th
-                className="px-6 py-4 text-left text-xs font-semibold text-gray-500 uppercase tracking-wider cursor-pointer select-none hover:text-gray-700"
-                onClick={() => handleSort("email")}
-              >
-                Email Address{getSortIcon("email")}
-              </th>
-              <th
-                className="px-6 py-4 text-left text-xs font-semibold text-gray-500 uppercase tracking-wider cursor-pointer select-none hover:text-gray-700"
-                onClick={() => handleSort("schoolName")}
-              >
-                School Name{getSortIcon("schoolName")}
-              </th>
+    <div className="vx min-h-full px-4 pb-16 pt-6 md:px-6">
+      <div className="flex flex-col gap-5">
+        <header className="flex flex-wrap items-end justify-between gap-3">
+          <h1 className="flex items-baseline gap-3 text-3xl font-semibold tracking-tight">
+            Students {totalItems > 0 && <span className={cn("tabular-nums", muted)}>{totalItems}</span>}
+          </h1>
+          {canManageStudents && (
+            <ButtonGroup>
               {showGroupColumn && (
-                <th
-                  className="px-6 py-4 text-left text-xs font-semibold text-gray-500 uppercase tracking-wider cursor-pointer select-none hover:text-gray-700"
-                  onClick={() => handleSort("groupName")}
-                >
-                  Group{getSortIcon("groupName")}
-                </th>
+                <Button variant="secondary" className="h-11" onClick={() => setGroupsOpen(true)}><Layers /> Groups</Button>
               )}
-              <th
-                className="px-6 py-4 text-left text-xs font-semibold text-gray-500 uppercase tracking-wider cursor-pointer select-none hover:text-gray-700"
-                onClick={() => handleSort("totalSessions")}
-              >
-                Progress{getSortIcon("totalSessions")}
-              </th>
               {showScenariosColumn && (
-                <th
-                  className="px-6 py-4 text-left text-xs font-semibold text-gray-500 uppercase tracking-wider cursor-pointer select-none hover:text-gray-700"
-                  onClick={() => handleSort("assignedScenariosCount")}
-                >
-                  Scenarios{getSortIcon("assignedScenariosCount")}
-                </th>
+                <Button variant="secondary" className="h-11" onClick={() => setIsAssignModalOpen(true)}>
+                  <ClipboardList /> Assign scenarios
+                </Button>
               )}
-              <th
-                className="px-6 py-4 text-left text-xs font-semibold text-gray-500 uppercase tracking-wider cursor-pointer select-none hover:text-gray-700"
-                onClick={() => handleSort("inviteStatus")}
-              >
-                Login{getSortIcon("inviteStatus")}
-              </th>
-              <th className="px-6 py-4 text-left text-xs font-semibold text-gray-500 uppercase tracking-wider">
-                Transcript
-              </th>
-              <th className="px-6 py-4 text-left text-xs font-semibold text-gray-500 uppercase tracking-wider">
-                Action
-              </th>
-            </tr>
-          </thead>
-          <tbody className="bg-white divide-y divide-gray-100">
-            {isLoading ? (
-              <tr>
-                <td colSpan={columnCount} className="px-6 py-12 text-center">
-                  <Spinner size={32} />
-                </td>
-              </tr>
-            ) : paginatedData.length === 0 ? (
-              <tr>
-                <td
-                  colSpan={columnCount}
-                  className="px-6 py-12 text-center text-gray-500"
-                >
-                  No students found.
-                </td>
-              </tr>
-            ) : (
-              paginatedData.map((student) => (
-                <tr
-                  key={student.id}
-                  className="hover:bg-gray-50/50 transition-colors group"
-                >
-                  <td
-                    className="px-6 py-4 whitespace-nowrap text-xs font-mono text-gray-500"
-                    title={student.id}
-                  >
-                    {student.visualId}
-                  </td>
-                  <td className="px-6 py-4 whitespace-nowrap text-sm font-semibold text-gray-800">
-                    {student.name}
-                  </td>
-                  <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-600">
-                    {student.email}
-                  </td>
-                  <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-600 max-w-xs truncate">
-                    {student.schoolName}
-                  </td>
-                  {showGroupColumn && (
-                    <td className="px-6 py-4 whitespace-nowrap text-sm">
-                      {student.groupName ? (
-                        <span className="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium bg-orange-100 text-orange-800">
-                          {student.groupName}
-                        </span>
-                      ) : (
-                        <span className="text-gray-400 text-xs">—</span>
-                      )}
-                    </td>
-                  )}
-                  <td className="px-6 py-4 whitespace-nowrap text-sm">
-                    {student.progress !== "N/A" ? (
-                      <div className="flex flex-col gap-0.5">
-                        <span className="font-semibold text-gray-900">{student.progress} avg</span>
-                        {student.bestScore && (
-                          <span className="text-xs text-gray-400">{student.bestScore} best · {student.totalSessions} sessions</span>
-                        )}
-                      </div>
-                    ) : (
-                      <span className="text-gray-400">No sessions yet</span>
-                    )}
-                  </td>
-                  {showScenariosColumn && (
-                    <td className="px-6 py-4 whitespace-nowrap text-sm">
-                      {student.isAssigned ? (
-                        <button
-                          onClick={() =>
-                            setSelectedStudent(student.originalData || student)
-                          }
-                          className="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium bg-green-100 text-green-800 hover:bg-green-200 transition-colors"
-                        >
-                          {/* One string, not three text nodes: the translator
-                              handles whole nodes, and a lone "s" node stayed
-                              English ("3 シナリオs"). */}
-                          {`${student.assignedScenariosCount} scenario${student.assignedScenariosCount !== 1 ? "s" : ""}`}
-                        </button>
-                      ) : (
-                        <span className="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium bg-gray-100 text-gray-800">
-                          Not Assigned
-                        </span>
-                      )}
-                    </td>
-                  )}
-                  <td className="px-6 py-4 whitespace-nowrap text-sm">
-                    <InviteStatusCell
-                      student={student}
-                      canResend={canManageStudents}
-                      isBusy={resendingId === student.id}
-                      onResend={() => requestResend(student)}
-                    />
-                  </td>
-                  <td className="px-6 py-4 whitespace-nowrap text-sm">
-                    <button
-                      onClick={() =>
-                        setSelectedStudent(student.originalData || student)
-                      }
-                      className="text-blue-600 hover:text-blue-800 font-medium underline decoration-blue-300 underline-offset-2"
-                    >
-                      View
-                    </button>
-                  </td>
-                  <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500">
-                    <div className="flex items-center gap-4">
-                      {canManageStudents && (
-                        <>
-                          <button
-                            onClick={() => handleEdit(student)}
-                            className="flex items-center gap-1.5 text-gray-500 hover:text-gray-900 transition-colors"
-                          >
-                            <PencilSquareIcon className="w-4 h-4" />
-                            Edit
-                          </button>
-                          {/* 5. Replace Profile button with Delete button */}
-                          <button
-                            onClick={() => handleDelete(student.id)}
-                            className="flex items-center gap-1.5 text-red-400 hover:text-red-600 transition-colors"
-                          >
-                            <TrashIcon className="w-4 h-4" />
-                            Delete
-                          </button>
-                        </>
-                      )}
-                    </div>
-                  </td>
-                </tr>
-              ))
+              <Button variant="secondary" className="h-11" onClick={handleDownloadTemplate} title="Download the .xlsx template for bulk upload">
+                <Download /> Template
+              </Button>
+              <Button variant="secondary" className="h-11" onClick={handleBulkUploadClick} disabled={isUploading}>
+                {isUploading ? <Loader2 className="animate-spin" /> : <Upload />} {isUploading ? "Uploading" : "Upload students"}
+              </Button>
+              <Button variant="secondary" className="h-11" onClick={exportCsv} disabled={exporting || totalItems === 0} title="Download this list as a spreadsheet (CSV)">
+                {exporting ? <Loader2 className="animate-spin" /> : <FileSpreadsheet />} Export
+              </Button>
+            </ButtonGroup>
+          )}
+          <input type="file" ref={fileInputRef} onChange={handleFileChange} accept={ACCEPTED_EXTENSIONS.join(",")} className="hidden" disabled={isUploading} />
+        </header>
+
+        <Intro id="students" steps={[
+          { title: "Click a row to open a student", body: "Their scores over time, each scenario's best, reflections and your private note." },
+          { title: "Select several to act at once", body: "Shift-click selects a range. Then remind, write an email, move to a group or delete." },
+          { title: "Groups are classes", body: "Groups → Open class shows a join code students type to join, and how the class is doing." },
+        ]} />
+        <ListToolbar
+          search={{ value: searchTerm, onChange: setSearchTerm, placeholder: "Search name or email" }}
+          filters={
+            <>
+              {showScenariosColumn && (
+                <ToolbarToggle label="Scenarios" value={filterAssigned} onChange={setFilterAssigned}
+                  options={[{ value: "", label: "All" }, { value: "assigned", label: "Assigned" }, { value: "unassigned", label: "Not assigned" }]} />
+              )}
+              {showGroupColumn && groups.length > 0 && (
+                <div className="px-1">
+                  <Select variant="ghost" label="Group" value={filterGroup} onChange={setFilterGroup}
+                    options={[{ value: "", label: "All groups" }, ...groups.map((g) => ({ value: g._id, label: g.name, hint: g.studentCount })), { value: "none", label: "No group" }]} />
+                </div>
+              )}
+              <ToolbarToggle label="Progress" value={filterProgress} onChange={setFilterProgress}
+                options={[{ value: "", label: "Any progress" }, ...(showScenariosColumn ? [{ value: "notstarted", label: "Not started" }] : []), { value: "active", label: "Has sessions" }, { value: "inactive", label: "No sessions" }]} />
+            </>
+          }
+          actions={canManageStudents && (
+            <Button size="lg" className="h-11 rounded-[22px]" onClick={handleAddNew}><Plus /> New student</Button>
+          )}
+        />
+
+        {pickedList.length > 0 && (
+          <div className="sticky top-2 z-20 flex flex-wrap items-center gap-3 rounded-2xl border border-[rgb(var(--vx-accent)/0.5)] bg-[rgb(var(--vx-card))] px-4 py-2 shadow-lg">
+            <span className="text-base font-semibold tabular-nums">{pickedList.length} selected</span>
+            <ButtonGroup>
+              <Button variant="secondary" size="sm" onClick={() => copyText(pickedList.map((r) => r.email).join(", "), `${pickedList.length} emails copied`)}><Copy /> Copy emails</Button>
+              <Button variant="secondary" size="sm" onClick={() => { window.location.href = reminder(pickedList); }}><Bell /> Remind</Button>
+              {canManageStudents && <Button variant="secondary" size="sm" onClick={() => setCompose({ students: pickedList })}><PenLine /> Write email</Button>}
+              <Button variant="secondary" size="sm" title="Open in your own mail app" onClick={() => { window.location.href = mailto({ bcc: pickedList.map((r) => r.email) }); }}><Mail /> Mail app</Button>
+            </ButtonGroup>
+            {canManageStudents && showGroupColumn && groups.length > 0 && (
+              <span className="flex items-center gap-1 text-sm font-medium">
+                Move to group <Menu label="Move to group" align="left" items={groupItems(pickedList)} />
+              </span>
             )}
-          </tbody>
-        </table>
+            {canManageStudents && (
+              <Button variant="destructive" size="sm" disabled={bulkBusy} onClick={() => setBulkDelete(true)}><Trash2 /> Delete</Button>
+            )}
+            {bulkBusy && <Loader2 size={18} className={cn("animate-spin", muted)} />}
+            <button type="button" onClick={() => setPicked({})} className={cn("ml-auto inline-flex items-center gap-1 text-sm font-medium hover:text-[rgb(var(--vx-ink))]", muted)}>
+              <X size={16} /> Clear
+            </button>
+          </div>
+        )}
+
+        <div className="overflow-hidden rounded-2xl border border-[rgb(var(--vx-line)/0.7)] bg-[rgb(var(--vx-card))]">
+          <div className="overflow-x-auto">
+            <table className="w-full border-collapse">
+              <thead className="border-b border-[rgb(var(--vx-line)/0.7)] bg-[rgb(var(--vx-cell)/0.5)]">
+                <tr>
+                  <th className="w-0 py-3 pl-5 pr-0">
+                    <Tick label="Select this page" checked={pageIds.length > 0 && pagePicked === pageIds.length}
+                      indeterminate={pagePicked > 0 && pagePicked < pageIds.length} onChange={togglePage} />
+                  </th>
+                  <Head k="name">Student</Head>
+                  {showSchoolColumn && <Head k="schoolName">School</Head>}
+                  {showGroupColumn && <Head k="groupName">Group</Head>}
+                  <Head k="totalSessions">Progress</Head>
+                  {showScenariosColumn && <Head k="assignedScenariosCount">Scenarios</Head>}
+                  <Head k="lastSessionAt">Last session</Head>
+                  <Head k="inviteStatus">Login</Head>
+                  <Head>Transcript</Head>
+                  <Head k="visualId">ID</Head>
+                  <Head className="w-0"><span className="sr-only">Actions</span></Head>
+                </tr>
+              </thead>
+              <tbody className={cn("divide-y divide-[rgb(var(--vx-line)/0.7)] transition-opacity", isLoading && paginatedData.length > 0 && "opacity-60")}>
+                {isLoading && paginatedData.length === 0 ? (
+                  Array.from({ length: 6 }).map((_, i) => (
+                    <tr key={i}><td colSpan={cols} className="px-5 py-3"><div className="h-10 animate-pulse rounded-xl bg-[rgb(var(--vx-cell)/0.7)]" /></td></tr>
+                  ))
+                ) : paginatedData.length === 0 ? (
+                  <tr>
+                    <td colSpan={cols} className="px-5 py-16 text-center">
+                      <p className={cn("text-base", muted)}>{searchTerm || filtersOn ? "No students match." : "No students yet. Add one, or upload your roster from a spreadsheet."}</p>
+                      {!searchTerm && !filtersOn && canManageStudents && (
+                        <div className="mt-4 flex justify-center">
+                          <ButtonGroup>
+                            <Button onClick={(e) => { e.stopPropagation(); handleAddNew(); }}><Plus /> Add a student</Button>
+                            <Button variant="secondary" onClick={(e) => { e.stopPropagation(); handleDownloadTemplate(); }}><Download /> Template</Button>
+                            <Button variant="secondary" onClick={(e) => { e.stopPropagation(); handleBulkUploadClick(); }}><Upload /> Upload roster</Button>
+                          </ButtonGroup>
+                        </div>
+                      )}
+                      {filtersOn && (
+                        <button type="button" onClick={() => { setFilterAssigned(""); setFilterProgress(""); setFilterGroup(""); }}
+                          className="mt-2 text-base font-medium text-[rgb(var(--vx-accent-text))] hover:underline">Clear filters</button>
+                      )}
+                    </td>
+                  </tr>
+                ) : (
+                  paginatedData.map((s) => (
+                    <tr key={s.id} onClick={() => setDrawer(s)} title="Open student"
+                      className={cn("group/row cursor-pointer transition-colors hover:bg-[rgb(var(--vx-accent)/0.05)]", picked[s.id] && "bg-[rgb(var(--vx-accent)/0.08)]")}>
+                      <td className="py-3 pl-5 pr-0"><Tick label={`Select ${s.name}`} checked={!!picked[s.id]} onChange={(e) => togglePick(s, e)} /></td>
+                      <td className="max-w-xs px-5 py-3">
+                        <div className="truncate text-base font-semibold">{s.name}</div>
+                        <div className={cn("flex items-center gap-0.5 text-sm", muted)}>
+                          <span className="truncate">{s.email}</span>
+                          <CopyButton value={s.email} label="Copy email" className="size-6 opacity-0 focus:opacity-100 group-hover/row:opacity-100" size={13} />
+                        </div>
+                      </td>
+                      {showSchoolColumn && <td className="max-w-[14rem] truncate px-5 py-3 text-base">{s.schoolName}</td>}
+                      {showGroupColumn && (
+                        <td className="whitespace-nowrap px-5 py-3">
+                          <span className="inline-flex items-center gap-0.5">
+                            {s.groupName
+                              ? <span className="inline-flex rounded-full bg-[rgb(var(--vx-accent)/0.14)] px-3 py-0.5 text-sm font-medium">{s.groupName}</span>
+                              : <span className={muted}>—</span>}
+                            {canManageStudents && groups.length > 0 && (
+                              <Menu label="Change group" align="left" className="opacity-0 focus-within:opacity-100 group-hover/row:opacity-100" items={groupItems([s])} />
+                            )}
+                          </span>
+                        </td>
+                      )}
+                      <td className="whitespace-nowrap px-5 py-3">
+                        {s.progress !== "N/A" ? (
+                          <div className="flex items-center gap-2.5"><MiniRing value={parseInt(s.progress, 10)} /><div>
+                            <div className="text-base font-semibold tabular-nums">{s.progress} <span className={cn("font-normal", muted)}>avg</span></div>
+                            <div className={cn("text-sm tabular-nums", muted)}>{s.bestScore ? `${s.bestScore} best · ` : ""}{s.totalSessions} session{s.totalSessions === 1 ? "" : "s"}</div>
+                          </div></div>
+                        ) : <span className={cn("text-base", muted)}>No sessions yet</span>}
+                      </td>
+                      {showScenariosColumn && (
+                        <td className="whitespace-nowrap px-5 py-3 text-base tabular-nums">
+                          {s.isAssigned ? `${s.assignedScenariosCount}` : <span className={muted}>None</span>}
+                        </td>
+                      )}
+                      <td className="whitespace-nowrap px-5 py-3 text-base">
+                        <span className="inline-flex items-center gap-2">
+                          <ActivityDot lastAt={s.lastSessionAt} />
+                          <Ago date={s.lastSessionAt} fallback="—" className={cn(!s.lastSessionAt && muted)} />
+                        </span>
+                      </td>
+                      <td className="whitespace-nowrap px-5 py-3">
+                        <InviteStatusCell student={s} canResend={canManageStudents} isBusy={resendingId === s.id} onResend={() => requestResend(s)} />
+                      </td>
+                      <td className="whitespace-nowrap px-5 py-3">
+                        <Button variant="secondary" size="sm" onClick={(e) => { e.stopPropagation(); setSelectedStudent(s.originalData || s); }}><FileText /> View</Button>
+                      </td>
+                      <td className={cn("whitespace-nowrap px-5 py-3 font-mono text-sm", muted)} title={s.id}>
+                        <span className="inline-flex items-center gap-0.5">{s.visualId}
+                          <CopyButton value={s.id} label="Copy ID" className="size-6 opacity-0 focus:opacity-100 group-hover/row:opacity-100" size={13} />
+                        </span>
+                      </td>
+                      <td className="whitespace-nowrap px-5 py-3 text-right">
+                        {canManageStudents && (
+                          <RowActions items={[
+                            { icon: Bell, label: "Remind", onClick: () => { window.location.href = reminder([s]); } },
+                            { icon: Pencil, label: "Edit", onClick: () => handleEdit(s) },
+                            { icon: Trash2, label: "Delete", danger: true, onClick: () => handleDelete(s.id) },
+                          ]} />
+                        )}
+                      </td>
+                    </tr>
+                  ))
+                )}
+              </tbody>
+            </table>
+          </div>
+          <div className="px-5">
+            <Pagination page={currentPage} pageSize={pageSize} total={totalItems} onPage={handlePageChange} onPageSize={setPageSize} />
+          </div>
         </div>
-        <PaginationBar
-        currentPage={currentPage}
-        totalPages={totalPages}
-        totalItems={totalItems}
-        pageNumbers={pageNumbers}
-        onPageChange={handlePageChange}
-        onPrevPage={prevPage}
-        onNextPage={nextPage}
-        isFirstPage={isFirstPage}
-        isLastPage={isLastPage}
-        rangeStart={rangeStart}
-        rangeEnd={rangeEnd}
-      />
       </div>
 
       {isStudentModalOpen && (
-        <div className="fixed inset-0 z-50 bg-black/40 backdrop-blur-sm flex justify-center items-center">
+        <div className="fixed inset-0 z-50 bg-black/40 backdrop-blur-sm flex justify-center items-center p-4">
           <StudentModal
             studentData={editingStudent}
             onSave={handleSaveStudent}
@@ -828,9 +800,44 @@ function StudentPage({ role }) {
           />
         </div>
       )}
+      {drawer && (
+        <StudentDrawer student={drawer} canManage={canManageStudents} onClose={() => setDrawer(null)}
+          onTranscripts={() => { setSelectedStudent(drawer.originalData || drawer); }}
+          onRemind={() => { window.location.href = reminder([drawer]); }}
+          onEmail={() => setCompose({ students: [drawer] })}
+          onAssign={showScenariosColumn ? () => { setAssignFor(drawer.name); setIsAssignModalOpen(true); } : null} />
+      )}
+      {compose && <ComposeEmail to={compose} fromName={user?.name} onClose={() => setCompose(null)} />}
+      {groupsOpen && (
+        <GroupsPanel groups={groups} onGroupsChange={setGroups} onClose={() => setGroupsOpen(false)}
+          onShowGroup={(g) => { setFilterGroup(g._id); setGroupsOpen(false); }}
+          onEmailGroup={(g) => setCompose({ group: g })} />
+      )}
+      {bulkDelete && (
+        <Dialog title={`Delete ${pickedList.length} student${pickedList.length === 1 ? "" : "s"}?`} onClose={() => { setBulkDelete(false); setConfirmText(""); }} size="sm" z="z-[60]"
+          footer={
+            <ButtonGroup>
+              <Button variant="secondary" size="lg" onClick={() => { setBulkDelete(false); setConfirmText(""); }}>Cancel</Button>
+              <Button variant="destructive" size="lg" disabled={confirmText.trim().toLowerCase() !== "delete" || bulkBusy} onClick={deleteMany}>
+                {bulkBusy ? <Loader2 className="animate-spin" /> : <Trash2 />} Delete
+              </Button>
+            </ButtonGroup>
+          }>
+          <div className="flex flex-col gap-3">
+            <p className={cn("text-base", muted)}>Their accounts are removed and they can no longer sign in. This cannot be undone.</p>
+            <p className="text-base">{pickedList.slice(0, 5).map((r) => r.name).join(", ")}{pickedList.length > 5 ? ` and ${pickedList.length - 5} more` : ""}</p>
+            <label className="flex flex-col gap-1 text-sm font-medium">
+              Type <span className="font-mono">delete</span> to confirm
+              <input value={confirmText} onChange={(e) => setConfirmText(e.target.value)} autoFocus
+                className="h-11 rounded-xl border-0 bg-[rgb(var(--vx-cell))] px-3 text-base outline-none focus:ring-2 focus:ring-[rgb(var(--vx-danger))]" />
+            </label>
+          </div>
+        </Dialog>
+      )}
       {isAssignModalOpen && showScenariosColumn && (
         <AssignScenariosModal
-          onClose={() => setIsAssignModalOpen(false)}
+          focusStudent={assignFor}
+          onClose={() => { setIsAssignModalOpen(false); setAssignFor(""); }}
           onAssignSuccess={() => {
             fetchStudents();
             toast.success("Scenarios assigned successfully");

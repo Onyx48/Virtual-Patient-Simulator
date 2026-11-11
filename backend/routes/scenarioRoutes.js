@@ -28,12 +28,22 @@ import { isFlowKey } from "../utils/voxioClient.js";
 // The educator Test button's destination, from the same place the student room
 // comes from.
 import { roomUrlFor, testRoomUrlFor } from "../utils/roomUrl.js";
+import { roomSessions } from "../state/roomSessions.js";
 import {
   isScenarioTestable,
   NOT_TESTABLE_MESSAGE,
 } from "../utils/testableScenarios.js";
 
 const router = express.Router();
+
+// What a student may not read: the case itself, the grading questions, the flow key (mindsets/student.md, S8).
+const STUDENT_HIDDEN = ["scenarioPrompt", "aiQuestions", "aiInstructions", "apiKey", "html", "template", "voxioSync"];
+const forRole = (req, obj) => {
+  if (req.user?.role !== "student") return obj;
+  const out = { ...obj };
+  STUDENT_HIDDEN.forEach((k) => delete out[k]);
+  return out;
+};
 
 const scenarioValidationRules = [
   body("scenarioName").optional().notEmpty().trim(),
@@ -99,7 +109,12 @@ router.get("/", protect, checkAccess("viewScenarios"), async (req, res) => {
 
     let scenarios;
     let total;
-    if (!paging) {
+    // ?fields=lite (dashboards): only what a card or a count needs, ids not populated, no prompts or
+    // AI fields. Opt-in, so every existing caller gets exactly what it got before.
+    const lite = req.query.fields === "lite";
+    if (!paging && lite) {
+      scenarios = await Scenario.find(query).select("_id scenarioName description status difficulty testable assignedTo assignedGroups createdAt educator").sort({ createdAt: -1 }).lean();
+    } else if (!paging) {
       scenarios = await populateList(Scenario.find(query).sort({ createdAt: -1 }));
     } else if (paging.sort.educator !== undefined) {
       // Sorting by creator means sorting by the populated name, which find()
@@ -125,9 +140,9 @@ router.get("/", protect, checkAccess("viewScenarios"), async (req, res) => {
       total = count;
     } else {
       [scenarios, total] = await Promise.all([
-        populateList(
-          Scenario.find(query).sort(paging.sort).skip(paging.skip).limit(paging.limit),
-        ),
+        lite
+          ? Scenario.find(query).select("_id scenarioName description status difficulty testable assignedTo assignedGroups createdAt educator").sort(paging.sort).skip(paging.skip).limit(paging.limit).lean()
+          : populateList(Scenario.find(query).sort(paging.sort).skip(paging.skip).limit(paging.limit)),
         Scenario.countDocuments(query),
       ]);
     }
@@ -151,7 +166,7 @@ router.get("/", protect, checkAccess("viewScenarios"), async (req, res) => {
     const scenariosWithStats = scenarios.map((s) => {
       const stat = statsMap[s._id.toString()];
       return {
-        ...s.toObject(),
+        ...(typeof s.toObject === "function" ? s.toObject() : s),
         avgScore: stat ? parseFloat((stat.avgScore * 100).toFixed(1)) : null,
         totalSessions: stat?.totalSessions ?? 0,
         // So the Test and Start buttons can be greyed out up front rather than
@@ -161,7 +176,8 @@ router.get("/", protect, checkAccess("viewScenarios"), async (req, res) => {
       };
     });
 
-    res.json(paging ? pageResponse(scenariosWithStats, total, paging) : scenariosWithStats);
+    const visible = scenariosWithStats.map((s) => forRole(req, s));
+    res.json(paging ? pageResponse(visible, total, paging) : visible);
   } catch (err) {
     console.error("Get Scenarios Error:", err);
     res.status(500).json({ message: "Server error fetching scenarios." });
@@ -340,11 +356,11 @@ router.post(
 );
 
 // Test room sessions: sessionId -> the customs the room starts its Voxio session with.
-const roomSessions = new Map();
+// Shared with POST /api/sessions/start (students in our room): backend/state/roomSessions.js
 
 router.get("/room/:sessionId", protect, (req, res) => {
   const r = roomSessions.get(req.params.sessionId);
-  if (!r || r.userId !== String(req.user._id)) return res.status(404).json({ message: "Test session not found. Press Test again." });
+  if (!r || r.userId !== String(req.user._id)) return res.status(404).json({ message: "This session was not found. Go back and press Start again." });
   res.json({ customs: r.customs });
 });
 
@@ -451,7 +467,7 @@ router.get("/:id", protect, checkAccess("viewScenarios"), async (req, res) => {
     }
 
     // Same flag as the list, for the student's Start button.
-    res.json({ ...scenario.toObject(), testable: isScenarioTestable(scenario._id) });
+    res.json(forRole(req, { ...scenario.toObject(), testable: isScenarioTestable(scenario._id) }));
   } catch (err) {
     console.error("Get Single Scenario Error:", err);
     res.status(500).json({ message: "Server error fetching scenario." });

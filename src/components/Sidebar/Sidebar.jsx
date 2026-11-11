@@ -1,229 +1,99 @@
 import React from "react";
-import { NavLink } from "react-router-dom";
+import { NavLink } from "../../lib/router";
+import { LayoutGrid, Building2, BookOpen, Users, GraduationCap, Video, Settings, LogOut, ArrowUpRight, BadgeCheck, ListChecks, BookA } from "lucide-react";
 import { useAuth } from "../../AuthContext";
 import { useLanguage } from "../../i18n/LanguageContext";
 import sitLogo from "../../assets/SIT-logo.jpg";
-import {
-  Squares2X2Icon,
-  BuildingLibraryIcon,
-  BookOpenIcon,
-  UsersIcon,
-  Cog6ToothIcon,
-  VideoCameraIcon,
-  ArrowLeftOnRectangleIcon,
-} from "@heroicons/react/24/outline";
-
-const hasAccess = (userRole, allowedRoles) => {
-  if (!userRole) return false;
-  return allowedRoles.includes(userRole);
-};
+import { cn } from "../../lib/utils";
 
 /*
- * Where Create Room goes. A plain link — the screenshare app mints the room
- * itself, so nothing is generated on this side. Set VITE_ROOM_BASE_URL to move it.
+ * Where Create Room goes. A plain link: the screenshare app mints the room itself.
+ * Set VITE_ROOM_BASE_URL to move it.
  */
-const CREATE_ROOM_URL =
-  import.meta.env.VITE_ROOM_BASE_URL ||
-  "https://screenshare.gospacesxr.com/create-room";
+const CREATE_ROOM_URL = import.meta.env.VITE_ROOM_BASE_URL || "https://screenshare.gospacesxr.com/create-room";
 
-function Sidebar({ logo }) {
+const ALL = ["superadmin", "school_admin", "educator", "student"];
+
+const itemClass = (active, collapsed) =>
+  cn(
+    "group flex h-11 items-center gap-3 rounded-full text-base font-medium transition-colors",
+    collapsed ? "w-11 justify-center" : "px-4",
+    active
+      ? "bg-[rgb(var(--vx-card))] text-[rgb(var(--vx-ink))] shadow-sm [&_svg]:text-[rgb(var(--vx-accent-text))]"
+      : "text-[rgb(var(--vx-muted))] hover:bg-[rgb(var(--vx-card)/0.6)] hover:text-[rgb(var(--vx-ink))]",
+  );
+
+function Item({ item, collapsed }) {
+  const Icon = item.icon;
+  const body = (
+    <>
+      <Icon size={20} className="shrink-0" />
+      {!collapsed && <span className="flex-1 truncate">{item.name}</span>}
+      {!collapsed && item.externalHref && <ArrowUpRight size={16} className="opacity-60" />}
+    </>
+  );
+  // An external item leaves the app, so it is a plain anchor in a new tab.
+  if (item.externalHref) {
+    return (
+      <a href={item.externalHref} target="_blank" rel="noopener noreferrer" title={collapsed ? item.name : undefined} className={itemClass(false, collapsed)}>
+        {body}
+      </a>
+    );
+  }
+  return (
+    <NavLink to={item.path} end={item.path === "/"} title={collapsed ? item.name : undefined} className={({ isActive }) => itemClass(isActive, collapsed)}>
+      {body}
+    </NavLink>
+  );
+}
+
+function Sidebar({ collapsed = false }) {
   const { user, logout } = useAuth();
   const { t } = useLanguage();
-  const userRole = user?.role;
+  const role = user?.role;
 
-  const menuItems = [
-    {
-      name: t("nav.dashboard"),
-      path: "/",
-      icon: <Squares2X2Icon className="w-5 h-5" />,
-      allowedRoles: ["superadmin", "school_admin", "educator", "student"],
-    },
-    {
-      name: t("nav.schools"),
-      path: "/schools",
-      icon: <BuildingLibraryIcon className="w-5 h-5" />,
-      allowedRoles: ["superadmin"],
-    },
-    {
-      name: t("nav.scenarios"),
-      path: "/scenarios",
-      icon: <BookOpenIcon className="w-5 h-5" />,
-      allowedRoles: ["school_admin", "educator", "student"],
-    },
-    {
-      name: t("nav.students"),
-      path: "/students",
-      icon: <UsersIcon className="w-5 h-5" />,
-      allowedRoles: ["school_admin", "educator"],
-    },
-    {
-      name: t("nav.educators"),
-      path: "/educators",
-      icon: <UsersIcon className="w-5 h-5" />,
-      allowedRoles: ["school_admin"],
-    },
+  const main = [
+    { name: t("nav.dashboard"), path: "/", icon: LayoutGrid, roles: ALL },
+    { name: t("nav.schools"), path: "/schools", icon: Building2, roles: ["superadmin"] },
+    { name: t("nav.scenarios"), path: "/scenarios", icon: BookOpen, roles: ["school_admin", "educator", "student"] },
+    { name: t("nav.students"), path: "/students", icon: Users, roles: ["school_admin", "educator"] },
+    { name: t("nav.educators"), path: "/educators", icon: GraduationCap, roles: ["school_admin"] },
+    { name: "Readiness", path: "/readiness", icon: BadgeCheck, roles: ["educator", "school_admin"] },
+    { name: "Rubric bank", path: "/rubrics", icon: ListChecks, roles: ["educator"] },
   ];
-
-  const supportItems = [
-    {
-      name: t("nav.createRoom"),
-      /*
-       * The screenshare app, opened directly. This used to point at
-       * /create-room/<userId>, which has no route and no page — the click fell
-       * through to the catch-all in ContentArea.jsx and silently bounced back to
-       * the dashboard, so the button looked broken.
-       */
-      externalHref: CREATE_ROOM_URL,
-      icon: <VideoCameraIcon className="w-5 h-5" />,
-      allowedRoles: ["superadmin", "school_admin", "educator", "student"],
-    },
-    {
-      name: t("nav.settings"),
-      path: "/settings",
-      icon: <Cog6ToothIcon className="w-5 h-5" />,
-      allowedRoles: ["superadmin", "school_admin", "educator", "student"],
-    },
+  const more = [
+    { name: t("nav.createRoom"), externalHref: CREATE_ROOM_URL, icon: Video, roles: ["educator", "student"] },
+    { name: "Definitions", path: "/definitions", icon: BookA, roles: ALL },
+    { name: t("nav.settings"), path: "/settings", icon: Settings, roles: ALL },
   ];
+  const visible = (list) => list.filter((i) => role && i.roles.includes(role));
 
   return (
-    <aside className="fixed top-0 left-0 h-screen w-64 bg-[#0F0F0F] text-gray-400 flex flex-col transition-all duration-300 z-50 font-sans">
-      {/*
-        Height is content-driven rather than the h-16 it used to be: the logo is
-        now h-24 (96px), which cannot fit a 64px bar. This block is the sidebar's
-        own header — the main content is offset from Header's top-16, not from
-        here — so growing it only pushes the menu down.
-      */}
-      <div className="flex items-center justify-center px-6 py-6 border-b border-gray-800 bg-black">
-        {logo ? (
-          logo
-        ) : (
-          <img
-            src={sitLogo}
-            alt="Singapore Institute of Technology"
-            className="h-24 w-auto object-contain"
-          />
-        )}
-      </div>
+    <aside className={cn("flex h-screen shrink-0 flex-col gap-4 py-3 transition-[width] duration-200", collapsed ? "w-[76px] items-center px-2" : "w-64 px-3")}>
+      {/* The logo file carries its own black ground, so it is shown as is, rounded, with no tile. */}
+      {collapsed ? (
+        // Collapsed: only the SiT mark (x 93-243, y 70-220 of the 508x278 file), centred in a 56px tile.
+        <span className="relative size-14 shrink-0 overflow-hidden rounded-2xl bg-black" title="Singapore Institute of Technology">
+          <img src={sitLogo} alt="Singapore Institute of Technology" className="absolute max-w-none"
+            style={{ width: 190, height: 104, left: -35, top: -26 }} />
+        </span>
+      ) : (
+        <img src={sitLogo} alt="Singapore Institute of Technology" className="h-24 w-full shrink-0 rounded-2xl object-cover" />
+      )}
 
-      <div className="flex-1 overflow-y-auto py-6 px-3 space-y-1 custom-scrollbar">
-        <p className="px-3 text-xs font-semibold text-gray-500 uppercase tracking-wider mb-2">
-          {t("nav.mainMenu")}
-        </p>
+      <nav className={cn("flex flex-1 flex-col gap-1 overflow-y-auto", collapsed && "items-center")} aria-label="Main">
+        {visible(main).map((i) => <Item key={i.name} item={i} collapsed={collapsed} />)}
+        <div className={cn("my-3 border-t border-[rgb(var(--vx-line))]", collapsed ? "w-8" : "mx-4")} />
+        {visible(more).map((i) => <Item key={i.name} item={i} collapsed={collapsed} />)}
+      </nav>
 
-        {menuItems.map((item) =>
-          hasAccess(userRole, item.allowedRoles) ? (
-            <NavLink
-              key={item.name}
-              to={item.path}
-              className={({ isActive }) =>
-                `flex items-center gap-3 px-3 py-2.5 rounded-lg text-sm font-medium transition-colors duration-200 ${
-                  isActive
-                    ? "bg-orange-500/10 text-orange-500"
-                    : "hover:bg-gray-800 hover:text-white"
-                }`
-              }
-            >
-              {item.icon}
-              {item.name}
-            </NavLink>
-          ) : null,
-        )}
-
-        {/*
-          The divider alone separates these from the main menu. The old "Help &
-          Support" heading sat above Create Room and Settings, neither of which is
-          help or support.
-        */}
-        <div className="my-6 border-t border-gray-800 mx-3"></div>
-
-        {supportItems.map((item) => {
-          if (!hasAccess(userRole, item.allowedRoles)) {
-            return null;
-          }
-
-          const linkClasses =
-            "flex items-center gap-3 px-3 py-2.5 rounded-lg text-sm font-medium transition-colors duration-200";
-
-          /*
-           * An item with `externalHref` leaves the app, so it is a plain anchor: a
-           * NavLink would try to resolve it as an in-app route. New tab, and
-           * noreferrer alongside noopener because the room host has no business
-           * seeing which page sent the user.
-           */
-          if (item.externalHref) {
-            return (
-              <a
-                key={item.name}
-                href={item.externalHref}
-                target="_blank"
-                rel="noopener noreferrer"
-                className={`${linkClasses} hover:bg-gray-800 hover:text-white`}
-              >
-                {item.icon}
-                {item.name}
-              </a>
-            );
-          }
-
-          return (
-            <NavLink
-              key={item.name}
-              to={item.path}
-              className={({ isActive }) =>
-                `${linkClasses} ${
-                  isActive
-                    ? "bg-orange-500/10 text-orange-500"
-                    : "hover:bg-gray-800 hover:text-white"
-                }`
-              }
-            >
-              {item.icon}
-              {item.name}
-            </NavLink>
-          );
-        })}
-      </div>
-
-      <div className="p-4 border-t border-gray-800">
-        <button
-          onClick={logout}
-          className="flex items-center gap-3 w-full px-3 py-2.5 text-sm font-medium text-gray-400 hover:text-white hover:bg-gray-800 rounded-lg transition-colors duration-200 group"
-        >
-          <ArrowLeftOnRectangleIcon className="w-5 h-5 group-hover:text-red-400 transition-colors" />
-          {t("nav.logout")}
-        </button>
-      </div>
+      <button type="button" onClick={logout} title={collapsed ? t("nav.logout") : undefined}
+        className={cn(itemClass(false, collapsed), "hover:text-[rgb(var(--vx-danger))]")}>
+        <LogOut size={20} className="shrink-0" />
+        {!collapsed && <span>{t("nav.logout")}</span>}
+      </button>
     </aside>
   );
 }
 
 export default Sidebar;
-
-// In your main layout file (e.g., MainLayout.jsx)
-
-// import React from "react";
-// import Sidebar from "./Sidebar"; // Adjust the import path
-// import CustomLogo from "./CustomLogo"; // Assuming you have a logo component or image
-
-// function MainLayout({ children }) {
-// Example 1: Using an <img> tag with a text title
-//   const myLogo = (
-//     <div className="flex items-center gap-3">
-//       <img src="/logo-light.png" alt="My School Logo" className="h-8 w-auto" />
-//       <span className="text-lg font-bold text-white">My School</span>
-//     </div>
-//   );
-
-//   return (
-//     <div className="flex">
-//       {/* Pass the custom logo JSX to the 'logo' prop */}
-//       <Sidebar logo={myLogo} />
-
-//       <main className="flex-1 ml-64 p-8">
-//         {children}
-//       </main>
-//     </div>
-//   );
-// }
-
-// export default MainLayout;/*

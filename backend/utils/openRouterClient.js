@@ -48,7 +48,19 @@ export const openRouterChat = async (args) => {
   }
 };
 
-const openRouterOnce = async ({ messages, json = false, effort = "medium", maxTokens = MAX_TOKENS }) => {
+// Cost log for the superadmin (models/aiUsageModel.js). Imported lazily and never awaited, so a
+// logging failure can never fail or slow the AI call itself.
+const logUsage = (usage, kind) => {
+  import("../models/aiUsageModel.js")
+    .then(({ default: AiUsage }) => AiUsage.create({
+      model: OPENROUTER_MODEL, kind,
+      promptTokens: usage?.prompt_tokens || 0, completionTokens: usage?.completion_tokens || 0,
+      costUsd: typeof usage?.cost === "number" ? usage.cost : null,
+    }))
+    .catch(() => {});
+};
+
+const openRouterOnce = async ({ messages, json = false, effort = "medium", maxTokens = MAX_TOKENS, kind = "other" }) => {
   if (!isOpenRouterConfigured()) {
     throw Object.assign(new Error("OpenRouter is not configured on the server: missing OPENROUTER_API_KEY in .env"), { status: 400 });
   }
@@ -66,6 +78,8 @@ const openRouterOnce = async ({ messages, json = false, effort = "medium", maxTo
       messages,
       max_tokens: maxTokens,
       reasoning: { effort },
+      // Ask OpenRouter to report the call's cost in `usage` (usage accounting).
+      usage: { include: true },
       ...(json && { response_format: { type: "json_object" } }),
     }),
     signal: AbortSignal.timeout(TIMEOUT_MS),
@@ -101,6 +115,7 @@ const openRouterOnce = async ({ messages, json = false, effort = "medium", maxTo
   }
   const text = choice?.message?.content?.trim() || "";
   if (!text) throw new Error("OpenRouter returned an empty response.");
+  logUsage(body.usage, kind);
   return { text, usage: body.usage || {} };
 };
 
@@ -113,5 +128,6 @@ export const generateOpenRouterText = async ({ systemPrompt, userQuery, json = f
         { role: "user", content: userQuery },
       ],
       json,
+      kind: "scenario_ai",
     })
   ).text;

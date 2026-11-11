@@ -65,6 +65,11 @@ export default {
           3: "hsl(var(--chart-3))",
           4: "hsl(var(--chart-4))",
           5: "hsl(var(--chart-5))",
+          // bklit charts (src/components/charts) read these inside .vx (vx.css).
+          label: "var(--chart-label)",
+          "tooltip-background": "var(--chart-tooltip-background)",
+          "tooltip-foreground": "var(--chart-tooltip-foreground)",
+          "tooltip-muted": "var(--chart-tooltip-muted)",
         },
       },
       keyframes: {

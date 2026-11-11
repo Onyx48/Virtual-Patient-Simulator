@@ -15,6 +15,7 @@ import {
   invalidateStudentsCache,
 } from "../utils/studentsCache.js";
 import { inviteStatusOf } from "../utils/inviteStatus.js";
+import { sendEducatorMessage, assertMailConfigured } from "../utils/emailService.js";
 
 const router = express.Router();
 const STUDENTS_CACHE_TTL = 120;
@@ -83,6 +84,7 @@ const STUDENT_SORT_FIELDS = {
   totalSessions: "totalSessions",
   assignedScenariosCount: "assignedScenariosCount",
   inviteStatus: "inviteStatus",
+  lastSessionAt: "lastSessionAt",
 };
 
 /*
@@ -97,7 +99,9 @@ const sendStudentPage = async (req, res, paging) => {
   if (req.scope.educatorId) match.supervisor = req.scope.educatorId;
   else if (req.scope.schoolId) match.schoolId = req.scope.schoolId;
 
-  const { searchTerm, assigned, progress } = req.query;
+  const { searchTerm, assigned, progress, groupId } = req.query;
+  if (groupId === "none") match.groupId = null;
+  else if (groupId && mongoose.Types.ObjectId.isValid(groupId)) match.groupId = new mongoose.Types.ObjectId(groupId);
   if (searchTerm) {
     const rx = new RegExp(escapeRegex(searchTerm), "i");
     match.$or = [{ name: rx }, { email: rx }];
@@ -108,25 +112,22 @@ const sendStudentPage = async (req, res, paging) => {
   if (assigned === "unassigned") filters.assignedScenariosCount = 0;
   if (progress === "active") filters.totalSessions = { $gt: 0 };
   if (progress === "inactive") filters.totalSessions = 0;
+  // Assigned something but never practised: the students an educator chases first.
+  if (progress === "notstarted") {
+    filters.totalSessions = 0;
+    filters.assignedScenariosCount = { $gt: 0 };
+  }
 
-  const [result] = await User.aggregate([
-    { $match: match },
+  // Per-student stats: session counts and scores (indexed on sessions.student_id).
+  const statsStages = [
     ...assignedScenarioCountStages(),
+    { $addFields: { _sid: { $toString: "$_id" } } },
     {
       $lookup: {
         from: "sessions",
-        let: { sid: { $toString: "$_id" } },
-        pipeline: [
-          { $match: { $expr: { $eq: ["$student_id", "$$sid"] } } },
-          {
-            $group: {
-              _id: null,
-              best: { $max: "$score" },
-              avg: { $avg: "$score" },
-              n: { $sum: 1 },
-            },
-          },
-        ],
+        localField: "_sid",
+        foreignField: "student_id",
+        pipeline: [{ $group: { _id: null, best: { $max: "$score" }, avg: { $avg: "$score" }, n: { $sum: 1 }, last: { $max: "$createdAt" } } }],
         as: "_stats",
       },
     },
@@ -136,17 +137,23 @@ const sendStudentPage = async (req, res, paging) => {
         totalSessions: { $ifNull: ["$_stats.n", 0] },
         bestScore: { $ifNull: ["$_stats.best", null] },
         avgScore: { $ifNull: ["$_stats.avg", null] },
-        // Must agree with inviteStatusOf in utils/inviteStatus.js.
-        inviteStatus: {
-          $cond: [
-            { $ifNull: ["$lastLoginAt", false] },
-            "active",
-            { $cond: [{ $ifNull: ["$credentialsSentAt", false] }, "invited", "pending"] },
-          ],
-        },
+        lastSessionAt: { $ifNull: ["$_stats.last", null] },
       },
     },
-    { $match: filters },
+  ];
+  // Must agree with inviteStatusOf in utils/inviteStatus.js.
+  const inviteStage = {
+    $addFields: {
+      inviteStatus: {
+        $cond: [
+          { $ifNull: ["$lastLoginAt", false] },
+          "active",
+          { $cond: [{ $ifNull: ["$credentialsSentAt", false] }, "invited", "pending"] },
+        ],
+      },
+    },
+  };
+  const namesStages = [
     { $lookup: { from: "schools", localField: "schoolId", foreignField: "_id", as: "_school" } },
     { $lookup: { from: "groups", localField: "groupId", foreignField: "_id", as: "_group" } },
     {
@@ -167,27 +174,47 @@ const sendStudentPage = async (req, res, paging) => {
         _groupName: { $toLower: { $ifNull: [{ $first: "$_group.name" }, ""] } },
       },
     },
-    {
-      $facet: {
-        items: [
-          { $sort: paging.sort },
-          { $skip: paging.skip },
-          { $limit: paging.limit },
-          {
-            $project: {
-              password: 0,
-              _stats: 0,
-              _school: 0,
-              _group: 0,
-              _schoolName: 0,
-              _groupName: 0,
-            },
+  ];
+  const hide = { $project: { password: 0, _stats: 0, _sid: 0, _school: 0, _group: 0, _schoolName: 0, _groupName: 0 } };
+
+  /*
+   * When neither the filters nor the sort depend on the stats, pick the page first and compute
+   * the stats for those rows only. Otherwise every matching student needs them before sorting.
+   * Either way the result is the same; this only changes how much work it takes.
+   */
+  const STAT_KEYS = ["totalSessions", "assignedScenariosCount", "lastSessionAt"];
+  const NAME_KEYS = ["_schoolName", "_groupName"];
+  const sortKeys = Object.keys(paging.sort);
+  const needsStatsFirst = Object.keys(filters).length > 0 || sortKeys.some((k) => STAT_KEYS.includes(k));
+  const needsNamesFirst = sortKeys.some((k) => NAME_KEYS.includes(k));
+
+  const [result] = needsStatsFirst
+    ? await User.aggregate([
+        { $match: match },
+        ...statsStages,
+        inviteStage,
+        { $match: filters },
+        ...namesStages,
+        { $facet: { items: [{ $sort: paging.sort }, { $skip: paging.skip }, { $limit: paging.limit }, hide], total: [{ $count: "n" }] } },
+      ])
+    : await User.aggregate([
+        { $match: match },
+        inviteStage,
+        {
+          $facet: {
+            items: [
+              ...(needsNamesFirst ? namesStages : []),
+              { $sort: paging.sort },
+              { $skip: paging.skip },
+              { $limit: paging.limit },
+              ...(needsNamesFirst ? [] : namesStages),
+              ...statsStages,
+              hide,
+            ],
+            total: [{ $count: "n" }],
           },
-        ],
-        total: [{ $count: "n" }],
-      },
-    },
-  ]);
+        },
+      ]);
 
   res.json(pageResponse(result.items, result.total[0]?.n || 0, paging));
 };
@@ -282,14 +309,15 @@ router.get("/", protect, checkAccess("viewStudents"), async (req, res) => {
           bestScore: { $max: "$score" },
           avgScore: { $avg: "$score" },
           totalSessions: { $sum: 1 },
+          lastSessionAt: { $max: "$createdAt" },
         },
       },
     ]);
 
+    // A Map, not sessionStats.find() per student: that was quadratic and froze the server at scale.
+    const statById = new Map(sessionStats.map((s) => [s._id, s]));
     const studentsWithStats = students.map((student) => {
-      const sessionStat = sessionStats.find(
-        (s) => s._id === student._id.toString(),
-      );
+      const sessionStat = statById.get(student._id.toString());
       return {
         ...student.toObject(),
         assignedScenariosCount:
@@ -297,6 +325,7 @@ router.get("/", protect, checkAccess("viewStudents"), async (req, res) => {
         bestScore: sessionStat?.bestScore || null,
         avgScore: sessionStat?.avgScore || null,
         totalSessions: sessionStat?.totalSessions || 0,
+        lastSessionAt: sessionStat?.lastSessionAt || null,
         groupId: student.groupId || null,
         // Derived server-side so the roster and any other consumer cannot
         // disagree about what counts as invited — see utils/inviteStatus.js.
@@ -314,6 +343,156 @@ router.get("/", protect, checkAccess("viewStudents"), async (req, res) => {
   } catch (err) {
     console.error("Error in GET:", err);
     res.status(500).json({ message: err.message });
+  }
+});
+
+/*
+ * Readiness for the CPE / placement (after ci/internal-shortlisting: "the product proposes, the
+ * educator disposes"). Every student arrives with a proposed status and its reasons; the educator
+ * only overrides where they know better. Rules:
+ *   Ready    covered at least 80% of assigned scenarios, best-score average 70%+, practised in 21 days
+ *   Almost   best-score average 50%+ or covered at least half
+ *   Not yet  otherwise (including: assigned but never practised)
+ */
+const READY_RULES = { cover: 0.8, ready: 70, almost: 50, recentDays: 21 };
+const pctScore = (v) => { const n = Number(v); if (!(n > 0)) return 0; return Math.round(n <= 1 ? n * 100 : n <= 10 ? n * 10 : n); };
+
+router.get("/readiness", protect, checkAccess("viewStudents"), async (req, res) => {
+  try {
+    const who = { role: "student" };
+    if (req.scope.educatorId) who.supervisor = req.scope.educatorId;
+    else if (req.scope.schoolId) who.schoolId = req.scope.schoolId;
+    if (req.query.groupId && mongoose.Types.ObjectId.isValid(req.query.groupId)) who.groupId = req.query.groupId;
+    const students = await User.find(who).select("_id name email groupId readinessOverride").populate("groupId", "name").lean();
+    const ids = students.map((s) => String(s._id));
+    const Scenario = (await import("../models/scenarioModel.js")).default;
+    const Session = (await import("../models/sessionModel.js")).default;
+    const groupIds = [...new Set(students.map((s) => s.groupId?._id && String(s.groupId._id)).filter(Boolean))];
+    const scenarios = await Scenario.find({ $or: [{ assignedTo: { $in: students.map((s) => s._id) } }, { assignedGroups: { $in: groupIds } }] })
+      .select("_id assignedTo assignedGroups").lean();
+    const byScenario = await assignedStudentIdsByScenario(scenarios);
+    const assigned = new Map(ids.map((id) => [id, new Set()]));
+    byScenario.forEach((set, scen) => set.forEach((sid) => assigned.get(String(sid))?.add(String(scen))));
+    const sessions = await Session.find({ student_id: { $in: ids } }).select("student_id scenario_id score createdAt").lean();
+    const best = new Map(ids.map((id) => [id, new Map()]));
+    const last = new Map();
+    sessions.forEach((x) => {
+      const m = best.get(x.student_id); if (!m) return;
+      m.set(x.scenario_id, Math.max(m.get(x.scenario_id) || 0, pctScore(x.score)));
+      if (!last.get(x.student_id) || x.createdAt > last.get(x.student_id)) last.set(x.student_id, x.createdAt);
+    });
+    const now = Date.now();
+    const rows = students.map((s) => {
+      const id = String(s._id);
+      const asg = assigned.get(id);
+      const m = best.get(id);
+      const covered = [...asg].filter((x) => m.has(x)).length;
+      const cover = asg.size ? covered / asg.size : 0;
+      const bests = [...m.values()];
+      const avg = bests.length ? Math.round(bests.reduce((a, b) => a + b, 0) / bests.length) : null;
+      const lastAt = last.get(id) || null;
+      const recent = lastAt && now - new Date(lastAt).getTime() <= READY_RULES.recentDays * 86400000;
+      const reasons = [];
+      if (!asg.size) reasons.push("Nothing assigned yet");
+      else reasons.push(`Practised ${covered} of ${asg.size} scenarios`);
+      if (avg != null) reasons.push(`Best-score average ${avg}%`);
+      else if (asg.size) reasons.push("No scored sessions yet");
+      if (lastAt && !recent) reasons.push(`Last practised over ${READY_RULES.recentDays} days ago`);
+      let proposed = "notyet";
+      if (asg.size && cover >= READY_RULES.cover && avg != null && avg >= READY_RULES.ready && recent) proposed = "ready";
+      else if ((avg != null && avg >= READY_RULES.almost) || cover >= 0.5) proposed = "almost";
+      const o = s.readinessOverride?.status ? s.readinessOverride : null;
+      return {
+        _id: s._id, name: s.name, email: s.email, group: s.groupId?.name || null,
+        assigned: asg.size, covered, avg, lastSessionAt: lastAt, proposed, reasons,
+        override: o ? { status: o.status, note: o.note || "", byName: o.byName || "", at: o.at } : null,
+        status: o ? o.status : proposed,
+      };
+    }).sort((a, b) => a.name.localeCompare(b.name));
+    res.json({ rules: READY_RULES, students: rows });
+  } catch (err) {
+    console.error("Readiness error:", err);
+    res.status(500).json({ message: "Server error computing readiness." });
+  }
+});
+
+/* PATCH /api/students/:id/readiness { status: ready|almost|notyet|null, note } — null returns to the proposal. */
+router.patch("/:id/readiness", protect, checkAccess("viewStudents"), async (req, res) => {
+  try {
+    if (!mongoose.Types.ObjectId.isValid(req.params.id)) return res.status(404).json({ message: "Student not found" });
+    const student = await User.findById(req.params.id).select("role supervisor schoolId");
+    if (!student || student.role !== "student") return res.status(404).json({ message: "Student not found" });
+    if (req.scope.educatorId && String(student.supervisor) !== String(req.scope.educatorId)) return res.status(403).json({ message: "Access denied: Not your student" });
+    if (!req.scope.educatorId && req.scope.schoolId && String(student.schoolId) !== String(req.scope.schoolId)) return res.status(403).json({ message: "Access denied" });
+    const { status, note } = req.body || {};
+    if (status !== null && !["ready", "almost", "notyet"].includes(status)) return res.status(400).json({ message: "Status must be ready, almost, notyet or null." });
+    const readinessOverride = status === null ? undefined : { status, note: String(note || "").slice(0, 1000), byName: req.user.name || "", at: new Date() };
+    await User.updateOne({ _id: student._id }, readinessOverride ? { $set: { readinessOverride } } : { $unset: { readinessOverride: "" } });
+    res.json({ override: readinessOverride || null });
+  } catch (err) {
+    res.status(500).json({ message: "Server error saving readiness." });
+  }
+});
+
+/*
+ * Email the caller's own students: { studentIds: [] } or { groupId }, plus { subject, html }.
+ * One message per student (nobody sees the others' addresses), Reply-To the educator.
+ * Capped at 200 recipients per request. Reports who failed instead of failing the batch.
+ */
+router.post("/message", protect, checkAccess("viewStudents"), async (req, res) => {
+  try {
+    const { studentIds, groupId, subject, html } = req.body || {};
+    if (!String(subject || "").trim()) return res.status(400).json({ message: "Add a subject." });
+    if (!String(html || "").replace(/<[^>]*>/g, "").trim()) return res.status(400).json({ message: "Write the message first." });
+    try { assertMailConfigured(); } catch (e) { return res.status(503).json({ message: e.message }); }
+
+    const who = { role: "student" };
+    if (req.scope.educatorId) who.supervisor = req.scope.educatorId;
+    else if (req.scope.schoolId) who.schoolId = req.scope.schoolId;
+    if (groupId && mongoose.Types.ObjectId.isValid(groupId)) who.groupId = groupId;
+    else if (Array.isArray(studentIds) && studentIds.length) who._id = { $in: studentIds.filter((id) => mongoose.Types.ObjectId.isValid(id)) };
+    else return res.status(400).json({ message: "Choose who to send it to." });
+
+    const recipients = await User.find(who).select("_id name email").limit(201).lean();
+    if (!recipients.length) return res.status(400).json({ message: "None of those students are yours." });
+    if (recipients.length > 200) return res.status(400).json({ message: "That is more than 200 students. Send to smaller groups." });
+
+    const failed = [];
+    let sent = 0;
+    for (const r of recipients) {
+      try {
+        await sendEducatorMessage({ toEmail: r.email, subject, html, educatorName: req.user.name, educatorEmail: req.user.email });
+        sent += 1;
+      } catch (e) {
+        failed.push({ email: r.email, reason: e.message || "send failed" });
+      }
+    }
+    res.json({ sent, failed });
+  } catch (err) {
+    console.error("Student message error:", err);
+    res.status(500).json({ message: "Server error sending the message." });
+  }
+});
+
+/* Set or clear the educator's private note on a student. Body: { text }. Own students only. */
+router.patch("/:id/note", protect, checkAccess("viewStudents"), async (req, res) => {
+  try {
+    if (!mongoose.Types.ObjectId.isValid(req.params.id)) return res.status(404).json({ message: "Student not found" });
+    const student = await User.findById(req.params.id).select("role supervisor schoolId");
+    if (!student || student.role !== "student") return res.status(404).json({ message: "Student not found" });
+    if (req.scope.educatorId && student.supervisor?.toString() !== req.scope.educatorId.toString()) {
+      return res.status(403).json({ message: "Access denied: Not your student" });
+    }
+    if (!req.scope.educatorId && req.scope.schoolId && student.schoolId?.toString() !== req.scope.schoolId.toString()) {
+      return res.status(403).json({ message: "Access denied: Student not in your school" });
+    }
+    const text = String(req.body?.text || "").trim().slice(0, 4000);
+    const educatorNote = text ? { text, byName: req.user.name || "", at: new Date() } : { text: "", byName: "", at: null };
+    await User.updateOne({ _id: student._id }, { $set: { educatorNote } });
+    res.json({ educatorNote });
+  } catch (err) {
+    console.error("Student note error:", err);
+    res.status(500).json({ message: "Server error saving the note." });
   }
 });
 

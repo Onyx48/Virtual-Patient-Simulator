@@ -73,6 +73,21 @@ const schoolSchema = new mongoose.Schema(
       default: "pending",
     },
     inviteSentAt: { type: Date, default: null },
+    // Vendor notes on the school ("renewal call booked 12 Dec"). Superadmin only. Optional.
+    notes: {
+      type: [
+        new mongoose.Schema(
+          {
+            text: { type: String, required: true, maxlength: 4000 },
+            author: { type: mongoose.Schema.Types.ObjectId, ref: "User" },
+            authorName: { type: String, default: "" },
+          },
+          { timestamps: true },
+        ),
+      ],
+      default: undefined,
+      select: false,
+    },
     inviteSentTo: { type: String, default: "" },
   },
   {

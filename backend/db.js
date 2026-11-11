@@ -29,7 +29,9 @@ const connectDB = async () => {
       );
     }
 
-    await mongoose.connect(process.env.MONGODB_URI);
+    // MONGODB_DB (optional) picks another database on the same cluster, e.g. vps_loadtest for
+    // load testing. Unset, the database named in MONGODB_URI is used exactly as before.
+    await mongoose.connect(process.env.MONGODB_URI, process.env.MONGODB_DB ? { dbName: process.env.MONGODB_DB } : {});
 
     console.log(
       "MongoDB Connected successfully to database:",

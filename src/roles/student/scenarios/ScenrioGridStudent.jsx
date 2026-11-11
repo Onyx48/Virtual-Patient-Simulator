@@ -1,210 +1,98 @@
+// A student's scenario cards, in the vx design. Same data shape as before
+// ({ id, scenarioName, description, difficulty, highestScore, status, testable }).
 import React from "react";
-import { Target } from "lucide-react";
-import { useNavigate } from "react-router-dom";
+import axios from "axios";
+import toast from "react-hot-toast";
+import { Play, RotateCcw, BarChart3, Lock } from "lucide-react";
+import { useNavigate } from "../../../lib/router";
+import { Button, ButtonGroup } from "../../../components/vx/ui";
+import { Ago } from "../../../components/vx/bits";
+import { requestStart } from "../../../components/shared/MicCheck";
+import { getAuthHeaders, cn } from "../../../lib/utils.js";
 
-/*
- * Compared loosely — case, surrounding whitespace and any stray markup — because
- * "Neck Pain - Alice" and "neck pain — alice" are the same duplicate to a reader.
- * Kept in step with roles/educator/scenarios/ScenarioTable.jsx, which hides the
- * same repetition on the educator's card.
- */
-const normalise = (text) =>
-  String(text || "")
-    .replace(/<[^>]*>/g, " ")
-    .replace(/\s+/g, " ")
-    .trim()
-    .toLowerCase();
+const muted = "text-[rgb(var(--vx-muted))]";
+const norm = (t) => String(t || "").replace(/<[^>]*>/g, " ").replace(/\s+/g, " ").trim().toLowerCase();
+const showDescription = (s) => !!s.description && norm(s.description) !== norm(s.scenarioName);
 
-const showDescription = (scenario) =>
-  !!scenario.description &&
-  normalise(scenario.description) !== normalise(scenario.scenarioName);
+// Only scenarios the backend has enabled can run (backend/utils/testableScenarios.js); fail closed.
+export const canRun = (s) => s?.testable === true;
+export const NOT_RUNNABLE = "Not open for practice yet. Your educator will enable it.";
+export const difficultyLabel = (d) => ({ high: "Hard", low: "Easy", medium: "Medium" }[String(d || "").toLowerCase()] || d || "Medium");
 
-/*
- * Only scenarios the backend has enabled can be run in the simulator — see
- * backend/utils/testableScenarios.js. A card whose caller did not carry the flag
- * fails closed, because the alternative is a button that 403s on click. The card
- * itself stays clickable either way: reading a case you cannot run is still useful.
- */
-const canRun = (scenario) => scenario?.testable === true;
-const NOT_RUNNABLE =
-  "Not enabled for the simulator yet — only the enabled demo scenario can be run.";
+/** Opens the simulator in a new tab for this scenario. */
+export async function startSession(scenarioId) {
+  try {
+    const { data } = await axios.post("/api/sessions/start", { scenario_id: scenarioId }, getAuthHeaders());
+    if (!data?.redirect_url) throw new Error("The server did not say where the simulator is.");
+    window.open(data.redirect_url, "_blank", "noopener,noreferrer");
+  } catch (error) {
+    toast.error(error?.response?.data?.message || error.message || "Could not start the session.");
+  }
+}
 
-function ScenarioGridStudent({ data, onStartNow }) {
-  const navigate = useNavigate();
-
-  const handleStart = (scenarioId) => {
-    if (onStartNow) {
-      return onStartNow(scenarioId);
-    }
-    navigate(`/student/scenario/${scenarioId}`);
-  };
-
-  const handleCardClick = (scenarioId) => {
-    navigate(`/student/scenario/${scenarioId}`);
-  };
-
-  const getDifficultyColor = (level) => {
-    switch (level?.toLowerCase()) {
-      case "high":
-        return "text-red-500";
-      case "medium":
-        return "text-orange-500";
-      case "low":
-        return "text-green-500";
-      default:
-        return "text-gray-500";
-    }
-  };
-
-  const getSignalIcon = (level) => {
-    const colorClass = getDifficultyColor(level);
-    const bgClass = (isActive) =>
-      isActive ? colorClass.replace("text-", "bg-") : "bg-gray-200";
-
-    const l = level?.toLowerCase();
-    const isLow = l === "low" || l === "medium" || l === "high";
-    const isMed = l === "medium" || l === "high";
-    const isHigh = l === "high";
-
-    return (
-      <div className="flex items-end gap-[2px] h-3">
-        <div className={`w-1 h-1.5 rounded-sm ${bgClass(isLow)}`}></div>
-        <div className={`w-1 h-2.5 rounded-sm ${bgClass(isMed)}`}></div>
-        <div className={`w-1 h-3.5 rounded-sm ${bgClass(isHigh)}`}></div>
-      </div>
-    );
-  };
-
+function Bars({ level }) {
+  const n = { easy: 1, medium: 2, hard: 3 }[difficultyLabel(level).toLowerCase()] || 2;
   return (
-    <div className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-4 gap-6">
-      {data.map((scenario, index) => (
-        <div
-          key={scenario.id || index}
-          role="button"
-          tabIndex={0}
-          onClick={() => handleCardClick(scenario.id)}
-          onKeyDown={(event) => {
-            if (event.key === "Enter" || event.key === " ") {
-              event.preventDefault();
-              handleCardClick(scenario.id);
-            }
-          }}
-          className="bg-white rounded-3xl p-6 shadow-sm border border-gray-100 hover:shadow-lg transition-shadow flex flex-col h-full"
-        >
-          <div className="flex justify-between items-start mb-5">
-            <div className="flex items-center gap-3">
-              <div className="w-10 h-10 rounded-full bg-red-50 flex items-center justify-center border border-red-100">
-                <Target className="w-5 h-5 text-red-500" />
-              </div>
-              {/*
-                A scenario nobody has attempted has no score, and "0% Highest"
-                read as a failed attempt rather than as an untouched card — the
-                student saw a zero they had not earned. `highestScore` is null
-                until a session is scored, so the two cases are distinguishable.
-              */}
-              <div>
-                {scenario.highestScore == null ? (
-                  <span className="block text-sm font-semibold text-gray-400">
-                    No sessions
-                  </span>
-                ) : (
-                  <span className="block text-sm font-bold text-gray-900">
-                    {scenario.highestScore}% Highest
-                  </span>
-                )}
-              </div>
-            </div>
-
-            <div className="flex items-center gap-2">
-              {getSignalIcon(scenario.difficulty)}
-              <span
-                className={`text-xs font-bold ${getDifficultyColor(
-                  scenario.difficulty,
-                )}`}
-              >
-                {scenario.difficulty}
-              </span>
-            </div>
-          </div>
-
-          <div className="mb-8 flex-1">
-            <h3 className="text-lg font-bold text-gray-900 mb-2 leading-tight">
-              {scenario.scenarioName}
-            </h3>
-            {/*
-              Dropped when it only repeats the title — the AI writes the scenario
-              name into the short description, so the card showed the same line
-              twice, once as the bold heading and again beneath it. Nothing is put
-              in its place: a title with no description below it reads fine, while
-              "No description provided" is a sentence about the absence of one.
-            */}
-            {showDescription(scenario) && (
-              <p className="text-xs text-gray-500 leading-relaxed line-clamp-3">
-                {scenario.description}
-              </p>
-            )}
-          </div>
-
-          <div className="mt-auto">
-            <p className="text-[10px] font-bold text-gray-400 uppercase tracking-wider mb-3">
-              {scenario.status || "AVAILABLE"}
-            </p>
-
-            {scenario.status === "Completed" ? (
-              <div className="flex gap-3">
-                <button
-                  onClick={(event) => {
-                    event.stopPropagation();
-                    navigate(`/student/scenario/${scenario.id}`);
-                  }}
-                  className="flex-1 py-3 rounded-xl border border-gray-200 text-xs font-bold text-gray-700 hover:bg-gray-50 transition-colors"
-                >
-                  Results
-                </button>
-                <button
-                  onClick={(event) => {
-                    event.stopPropagation();
-                    handleStart(scenario.id);
-                  }}
-                  disabled={!canRun(scenario)}
-                  title={canRun(scenario) ? undefined : NOT_RUNNABLE}
-                  className={`flex-1 py-3 rounded-xl text-xs font-bold transition-colors ${
-                    canRun(scenario)
-                      ? "bg-gray-100 text-gray-600 hover:bg-gray-200"
-                      : "bg-gray-50 text-gray-300 cursor-not-allowed"
-                  }`}
-                >
-                  Start Again
-                </button>
-              </div>
-            ) : (
-              <button
-                onClick={(event) => {
-                  event.stopPropagation();
-                  handleStart(scenario.id);
-                }}
-                disabled={!canRun(scenario)}
-                title={canRun(scenario) ? undefined : NOT_RUNNABLE}
-                className={`w-full py-3.5 rounded-xl text-xs font-bold transition-colors ${
-                  canRun(scenario)
-                    ? "bg-black text-white hover:bg-gray-800 shadow-md"
-                    : "bg-gray-100 text-gray-400 cursor-not-allowed"
-                }`}
-              >
-                Start Now
-              </button>
-            )}
-          </div>
-        </div>
+    <span className="flex items-end gap-[2px]" aria-hidden>
+      {[1, 2, 3].map((i) => (
+        <span key={i} className={cn("w-1 rounded-sm", i <= n ? "bg-[rgb(var(--vx-accent))]" : "bg-[rgb(var(--vx-line))]")} style={{ height: 4 + i * 3 }} />
       ))}
-
-      {data.length === 0 && (
-        <div className="col-span-full text-center py-20 text-gray-400">
-          No scenarios found.
-        </div>
-      )}
-    </div>
+    </span>
   );
 }
 
-export default ScenarioGridStudent;
+export default function ScenarioGridStudent({ data, onStartNow }) {
+  const navigate = useNavigate();
+  const open = (id) => navigate(`/student/scenario/${id}`);
+  const start = (id) => (onStartNow ? onStartNow(id) : requestStart(id));
+
+  if (!data.length) {
+    return (
+      <div className="rounded-2xl border border-[rgb(var(--vx-line)/0.7)] bg-[rgb(var(--vx-card))] px-5 py-16 text-center">
+        <p className={cn("text-base", muted)}>No scenarios here yet. Your educator assigns them.</p>
+      </div>
+    );
+  }
+
+  return (
+    <ul className="grid grid-cols-1 gap-3 md:grid-cols-2 xl:grid-cols-3 2xl:grid-cols-4">
+      {data.map((s) => {
+        const done = s.status === "Completed";
+        const runnable = canRun(s);
+        return (
+          <li key={s.id} role="button" tabIndex={0} onClick={() => open(s.id)}
+            onKeyDown={(e) => { if (e.key === "Enter" || e.key === " ") { e.preventDefault(); open(s.id); } }}
+            className="group flex cursor-pointer flex-col gap-4 rounded-2xl border border-[rgb(var(--vx-line)/0.7)] bg-[rgb(var(--vx-card))] p-5 transition-[border-color,box-shadow] hover:border-[rgb(var(--vx-accent)/0.6)] hover:shadow-md">
+            <div className="flex items-center justify-between gap-3">
+              <span className={cn("inline-flex items-center gap-1.5 rounded-full px-3 py-0.5 text-sm font-medium",
+                done ? "bg-[rgb(var(--vx-ok)/0.12)] text-[rgb(var(--vx-ok))]" : "bg-[rgb(var(--vx-accent)/0.15)]")}>
+                {done ? "Done" : "To do"}
+              </span>
+              <span className={cn("inline-flex items-center gap-1.5 text-sm", muted)}><Bars level={s.difficulty} /> {difficultyLabel(s.difficulty)}</span>
+            </div>
+            <div className="flex min-w-0 flex-1 flex-col gap-1">
+              <h3 className="line-clamp-2 text-xl font-semibold leading-snug">{s.scenarioName}</h3>
+              {showDescription(s) && <p className={cn("line-clamp-2 text-sm", muted)}>{s.description}</p>}
+            </div>
+            <p className="flex flex-wrap items-center justify-between gap-2 text-sm">
+              {s.highestScore == null
+                ? <span className={muted}>Not tried yet</span>
+                : <span>Best <b className="tabular-nums">{s.highestScore}%</b>{s.attempts ? <span className={muted}> · {s.attempts} attempt{s.attempts === 1 ? "" : "s"}</span> : null}</span>}
+              {s.lastAt && <span className={muted}><Ago date={s.lastAt} /></span>}
+            </p>
+            {done ? (
+              <ButtonGroup className="w-full">
+                <Button variant="secondary" className="flex-1" onClick={(e) => { e.stopPropagation(); open(s.id); }}><BarChart3 /> Results</Button>
+                <Button className="flex-1" disabled={!runnable} title={runnable ? undefined : NOT_RUNNABLE}
+                  onClick={(e) => { e.stopPropagation(); start(s.id); }}>{runnable ? <RotateCcw /> : <Lock />} Again</Button>
+              </ButtonGroup>
+            ) : (
+              <Button className="w-full" disabled={!runnable} title={runnable ? undefined : NOT_RUNNABLE}
+                onClick={(e) => { e.stopPropagation(); start(s.id); }}>{runnable ? <Play /> : <Lock />} {runnable ? "Start" : "Not open yet"}</Button>
+            )}
+          </li>
+        );
+      })}
+    </ul>
+  );
+}

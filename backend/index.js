@@ -14,6 +14,9 @@ import simRoutes from "./routes/simRoutes.js";
 import dashboardRoutes from "./routes/dashboardRoutes.js";
 import importRoutes from "./routes/importRoutes.js";
 import groupRoutes from "./routes/groupRoutes.js";
+import rubricRoutes from "./routes/rubricRoutes.js";
+import assistantRoutes from "./routes/assistantRoutes.js";
+import contactRoutes from "./routes/contactRoutes.js";
 import askReasonRoutes from "./routes/askReasonRoutes.js";
 import { APP_ENV, isDev, isProd, publicMessage } from "./utils/appEnv.js";
 
@@ -80,6 +83,9 @@ app.use("/api/chat", simRoutes);
 app.use("/api/dashboard", dashboardRoutes);
 app.use("/api/import", importRoutes);
 app.use("/api/groups", groupRoutes);
+app.use("/api/rubrics", rubricRoutes);
+app.use("/api/assistant", assistantRoutes);
+app.use("/api/contact", contactRoutes);
 
 /*
  * Mounted twice on purpose. `/ask-reason` is the path the external simulator was

@@ -1,7 +1,7 @@
 import React, { useState, useEffect } from "react";
 import { ENVIRONMENTS, MODELS } from "../../lib/scenarioOptions";
 import { useDispatch, useSelector } from "react-redux";
-import { useNavigate, useParams } from "react-router-dom";
+import { useNavigate, useParams } from "../../lib/router";
 import { useForm, Controller } from "react-hook-form";
 import { useAuth } from "../../AuthContext";
 import axios from "axios";
@@ -156,12 +156,12 @@ const NECK_MOVEMENTS = [
  * Order here is the order the sections appear in the form: head down to toe,
  * which is how a clinician reads a body chart.
  */
-const REGIONS = [
+export const REGIONS = [
   { id: "shoulder", label: "Shoulder", movements: SHOULDER_MOVEMENTS },
   { id: "neck", label: "Neck", movements: NECK_MOVEMENTS },
 ];
 
-const emptyMovements = () =>
+export const emptyMovements = () =>
   Object.fromEntries(REGIONS.map((region) => [region.id, {}]));
 
 const quillModules = {
@@ -188,7 +188,7 @@ const quillModules = {
  * strings per region. Unset movements are omitted rather than sent empty, so a
  * region nobody touched stays an empty array.
  */
-const formatMovementsForBackend = (movementsObj) =>
+export const formatMovementsForBackend = (movementsObj) =>
   Object.fromEntries(
     REGIONS.map(({ id, movements }) => {
       const chosen = movementsObj?.[id] || {};
@@ -207,7 +207,7 @@ const formatMovementsForBackend = (movementsObj) =>
  * `movements`. An unrecognised region or movement is ignored — an older scenario
  * has no lower-limb keys at all, and that is not an error.
  */
-const processIncomingMovements = (incoming) => {
+export const processIncomingMovements = (incoming) => {
   const result = emptyMovements();
   if (!incoming) return result;
 
@@ -234,7 +234,7 @@ const processIncomingMovements = (incoming) => {
  * request goes through rather than measured progress — worded as work underway,
  * never as work completed. The elapsed counter beside them is the honest signal.
  */
-const AI_STAGES = [
+export const AI_STAGES = [
   "Reading your case description",
   "Writing the patient history",
   "Mapping the range of movement limits",
@@ -470,6 +470,7 @@ function ScenarioFormPage() {
   const onSubmit = async (data) => {
     setIsSaving(true);
 
+    const wantsPublish = data.status === "Published";
     const save = (status) => {
       const payload = {
         ...data,

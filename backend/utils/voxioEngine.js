@@ -22,7 +22,8 @@ import {
   resolveScenarioId,
 } from "./simEngine.js";
 import { getVoxioState, sendTurn, startVoxioSession } from "./voxioClient.js";
-import { gradingOf, reasoningTurnsOf, reflectionOf, reflectionTurnsOf, transcriptOf } from "./voxioState.js";
+import { gradingOf, reasoningOf, reasoningTurnsOf, reflectionOf, reflectionTurnsOf, transcriptOf } from "./voxioState.js";
+import { reasoningRecord } from "./reasoningScore.js";
 import { ensureFlow } from "./voxioSync.js";
 
 export { END_SESSION_INPUT, START_OF_REFLECTION, END_OF_REFLECTION, httpError };
@@ -78,6 +79,8 @@ export const syncFromVoxio = async (sessionId, givenState) => {
   const transcription = transcriptOf(state);
   const grading = gradingOf(state, questionList);
   const reflection = reflectionOf(state);
+  const cr = reasoningOf(state);
+  const clinicalReasoning = cr && reasoningRecord(cr.feedback, cr.status);
 
   const mirror = {
     diagnosis_history: transcription,
@@ -103,6 +106,7 @@ export const syncFromVoxio = async (sessionId, givenState) => {
           question_results: grading.question_results,
         }),
         ...(mirror.reflection && { reflection: mirror.reflection }),
+        ...(clinicalReasoning && { clinical_reasoning: { ...clinicalReasoning, completed_at: new Date() } }),
       },
     },
   ).catch((err) => console.error(`[VOXIO] could not update Session ${sessionId}: ${err.message}`));

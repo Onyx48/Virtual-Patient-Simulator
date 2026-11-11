@@ -1,6 +1,6 @@
 // src/components/StartupPages/SignupPage.jsx
 import React, { useState } from "react";
-import { Link, useNavigate } from "react-router-dom";
+import { Link, useNavigate } from "../../lib/router";
 import signupImage from "./Login-bg.jpg"; // Ensure path is correct
 import { useAuth } from "../../AuthContext"; // Import useAuth
 import { toast } from "react-hot-toast";

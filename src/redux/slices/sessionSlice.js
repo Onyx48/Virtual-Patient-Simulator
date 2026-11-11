@@ -7,7 +7,7 @@ export const fetchSessionsByStudentAndScenario = createAsyncThunk(
   async ({ studentId, scenarioId, page = 1 }, { rejectWithValue }) => {
     try {
       const response = await axios.get(
-        `/api/sessions/by-student/${studentId}/${scenarioId}?page=${page}`,
+        `/api/sessions/by-student/${studentId}/${scenarioId}?page=${page}&limit=50`,
         getAuthHeaders()
       );
       return { ...response.data, page };
@@ -32,6 +32,10 @@ export const fetchScenario = createAsyncThunk(
         name: response.data.scenarioName,
         description: response.data.description,
         difficulty: response.data.difficulty || "Medium",
+        // Without this the student's Start button was always disabled (canStart reads it).
+        testable: response.data.testable === true,
+        learningObjectives: response.data.learningObjectives || "",
+        profession: response.data.profession || "",
       };
     } catch (error) {
       return rejectWithValue(

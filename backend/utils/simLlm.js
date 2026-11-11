@@ -68,7 +68,7 @@ const parseObject = (text) => {
  * (under ~2s); the grader gets more room since nobody is waiting mid-sentence.
  */
 const callOpenRouter = async ({ system, messages, effort }) => {
-  const { text, usage: u } = await openRouterChat({
+  const { text, usage: u } = await openRouterChat({ kind: "sim",
     messages: [{ role: "system", content: system }, ...messages],
     json: true,
     effort,

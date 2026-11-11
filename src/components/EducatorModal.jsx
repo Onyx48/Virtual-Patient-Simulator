@@ -1,149 +1,58 @@
+// Add or edit an educator, in the vx design. Same onSave payload as before:
+// { id, educatorName, emailAddress, department }.
 import React, { useState } from "react";
-import { useForm } from "react-hook-form";
-import { XMarkIcon } from "@heroicons/react/24/outline";
+import { Loader2, Plus } from "lucide-react";
+import { Button, ButtonGroup, Dialog, InputGroup, InputCell, controlClass } from "./vx/ui";
+import { Select } from "./vx/bits";
+import { cn } from "../lib/utils";
+
+const DEPARTMENTS = ["Physiotherapy", "Occupational Therapy", "Science", "History", "English", "Mathematics"];
 
 function EducatorModal({ onSave, onClose, educatorData }) {
   const isEdit = !!educatorData;
-  const [isSubmitting, setIsSubmitting] = useState(false);
+  const [name, setName] = useState(educatorData?.name || "");
+  const [email, setEmail] = useState(educatorData?.email || "");
+  const [department, setDepartment] = useState(educatorData?.department || "Physiotherapy");
+  const [busy, setBusy] = useState(false);
+  const [error, setError] = useState("");
 
-  const {
-    register,
-    handleSubmit,
-    formState: { errors },
-  } = useForm({
-    defaultValues: isEdit
-      ? {
-          educatorName: educatorData.name,
-          emailAddress: educatorData.email,
-          department: educatorData.department || "Science",
-        }
-      : {
-          educatorName: "",
-          emailAddress: "",
-          department: "Science",
-        },
-  });
-
-  const onSubmit = async (data) => {
-    setIsSubmitting(true);
-    const submissionData = {
-      id: educatorData?.id,
-      educatorName: data.educatorName,
-      emailAddress: data.emailAddress,
-      department: data.department,
-    };
-
-    await onSave(submissionData);
-    setIsSubmitting(false);
+  const submit = async (e) => {
+    e.preventDefault();
+    if (!name.trim()) return setError("Add the educator's name.");
+    if (!/\S+@\S+\.\S+/.test(email)) return setError("That email address doesn't look right.");
+    setError("");
+    setBusy(true);
+    await onSave({ id: educatorData?.id, educatorName: name.trim(), emailAddress: email.trim(), department });
+    setBusy(false);
   };
 
   return (
-    <div className="bg-white rounded-2xl shadow-2xl max-w-lg w-full max-h-[90vh] overflow-y-auto transform transition-all">
-      <div className="flex items-center justify-between border-b border-gray-100 px-6 py-5">
-        <div className="flex items-center gap-2">
-          <h2 className="text-lg font-bold text-gray-900">
-            {isEdit ? "Edit Educator" : "Add New Educator"}
-          </h2>
-          <span className="bg-gray-100 text-gray-600 text-xs px-2 py-0.5 rounded-full font-medium">
-            {isEdit ? "Editing" : "New"}
-          </span>
-        </div>
-
-        <button
-          onClick={onClose}
-          className="p-1.5 rounded-full text-gray-400 hover:bg-gray-100 hover:text-gray-600 transition-colors"
-        >
-          <XMarkIcon className="w-5 h-5" />
-        </button>
-      </div>
-
-      <form onSubmit={handleSubmit(onSubmit)} className="p-6 space-y-5">
-        <div className="space-y-1.5">
-          <label className="block text-sm font-semibold text-gray-700">
-            Educator Name
-          </label>
-          <input
-            type="text"
-            {...register("educatorName", { required: "Name is required" })}
-            className="w-full px-4 py-2.5 rounded-lg border border-gray-300 focus:ring-2 focus:ring-orange-500 focus:border-transparent outline-none transition-all text-sm"
-            placeholder="e.g. Haylie Dormat"
-          />
-          {errors.educatorName && (
-            <p className="text-xs text-red-500">
-              {errors.educatorName.message}
-            </p>
-          )}
-        </div>
-
-        <div className="space-y-1.5">
-          <label className="block text-sm font-semibold text-gray-700">
-            Email Address
-          </label>
-          <input
-            type="email"
-            {...register("emailAddress", { required: "Email is required" })}
-            className="w-full px-4 py-2.5 rounded-lg border border-gray-300 focus:ring-2 focus:ring-orange-500 focus:border-transparent outline-none transition-all text-sm"
-            placeholder="name@example.com"
-          />
-          {errors.emailAddress && (
-            <p className="text-xs text-red-500">
-              {errors.emailAddress.message}
-            </p>
-          )}
-        </div>
-
-        <div className="space-y-1.5">
-          <label className="block text-sm font-semibold text-gray-700">
-            Department
-          </label>
-          <div className="relative">
-            <select
-              {...register("department", {
-                required: "Department is required",
-              })}
-              className="w-full px-4 py-2.5 rounded-lg border border-gray-300 focus:ring-2 focus:ring-orange-500 focus:border-transparent outline-none transition-all text-sm appearance-none bg-white cursor-pointer"
-            >
-              <option value="Science">Science</option>
-              <option value="History">History</option>
-              <option value="English">English</option>
-              <option value="Mathematics">Mathematics</option>
-            </select>
-            <div className="pointer-events-none absolute inset-y-0 right-0 flex items-center px-3 text-gray-500">
-              <svg
-                className="h-4 w-4"
-                fill="none"
-                stroke="currentColor"
-                viewBox="0 0 24 24"
-              >
-                <path
-                  strokeLinecap="round"
-                  strokeLinejoin="round"
-                  strokeWidth="2"
-                  d="M19 9l-7 7-7-7"
-                />
-              </svg>
-            </div>
-          </div>
-        </div>
-
-        <div className="pt-4 flex items-center justify-end gap-3 border-t border-gray-50 mt-2">
-          <button
-            type="button"
-            onClick={onClose}
-            className="px-5 py-2.5 rounded-lg text-sm font-semibold text-gray-700 bg-white border border-gray-200 hover:bg-gray-50 shadow-sm transition-colors"
-          >
-            Discard Changes
-          </button>
-          <button
-            type="submit"
-            disabled={isSubmitting}
-            className="px-5 py-2.5 rounded-lg text-sm font-semibold text-white bg-orange-500 hover:bg-orange-600 disabled:opacity-50 transition-colors shadow-md"
-          >
-            {isSubmitting ? "Saving..." : "Save Changes"}
-          </button>
+    <Dialog title={isEdit ? "Edit educator" : "New educator"} onClose={onClose} size="md" z="z-[60]">
+      <form onSubmit={submit} className="flex flex-col gap-4">
+        <InputGroup vertical>
+          <InputCell label="Full name" htmlFor="ed-name">
+            <input id="ed-name" autoFocus value={name} onChange={(e) => setName(e.target.value)} placeholder="e.g. Dr. Marcus Lee" autoComplete="off" className={cn(controlClass, "text-lg")} />
+          </InputCell>
+          <InputCell label="Email" htmlFor="ed-email">
+            <input id="ed-email" type="email" value={email} onChange={(e) => setEmail(e.target.value)} placeholder="name@school.edu" autoComplete="off" className={cn(controlClass, "text-lg")} />
+          </InputCell>
+          <InputCell as="div" label="Department">
+            <Select variant="ghost" label="Department" value={department} onChange={setDepartment} className="-mx-4 w-[calc(100%+2rem)] [&>button]:text-lg"
+              options={DEPARTMENTS.map((d) => ({ value: d, label: d }))} />
+          </InputCell>
+        </InputGroup>
+        {error && <p role="alert" className="px-1 text-sm text-[rgb(var(--vx-danger))]">{error}</p>}
+        {!isEdit && <p className="px-1 text-sm text-[rgb(var(--vx-muted))]">We email them their login details.</p>}
+        <div className="flex justify-end">
+          <ButtonGroup>
+            <Button variant="secondary" size="lg" onClick={onClose}>Cancel</Button>
+            <Button type="submit" size="lg" disabled={busy}>
+              {busy ? <><Loader2 className="animate-spin" /> Saving</> : isEdit ? "Save changes" : <><Plus /> Add educator</>}
+            </Button>
+          </ButtonGroup>
         </div>
       </form>
-    </div>
+    </Dialog>
   );
 }
 

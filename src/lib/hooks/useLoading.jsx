@@ -20,7 +20,7 @@ export function useLoading(initialState = false) {
 
 export function Spinner({
   size = 40,
-  colorClass = "border-t-gray-600",
+  colorClass = "border-t-[rgb(var(--vx-accent,255_154_86))]",
   label = "Loading...",
 }) {
   return (
@@ -31,7 +31,7 @@ export function Spinner({
       aria-busy="true"
     >
       <div
-        className={`rounded-full border-4 border-gray-200 ${colorClass} animate-spin motion-reduce:animate-[spin_2.5s_linear_infinite]`}
+        className={`rounded-full border-4 border-[rgb(var(--vx-cell,229_231_235))] ${colorClass} animate-spin motion-reduce:animate-[spin_2.5s_linear_infinite]`}
         style={{ width: size, height: size }}
         aria-hidden="true"
       />
@@ -42,7 +42,7 @@ export function Spinner({
 
 export function FullPageSpinner({ label = "Loading..." }) {
   return (
-    <div className="flex items-center justify-center w-full h-screen bg-white">
+    <div className="flex h-full min-h-[50vh] w-full flex-1 items-center justify-center">
       <Spinner size={48} label={label} />
     </div>
   );

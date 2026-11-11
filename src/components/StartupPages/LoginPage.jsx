@@ -1,212 +1,49 @@
 import React, { useState } from "react";
-import { Link, useNavigate } from "react-router-dom";
-import loginImage from "./Login-bg.jpg";
 import { useAuth } from "../../AuthContext";
-
-const validateEmail = (emailToValidate) => {
-  if (!emailToValidate.trim()) return "Email is required.";
-  if (!/\S+@\S+\.\S+/.test(emailToValidate))
-    return "Please use a valid email address.";
-  return "";
-};
-
-const validatePassword = (passwordToValidate) => {
-  if (!passwordToValidate) return "Password is required.";
-  return "";
-};
-
-const errorIcon = (
-  <div className="absolute inset-y-0 right-0 pr-3 flex items-center pointer-events-none">
-    <svg
-      className="h-5 w-5 text-red-500"
-      xmlns="http://www.w3.org/2000/svg"
-      viewBox="0 0 20 20"
-      fill="currentColor"
-      aria-hidden="true"
-    >
-      <path
-        fillRule="evenodd"
-        d="M18 10a8 8 0 11-16 0 8 8 0 0116 0zm-7 4a1 1 0 11-2 0 1 1 0 012 0zm-1-9a1 1 0 00-1 1v4a1 1 0 102 0V6a1 1 0 00-1-1z"
-        clipRule="evenodd"
-      />
-    </svg>
-  </div>
-);
+import { AuthField, AuthGroup, AuthLayout } from "./auth/AuthPage";
 
 function LoginPage() {
   const { login } = useAuth();
-  const navigate = useNavigate();
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
+  const [err, setErr] = useState(null); // { text, field?: "email" | "password" }
+  const [busy, setBusy] = useState(false);
 
-  const [emailError, setEmailError] = useState("");
-  const [passwordError, setPasswordError] = useState("");
-  const [apiError, setApiError] = useState("");
-  const [isLoading, setIsLoading] = useState(false);
-
-  const handleSubmit = async (e) => {
+  const submit = async (e) => {
     e.preventDefault();
-    const currentEmailError = validateEmail(email);
-    const currentPasswordError = validatePassword(password);
-
-    setEmailError(currentEmailError);
-    setPasswordError(currentPasswordError);
-    setApiError("");
-
-    if (!currentEmailError && !currentPasswordError) {
-      setIsLoading(true);
-      try {
-        await login(email, password);
-      } catch (err) {
-        const message =
-          err.response?.status === 401
-            ? "Wrong email or password."
-            : err.response?.data?.message ||
-              err.response?.data?.error ||
-              err.response?.data?.msg ||
-              err.message ||
-              "Wrong email or password.";
-        setApiError(message);
-      } finally {
-        setIsLoading(false);
-      }
+    if (!email.trim()) return setErr({ text: "Enter your email.", field: "email" });
+    if (!/\S+@\S+\.\S+/.test(email)) return setErr({ text: "Enter a valid email address.", field: "email" });
+    if (!password) return setErr({ text: "Enter your password.", field: "password" });
+    setBusy(true);
+    setErr(null);
+    try {
+      await login(email, password);
+    } catch (error) {
+      const data = error.response?.data;
+      setErr({
+        text: error.response?.status === 401
+          ? "Wrong email or password."
+          : data?.message || data?.error || data?.msg || error.message || "Something went wrong. Please try again.",
+      });
+    } finally {
+      setBusy(false);
     }
   };
 
-  const handleEmailChange = (e) => {
-    setEmail(e.target.value);
-    if (emailError) setEmailError(validateEmail(e.target.value));
-    if (apiError) setApiError("");
-  };
-
-  const handlePasswordChange = (e) => {
-    setPassword(e.target.value);
-    if (passwordError) setPasswordError(validatePassword(e.target.value));
-    if (apiError) setApiError("");
-  };
-
   return (
-    <div className="min-h-screen flex items-stretch text-white">
-      {/* Left Panel */}
-      <div className="lg:w-1/2 w-full flex items-center justify-center text-center md:px-16 px-0 z-0 bg-black">
-        <div
-          className="absolute lg:hidden z-10 inset-0 bg-gray-500 bg-no-repeat bg-cover items-center"
-          style={{ backgroundImage: `url(${loginImage})` }}
-        >
-          <div className="absolute bg-black opacity-60 inset-0 z-0"></div>
-        </div>
-
-        <div className="w-full py-6 z-20">
-          <h1 className="text-4xl font-bold text-custom-orange mb-2">
-            Welcome Back
-          </h1>
-          <p className="text-base text-gray-300 mb-8">
-            Welcome back! Please enter your details.
-          </p>
-
-          <form
-            onSubmit={handleSubmit}
-            className="sm:w-2/3 w-full px-4 lg:px-0 mx-auto"
-          >
-            {apiError && (
-              <p className="text-red-500 text-sm mb-4 text-center">
-                {apiError}
-              </p>
-            )}
-            {/* Email Input */}
-            <div className="pb-2 pt-4">
-              <label
-                htmlFor="email-login"
-                className="block text-sm font-medium text-gray-300 text-left mb-1"
-              >
-                Email
-              </label>
-              <div className="relative">
-                <input
-                  type="email"
-                  name="email"
-                  id="email-login"
-                  placeholder="Email"
-                  value={email}
-                  onChange={handleEmailChange}
-                  onBlur={() => setEmailError(validateEmail(email))}
-                  className={`block w-full p-3 text-lg rounded-md bg-gray-800 border placeholder-gray-500 text-white focus:outline-none focus:ring-2 focus:border-transparent ${
-                    emailError
-                      ? "border-red-500 ring-red-500 focus:ring-red-500"
-                      : "border-gray-700 focus:ring-custom-orange"
-                  }`}
-                />
-                {emailError && errorIcon}
-              </div>
-              {emailError && (
-                <p className="mt-2 text-sm text-red-500 text-left">
-                  {emailError}
-                </p>
-              )}
-            </div>
-
-            <div className="pb-2 pt-4">
-              <label
-                htmlFor="password-login"
-                className="block text-sm font-medium text-gray-300 text-left mb-1"
-              >
-                Password
-              </label>
-              <div className="relative">
-                <input
-                  type="password"
-                  name="password"
-                  id="password-login"
-                  placeholder="Password"
-                  value={password}
-                  onChange={handlePasswordChange}
-                  onBlur={() => setPasswordError(validatePassword(password))}
-                  className={`block w-full p-3 text-lg rounded-md bg-gray-800 border placeholder-gray-500 text-white focus:outline-none focus:ring-2 focus:border-transparent ${
-                    passwordError
-                      ? "border-red-500 ring-red-500 focus:ring-red-500"
-                      : "border-gray-700 focus:ring-custom-orange"
-                  }`}
-                />
-                {passwordError && errorIcon}
-              </div>
-              {passwordError && passwordError.trim() && (
-                <p className="mt-2 text-sm text-red-500 text-left">
-                  {passwordError}
-                </p>
-              )}
-            </div>
-
-            {/* <div className="flex justify-end items-center mt-2 mb-6">
-              <Link to="/forgot-password" className="text-sm text-gray-400 hover:underline hover:text-gray-100">Forgot Password?</Link>
-            </div> */}
-
-            {/* Absorbs the margin the removed Remember Me row used to contribute. */}
-            <div className="px-4 pb-2 pt-8">
-              <button
-                type="submit"
-                disabled={isLoading}
-                className="uppercase block w-full p-3 text-lg rounded-md bg-orange-500 hover:bg-orange-600 focus:outline-none focus:ring-2 focus:ring-custom-orange focus:ring-opacity-50 text-black font-semibold disabled:opacity-50"
-              >
-                {isLoading ? "Signing In..." : "Sign In"}
-              </button>
-            </div>
-            {/* <div className="mt-8 text-center text-sm text-gray-400">
-              Don't have an account?{' '}
-              <Link to="/signup" className="font-semibold text-custom-orange hover:underline">
-                Sign up
-              </Link>
-            </div> */}
-          </form>
-        </div>
-      </div>
-      {/* Right Panel */}
-      <div
-        className="lg:flex w-1/2 hidden bg-gray-500 bg-no-repeat bg-cover relative items-center"
-        style={{ backgroundImage: `url(${loginImage})` }}
-      >
-        <div className="absolute bg-black opacity-20 inset-0 z-0"></div>
-      </div>
-    </div>
+    <AuthLayout title="Welcome back" sub="Sign in to continue to your scenarios.">
+      <form className="au-form" onSubmit={submit} noValidate>
+        <AuthGroup error={err?.field ? err.text : undefined}>
+          <AuthField label="Email" type="email" name="email" autoComplete="username" autoCapitalize="none" spellCheck={false} autoFocus required
+            value={email} onChange={(e) => { setEmail(e.target.value); setErr(null); }} error={err?.field === "email" ? err.text : undefined} />
+          <AuthField label="Password" type="password" name="password" autoComplete="current-password" required
+            value={password} onChange={(e) => { setPassword(e.target.value); setErr(null); }} error={err?.field === "password" ? err.text : undefined} />
+        </AuthGroup>
+        {err && !err.field && <div className="au-alert" role="alert">{err.text}</div>}
+        <button className="au-submit" disabled={busy}>{busy ? "Signing in…" : "Sign in"}</button>
+      </form>
+    </AuthLayout>
   );
 }
+
 export default LoginPage;

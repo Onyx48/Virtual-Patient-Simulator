@@ -27,7 +27,7 @@ export const assertMailConfigured = () => {
  * failed send (handled by assertMailConfigured) instead of a dead server.
  */
 let sesClient = null;
-const getSesClient = () => {
+export const getSesClient = () => {
   if (!sesClient) {
     sesClient = new SESClient({
       region: process.env.AWS_REGION,
@@ -216,4 +216,46 @@ export const sendWelcomeEmail = async ({ toEmail, name, password }) => {
     console.error("[EMAIL] Error sending welcome email via SES:", error);
     throw error;
   }
+};
+
+
+/*
+ * Keep only simple formatting from the educator's editor: paragraphs, line breaks, bold, italic,
+ * underline, lists, quotes, headings and http(s)/mailto links. Everything else is dropped.
+ */
+export const sanitizeEmailHtml = (html) => {
+  const ALLOWED = new Set(["p", "br", "b", "strong", "i", "em", "u", "ul", "ol", "li", "a", "blockquote", "h3", "div", "span"]);
+  return String(html || "")
+    .replace(/<(script|style|iframe|object|embed|svg|math)[\s\S]*?<\/\1>/gi, "")
+    .replace(/<!--[\s\S]*?-->/g, "")
+    .replace(/<\/?([a-z0-9]+)([^>]*)>/gi, (tag, name, attrs) => {
+      const n = name.toLowerCase();
+      if (!ALLOWED.has(n)) return "";
+      if (tag.startsWith("</")) return `</${n}>`;
+      if (n === "a") {
+        const m = attrs.match(/href\s*=\s*("([^"]*)"|'([^']*)')/i);
+        const href = m ? (m[2] ?? m[3] ?? "") : "";
+        return /^(https?:|mailto:)/i.test(href.trim())
+          ? `<a href="${href.replace(/"/g, "&quot;")}" target="_blank" rel="noopener noreferrer">`
+          : "<a>";
+      }
+      return n === "br" ? "<br/>" : `<${n}>`;
+    });
+};
+
+/** One educator message to one student. Reply-To is the educator, so answers reach them. */
+export const sendEducatorMessage = async ({ toEmail, subject, html, educatorName, educatorEmail }) => {
+  assertMailConfigured();
+  const body = `<div style="font-family: Arial, sans-serif; line-height: 1.6; color:#1c1b18; max-width: 640px;">
+    ${sanitizeEmailHtml(html)}
+    <p style="color:#6b665d; font-size: 13px; margin-top: 24px;">Sent by ${String(educatorName || "your educator").replace(/[<>]/g, "")} through the Virtual Patient Simulator.</p>
+  </div>`;
+  const command = new SendEmailCommand({
+    Source: process.env.EMAIL_FROM,
+    Destination: { ToAddresses: [toEmail] },
+    ...(educatorEmail && { ReplyToAddresses: [educatorEmail] }),
+    Message: { Subject: { Data: String(subject || "").slice(0, 200) }, Body: { Html: { Data: body } } },
+  });
+  await getSesClient().send(command);
+  return true;
 };

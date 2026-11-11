@@ -14,6 +14,7 @@
 import Scenario from "../models/scenarioModel.js";
 import { forgetScenario, scenarioFor } from "./simEngine.js";
 import { buildFlow } from "./voxioFlow.js";
+import { addHtScorer } from "./htScorer.js";
 import { createFlow, getFlow, isFlowKey, isVoxioConfigured, updateFlow } from "./voxioClient.js";
 
 const running = new Map(); // scenarioId -> promise, so two saves do not race
@@ -110,6 +111,10 @@ export const roomCustoms = async (scenarioId) => {
     nodes.reflection_out = { type: "out", parameters: { variables: ["self_rating", "summary", "status", "reflection_done"] }, next: nodes.reflection_result.next };
     nodes.reflection_result.next = "reflection_out";
   }
+  // The history-taking timeline (docs/HT_TIMELINE_PLAN.md): a silent scorer after each patient reply.
+  // Camera scoring is off until a school turns it on.
+  const ctx = await scenarioFor(id);
+  addHtScorer(flow.workflow, { profession: ctx?.profession, vision: false });
   // Likewise every node's parameters must list input_variables ({} for none).
   for (const node of Object.values(flow.workflow.nodes)) {
     node.next ??= [];

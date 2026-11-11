@@ -106,5 +106,11 @@ const scenarioSchema = new mongoose.Schema(
   },
 );
 
+// Indexes for the scoped lists and lookups (added for scale; additive, built at startup).
+scenarioSchema.index({ educator: 1, createdAt: -1 });
+scenarioSchema.index({ schoolId: 1, createdAt: -1 });
+scenarioSchema.index({ assignedTo: 1 });
+scenarioSchema.index({ assignedGroups: 1 });
+scenarioSchema.index({ createdAt: -1 });
 const Scenario = mongoose.model("Scenario", scenarioSchema);
 export default Scenario;

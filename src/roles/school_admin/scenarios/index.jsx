@@ -1,13 +1,13 @@
 import React, { useState, useEffect } from "react";
 import { useDispatch } from "react-redux";
-import { useNavigate } from "react-router-dom";
+import { useNavigate } from "../../../lib/router";
 import { toast } from "react-hot-toast";
 import { Squares2X2Icon, TableCellsIcon } from "@heroicons/react/24/outline";
 
 import ScenarioManagementControls from "../../educator/scenarios/ScenarioManagementControls.jsx";
 import ScenarioTable from "../../educator/scenarios/ScenarioTable.jsx";
 import ScenarioListTable from "./ScenarioListTable.jsx";
-import PaginationBar from "../../../components/ui/PaginationBar";
+import { Pagination } from "../../../components/vx/list.jsx";
 import ConfirmationModal from "../../../components/ui/ConfirmationModal";
 
 import { useServerPagination } from "../../../lib/hooks/useServerPagination";
@@ -60,13 +60,14 @@ function SchoolAdminScenariosPage() {
     isLastPage,
     rangeStart,
     rangeEnd,
+    pager,
   } = useServerPagination("/api/scenarios", {
     params: {
       searchTerm,
       status: filterCriteria.status || "",
       educatorName: filterCriteria.educator || "",
     },
-    pageSize: view === "table" ? 15 : 8,
+    pageSize: 10,
     sortConfig,
   });
 
@@ -171,19 +172,7 @@ function SchoolAdminScenariosPage() {
         />
       )}
 
-      <PaginationBar
-        currentPage={currentPage}
-        totalPages={totalPages}
-        totalItems={totalItems}
-        pageNumbers={pageNumbers}
-        onPageChange={handlePageChange}
-        onPrevPage={prevPage}
-        onNextPage={nextPage}
-        isFirstPage={isFirstPage}
-        isLastPage={isLastPage}
-        rangeStart={rangeStart}
-        rangeEnd={rangeEnd}
-      />
+      <div className="vx bg-transparent"><Pagination {...pager} /></div>
 
       <ConfirmationModal
         isOpen={!!pendingDelete}

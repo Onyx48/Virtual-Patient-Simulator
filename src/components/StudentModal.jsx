@@ -1,6 +1,9 @@
 import React, { useState } from "react";
 import { useForm } from "react-hook-form";
-import { XMarkIcon } from "@heroicons/react/24/outline";
+import { X, ChevronDown, Loader2, Plus } from "lucide-react";
+import { Button, ButtonGroup, Segmented, InputGroup, InputCell, controlClass } from "./vx/ui";
+import { cn } from "../lib/utils";
+import { Select } from "./vx/bits";
 
 function StudentModal({
   onSave,
@@ -24,6 +27,8 @@ function StudentModal({
   const {
     register,
     handleSubmit,
+    watch,
+    setValue,
     formState: { errors },
   } = useForm({
     defaultValues: isEdit
@@ -72,154 +77,76 @@ function StudentModal({
     setIsSubmitting(false);
   };
 
+  const err = errors.studentName?.message || errors.emailAddress?.message;
+  const nameField = register("studentName", { required: "Add the student's name." });
+  const emailField = register("emailAddress", {
+    required: "Add an email address.",
+    pattern: { value: /\S+@\S+\.\S+/, message: "That email address doesn't look right." },
+  });
+
   return (
-    <div className="bg-white rounded-2xl shadow-2xl max-w-lg w-full max-h-[90vh] overflow-y-auto transform transition-all">
-      <div className="flex items-center justify-between border-b border-gray-100 px-6 py-5">
-        <h2 className="text-lg font-bold text-gray-900">
-          {isEdit ? "Edit Student Details" : "Add New Student"}
-        </h2>
-        <button
-          onClick={onClose}
-          className="p-1.5 rounded-full text-gray-400 hover:bg-gray-100 hover:text-gray-600 transition-colors"
-        >
-          <XMarkIcon className="w-5 h-5" />
+    <div className="vx flex max-h-[90vh] w-full max-w-xl flex-col overflow-hidden rounded-3xl bg-[rgb(var(--vx-bg))] text-[rgb(var(--vx-ink))] shadow-2xl">
+      <div className="flex items-center justify-between gap-3 px-6 pb-2 pt-6">
+        <h2 className="text-2xl font-semibold tracking-tight">{isEdit ? "Edit student" : "New student"}</h2>
+        <button type="button" onClick={onClose} aria-label="Close"
+          className="grid size-10 place-items-center rounded-full text-[rgb(var(--vx-muted))] transition-colors hover:bg-[rgb(var(--vx-cell))] hover:text-[rgb(var(--vx-ink))]">
+          <X size={20} />
         </button>
       </div>
 
-      <form onSubmit={handleSubmit(onSubmit)} className="p-6 space-y-5">
-        <div className="space-y-1.5">
-          <label className="block text-sm font-semibold text-gray-700">
-            Full Name
-          </label>
-          <input
-            type="text"
-            {...register("studentName", { required: "Name is required" })}
-            className="w-full px-4 py-2.5 rounded-lg border border-gray-300 focus:ring-2 focus:ring-orange-500 focus:border-transparent outline-none transition-all text-sm"
-            placeholder="e.g. Tatiana Baptista"
-          />
-          {errors.studentName && (
-            <p className="text-xs text-red-500">{errors.studentName.message}</p>
-          )}
-        </div>
-
-        <div className="space-y-1.5">
-          <label className="block text-sm font-semibold text-gray-700">
-            Email Address
-          </label>
-          <input
-            type="email"
-            {...register("emailAddress", { required: "Email is required" })}
-            className="w-full px-4 py-2.5 rounded-lg border border-gray-300 focus:ring-2 focus:ring-orange-500 focus:border-transparent outline-none transition-all text-sm"
-            placeholder="name@example.com"
-          />
-          {errors.emailAddress && (
-            <p className="text-xs text-red-500">
-              {errors.emailAddress.message}
-            </p>
-          )}
-        </div>
-
-        <div className="grid grid-cols-2 gap-5">
-          {!(schoolIsFixed && !isEdit) && (
-            <div className="space-y-1.5 col-span-2">
-              <label className="block text-sm font-semibold text-gray-700">
-                School Name
-              </label>
-              <input
-                type="text"
-                {...register("schoolName")}
-                readOnly={schoolIsFixed}
-                className="w-full px-4 py-2.5 rounded-lg border border-gray-300 focus:ring-2 focus:ring-orange-500 focus:border-transparent outline-none transition-all text-sm"
-                placeholder="School Name"
-              />
-            </div>
-          )}
-        </div>
-
-        {/* Group assignment — for the roles scoped to a single school */}
-        {canAssignGroup && (
-          <div className="space-y-3">
-            <label className="block text-sm font-semibold text-gray-700">
-              Group Assignment
-            </label>
-            <div className="flex gap-3">
-              {[
-                { value: "none", label: "No group" },
-                { value: "existing", label: "Existing group" },
-                { value: "new", label: "Create new group" },
-              ].map((opt) => (
-                <button
-                  key={opt.value}
-                  type="button"
-                  onClick={() => setGroupMode(opt.value)}
-                  className={`flex-1 py-2 rounded-lg text-sm font-medium border transition-colors ${
-                    groupMode === opt.value
-                      ? "bg-black text-white border-black"
-                      : "bg-white text-gray-600 border-gray-300 hover:bg-gray-50"
-                  }`}
-                >
-                  {opt.label}
-                </button>
-              ))}
-            </div>
-
-            {groupMode === "existing" && (
-              <div className="space-y-1.5">
-                {groups.length === 0 ? (
-                  <p className="text-xs text-gray-400">
-                    No groups yet. Create one using "Create new group".
-                  </p>
-                ) : (
-                  <select
-                    {...register("groupId")}
-                    className="w-full px-4 py-2.5 rounded-lg border border-gray-300 focus:ring-2 focus:ring-orange-500 focus:border-transparent outline-none transition-all text-sm bg-white"
-                  >
-                    <option value="">— Select a group —</option>
-                    {groups.map((g) => (
-                      <option key={g._id} value={g._id}>
-                        {g.name}
-                        {g.studentCount != null
-                          ? ` (${g.studentCount} student${g.studentCount !== 1 ? "s" : ""})`
-                          : ""}
-                      </option>
-                    ))}
-                  </select>
-                )}
-              </div>
+      <form onSubmit={handleSubmit(onSubmit)} className="flex flex-col gap-5 overflow-y-auto px-6 pb-6 pt-3">
+        <div className="flex flex-col gap-2">
+          <InputGroup vertical>
+            <InputCell label="Full name" htmlFor="st-name" className={cn(errors.studentName && "bg-[rgb(var(--vx-danger)/0.08)]")}>
+              <input id="st-name" type="text" autoFocus autoComplete="off" {...nameField} placeholder="e.g. Tatiana Baptista" className={cn(controlClass, "text-lg")} />
+            </InputCell>
+            <InputCell label="Email" htmlFor="st-email" className={cn(errors.emailAddress && "bg-[rgb(var(--vx-danger)/0.08)]")}>
+              <input id="st-email" type="email" autoComplete="off" {...emailField} placeholder="name@example.com" className={cn(controlClass, "text-lg")} />
+            </InputCell>
+            {!(schoolIsFixed && !isEdit) && (
+              <InputCell label="School" htmlFor="st-school">
+                <input id="st-school" type="text" {...register("schoolName")} readOnly={schoolIsFixed} placeholder="School name"
+                  className={cn(controlClass, "text-lg", schoolIsFixed && "text-[rgb(var(--vx-muted))]")} />
+              </InputCell>
             )}
+          </InputGroup>
+          {err && <p role="alert" className="px-1 text-sm text-[rgb(var(--vx-danger))]">{err}</p>}
+          {!isEdit && <p className="px-1 text-sm text-[rgb(var(--vx-muted))]">We email them their login details.</p>}
+        </div>
 
+        {canAssignGroup && (
+          <div className="flex flex-col gap-2">
+            <span className="px-1 text-base font-semibold">Group</span>
+            <Segmented label="Group" value={groupMode} onChange={setGroupMode}
+              options={[{ value: "none", label: "None" }, { value: "existing", label: "Existing" }, { value: "new", label: "New group" }]} />
+            {groupMode === "existing" && (groups.length === 0 ? (
+              <p className="px-1 text-sm text-[rgb(var(--vx-muted))]">No groups yet. Pick New group to make one.</p>
+            ) : (
+              <InputGroup vertical>
+                <InputCell label="Which group" htmlFor="st-group">
+                  <Select variant="ghost" label="Which group" value={watch("groupId") || ""} onChange={(v) => setValue("groupId", v, { shouldDirty: true })}
+                    placeholder="Choose a group" className="-mx-4 w-[calc(100%+2rem)] [&>button]:text-lg"
+                    options={groups.map((g) => ({ value: g._id, label: g.name, hint: g.studentCount != null ? `${g.studentCount}` : undefined }))} />
+                </InputCell>
+              </InputGroup>
+            ))}
             {groupMode === "new" && (
-              <div className="space-y-1.5">
-                <input
-                  type="text"
-                  {...register("newGroupName")}
-                  className="w-full px-4 py-2.5 rounded-lg border border-gray-300 focus:ring-2 focus:ring-orange-500 focus:border-transparent outline-none transition-all text-sm"
-                  placeholder="e.g. Morning Cohort A"
-                />
-              </div>
+              <InputGroup vertical>
+                <InputCell label="New group name" htmlFor="st-newgroup">
+                  <input id="st-newgroup" type="text" autoComplete="off" {...register("newGroupName")} placeholder="e.g. Morning Cohort A" className={cn(controlClass, "text-lg")} />
+                </InputCell>
+              </InputGroup>
             )}
           </div>
         )}
 
-        <div className="pt-4 flex items-center justify-end gap-3">
-          <button
-            type="button"
-            onClick={onClose}
-            className="px-5 py-2.5 rounded-lg text-sm font-semibold text-gray-700 bg-gray-100 hover:bg-gray-200 transition-colors"
-          >
-            Cancel
-          </button>
-          <button
-            type="submit"
-            disabled={isSubmitting}
-            className="px-5 py-2.5 rounded-lg text-sm font-semibold text-white bg-black hover:bg-gray-800 disabled:opacity-50 transition-colors shadow-lg"
-          >
-            {isSubmitting
-              ? "Saving..."
-              : isEdit
-                ? "Update Student"
-                : "Create Student"}
-          </button>
+        <div className="flex justify-end pt-1">
+          <ButtonGroup>
+            <Button variant="secondary" size="lg" onClick={onClose}>Cancel</Button>
+            <Button type="submit" size="lg" disabled={isSubmitting}>
+              {isSubmitting ? <><Loader2 className="animate-spin" /> Saving</> : isEdit ? "Save changes" : <><Plus /> Add student</>}
+            </Button>
+          </ButtonGroup>
         </div>
       </form>
     </div>

@@ -1,6 +1,6 @@
-import { useState, useEffect, useCallback, useRef } from "react";
-import axios from "axios";
-import { getAuthHeaders } from "../utils.js";
+import { useState, useEffect, useCallback, useRef, useMemo } from "react";
+import { useQuery, keepPreviousData } from "@tanstack/react-query";
+import { apiGet, who } from "../query";
 import { buildPageNumbers } from "./usePagination";
 
 /**
@@ -13,15 +13,12 @@ import { buildPageNumbers } from "./usePagination";
  * `searchTerm` inside params is debounced so typing does not fire a request per
  * keystroke. Pass `mapItem` to reshape each row as it arrives.
  */
-export function useServerPagination(url, { params = {}, pageSize = 10, sortConfig = null, mapItem } = {}) {
+import { snapSize, PAGE_SIZES } from "./usePagedRows";
+
+export function useServerPagination(url, { params = {}, pageSize: askedSize = 10, sortConfig = null, mapItem } = {}) {
+  const [pageSize, setPageSize] = useState(() => snapSize(askedSize));
+  useEffect(() => { setPageSize(snapSize(askedSize)); }, [askedSize]);
   const [currentPage, setCurrentPage] = useState(1);
-  const [items, setItems] = useState([]);
-  const [totalItems, setTotalItems] = useState(0);
-  const [totalPages, setTotalPages] = useState(1);
-  const [isLoading, setIsLoading] = useState(true);
-  const [error, setError] = useState(null);
-  const [reloadKey, setReloadKey] = useState(0);
-  const [hasLoaded, setHasLoaded] = useState(false);
 
   const [debouncedSearch, setDebouncedSearch] = useState(params.searchTerm || "");
   useEffect(() => {
@@ -48,50 +45,36 @@ export function useServerPagination(url, { params = {}, pageSize = 10, sortConfi
   const mapRef = useRef(mapItem);
   mapRef.current = mapItem;
 
+  // TanStack Query: each page is cached by its key; the previous page stays on screen while the
+  // next one loads (keepPreviousData), and coming back to a page within 30 s needs no request.
+  const query = useQuery({
+    queryKey: [who(), url, filtersKey, debouncedSearch, sortKey, currentPage, pageSize],
+    queryFn: ({ signal }) => apiGet(url, {
+      ...JSON.parse(filtersKey),
+      ...(debouncedSearch && { searchTerm: debouncedSearch }),
+      ...(sortConfig && { sortBy: sortConfig.key, sortDir: sortConfig.direction }),
+      page: currentPage,
+      limit: pageSize,
+    }, signal),
+    placeholderData: keepPreviousData,
+  });
+  const data = query.data;
+  const mapped = useMemo(() => (data ? (mapRef.current ? data.items.map(mapRef.current) : data.items) : []), [data]);
+  // Callers edit rows in place after a save (setPaginatedData); that wins until the next response.
+  const [override, setOverride] = useState(null);
+  useEffect(() => { setOverride(null); }, [data]);
+  const items = override ?? mapped;
+  const setItems = useCallback((v) => setOverride((cur) => (typeof v === "function" ? v(cur ?? mapped) : v)), [mapped]);
+  const totalItems = data?.total ?? 0;
+  const totalPages = data?.totalPages ?? 1;
+  const isLoading = query.isFetching;
+  const hasLoaded = query.data !== undefined || query.isError;
+  const error = query.isError ? (query.error?.response?.data?.message || "Failed to load data.") : null;
+  // A delete can empty the last page; step back rather than show nothing.
   useEffect(() => {
-    let cancelled = false;
-    setIsLoading(true);
-    setError(null);
-
-    axios
-      .get(url, {
-        ...getAuthHeaders(),
-        params: {
-          ...JSON.parse(filtersKey),
-          ...(debouncedSearch && { searchTerm: debouncedSearch }),
-          ...(sortConfig && { sortBy: sortConfig.key, sortDir: sortConfig.direction }),
-          page: currentPage,
-          limit: pageSize,
-        },
-      })
-      .then(({ data }) => {
-        if (cancelled) return;
-        const rows = mapRef.current ? data.items.map(mapRef.current) : data.items;
-        setItems(rows);
-        setTotalItems(data.total);
-        setTotalPages(data.totalPages);
-        // A delete can empty the last page; step back rather than show nothing.
-        if (rows.length === 0 && currentPage > 1 && currentPage > data.totalPages) {
-          setCurrentPage(data.totalPages);
-        }
-      })
-      .catch((err) => {
-        if (cancelled) return;
-        setError(err.response?.data?.message || "Failed to load data.");
-      })
-      .finally(() => {
-        if (!cancelled) {
-          setIsLoading(false);
-          setHasLoaded(true);
-        }
-      });
-
-    return () => {
-      cancelled = true;
-    };
-    // sortConfig is covered by sortKey.
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [url, filtersKey, debouncedSearch, sortKey, currentPage, pageSize, reloadKey]);
+    if (data && !query.isPlaceholderData && data.items.length === 0 && currentPage > 1 && currentPage > data.totalPages) setCurrentPage(Math.max(1, data.totalPages));
+  }, [data, currentPage, query.isPlaceholderData]);
+  const refetchQuery = query.refetch;
 
   const handlePageChange = useCallback(
     (page) => setCurrentPage(Math.min(Math.max(1, page), totalPages)),
@@ -106,11 +89,14 @@ export function useServerPagination(url, { params = {}, pageSize = 10, sortConfi
     // not replace the page (and its search box) on every later page change.
     isInitialLoading: isLoading && !hasLoaded,
     error,
-    refetch: useCallback(() => setReloadKey((k) => k + 1), []),
+    refetch: useCallback(() => { refetchQuery(); }, [refetchQuery]),
     currentPage,
     totalPages,
     totalItems,
     itemsPerPage: pageSize,
+    setPageSize,
+    // Spread into vx <Pagination {...pager} />
+    pager: { page: currentPage, pageSize, total: totalItems, onPage: (p) => setCurrentPage(Math.max(1, p)), onPageSize: setPageSize, sizes: PAGE_SIZES },
     pageNumbers: buildPageNumbers(currentPage, totalPages),
     handlePageChange,
     nextPage: () => handlePageChange(currentPage + 1),

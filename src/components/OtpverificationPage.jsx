@@ -1,5 +1,5 @@
 import React, { useState, useRef, useEffect, useCallback } from "react";
-import { Link, useLocation, useNavigate } from "react-router-dom";
+import { Link, useLocation, useNavigate } from "../lib/router";
 import formBgImage from "./StartupPages/Login-bg.jpg";
 import axios from "axios";
 import { toast } from "react-hot-toast";

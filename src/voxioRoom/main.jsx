@@ -14,9 +14,62 @@
 import React, { useEffect, useRef, useState } from "react";
 import { createRoot } from "react-dom/client";
 import { createSession } from "voxioagent/client";
-import { Mic, MicOff, PhoneOff, Play, Send, Activity, ChevronDown, ChevronUp, Captions, ArrowLeft, MessageSquare, X, Brain, LogOut } from "lucide-react";
+import { ChevronRight, Clock, Mic, MicOff, PhoneOff, Play, Send, Captions, ArrowLeft, MessageSquare, X, Brain, LogOut } from "lucide-react";
 import "../index.css";
 import { SCENARIO, buildCustoms } from "./testScenario.js";
+import { reasoningRecord } from "../../backend/utils/reasoningScore.js";
+import Results from "./Results.jsx";
+import { ROOM_MOTION, Journey, StageBanner, IntroCard, Presence } from "./RoomParts.jsx";
+import FlowPanel from "./FlowPanel.jsx";
+import { Button, ButtonGroup } from "../components/vx/ui.jsx";
+import "./room.css";
+import { htFields, htKeys } from "../lib/htRubric.js";
+const HT_KEYS = htKeys(true);
+const PdfViewer = React.lazy(() => import("../components/shared/PdfViewer.jsx"));
+// A student's run reports its results to the server (POST /api/sessions/:id/room-results):
+// the room's Voxio sessions do not reach our webhook. Educator Test runs have no record; the
+// server answers 404 and nothing is saved.
+const saveResults = async (body) => {
+  if (!SESSION_ID) return;
+  try {
+    const auth = await getAuth();
+    const r = await fetch(`${API}/api/sessions/${encodeURIComponent(SESSION_ID)}/room-results`, {
+      method: "POST", keepalive: true,
+      headers: { "Content-Type": "application/json", Authorization: `Bearer ${auth?.token || ""}` },
+      body: JSON.stringify(body),
+    });
+    return r.ok ? await r.json() : null;
+  } catch { return null; /* the next milestone sends everything again */ }
+};
+// One scored turn, stored as soon as it arrives (POST /api/sessions/:id/ht-turn).
+const saveHtTurn = async (turn) => {
+  if (!SESSION_ID) return;
+  try {
+    const auth = await getAuth();
+    await fetch(`${API}/api/sessions/${encodeURIComponent(SESSION_ID)}/ht-turn`, {
+      method: "POST", keepalive: true,
+      headers: { "Content-Type": "application/json", Authorization: `Bearer ${auth?.token || ""}` },
+      body: JSON.stringify(turn),
+    });
+  } catch { /* the end-of-visit report sends every turn again */ }
+};
+/** The learner's note and flag on this attempt (PATCH /api/sessions/:id/mine). */
+const saveMine = async (recordId, body) => {
+  try {
+    const auth = await getAuth();
+    const r = await fetch(`${API}/api/sessions/${recordId}/mine`, {
+      method: "PATCH", headers: { "Content-Type": "application/json", Authorization: `Bearer ${auth?.token || ""}` }, body: JSON.stringify(body),
+    });
+    return r.ok;
+  } catch { return false; }
+};
+
+const fetchReport = async (url) => {
+  const auth = await getAuth();
+  const r = await fetch(`${API}${url}`, { headers: { Authorization: `Bearer ${auth?.token || ""}` } });
+  if (!r.ok) throw Object.assign(new Error("report"), { response: { status: r.status } });
+  return { data: await r.arrayBuffer() };
+};
 
 // Must match END_SESSION_INPUT in backend/utils/simEngine.js: the patient node sets
 // end_diagnosis "yes" on exactly this line, and the judge node branches to feedback.
@@ -38,49 +91,27 @@ const SETTLE_MS = 1000;
 const CR_LIMIT_S = 600; // guide doc 1.8: the platform ends Clinical Reasoning at 10 minutes
 const CLOSE_MS = 3000; // after the guide's closing line, before the platform ends the session
 
-/*
- * Clinical Reasoning score, calculated in code as feedback engine doc 1.5 and 1.9 require:
- * a criterion's final rating is the lower of its quality rating and the cap set by its
- * independence level (criterion 3: the lower of physical_observation and whole_picture);
- * the percentage is the sum of final rating / 4 x weight. Skipped or distress: no score.
- */
-const CR_WEIGHTS = { 1: 0.2, 2: 0.25, 3: 0.25, 4: 0.15, 5: 0.15 };
-const CR_NAMES = { 1: "Information Gathering and Cue Recognition", 2: "Hypothesis Generation and Prioritisation", 3: "Analysis and Interpretation of Findings", 4: "Red Flags and Safety Screening", 5: "Justification and Reflection" };
-const CR_ELEMENTS = { 1: ["cues"], 2: ["hypotheses"], 3: ["physical_observation", "whole_picture"], 4: ["red_flags"], 5: ["examination"] };
-const INDEPENDENCE = ["independent", "prompted", "step_by_step", "not_reached", "not_covered"]; // high to low
-const CAP = { independent: 4, prompted: 3, step_by_step: 2, not_reached: 1, not_covered: 1 };
-const INDEPENDENCE_LABEL = { independent: "On your own", prompted: "With a prompt", step_by_step: "With step-by-step guidance", not_reached: "Not yet", not_covered: "Not covered this time" };
-const LEVEL = { 4: "Highly Proficient", 3: "Proficient", 2: "Developing", 1: "Needs Development" };
-
-function scoreReasoning(fb, status) {
-  if (!fb || status === "skipped" || status === "ended_early_distress" || !Array.isArray(fb.criteria) || !fb.criteria.length) return { percent: null, rows: [] };
-  const elements = fb.element_independence || {};
-  const rows = [1, 2, 3, 4, 5].map((n) => {
-    const c = fb.criteria.find((x) => Number(x.criterion) === n) || {};
-    const levels = CR_ELEMENTS[n].map((k) => elements[k]).filter((v) => INDEPENDENCE.includes(v));
-    const independence = levels.length
-      ? levels.reduce((low, v) => (INDEPENDENCE.indexOf(v) > INDEPENDENCE.indexOf(low) ? v : low))
-      : INDEPENDENCE.includes(c.independence) ? c.independence : "not_covered";
-    const quality = Math.max(1, Math.min(4, Math.round(Number(c.quality_rating) || 1)));
-    return { n, name: CR_NAMES[n], independence, final: Math.min(quality, CAP[independence]) };
-  });
-  return { percent: Math.round(rows.reduce((sum, r) => sum + (r.final / 4) * CR_WEIGHTS[r.n], 0) * 100), rows };
-}
-
+// Clinical Reasoning is scored by the same code the server uses (backend/utils/reasoningScore.js).
 const params = new URLSearchParams(location.search);
 const SESSION_ID = params.get("session");
+const SCENARIO_ID = params.get("scenario");
 const FLOW_KEY = import.meta.env.VITE_VOXIO_TEST_FLOW_KEY;
 const API = import.meta.env.VITE_API_BASE_URL || "http://localhost:5001"; // same variable as src/main.jsx
 
+// The room is its own page, so it gets its access token (and who is signed in) from the refresh cookie.
+let authPromise;
+const getAuth = () => (authPromise ||= fetch(`${API}/api/auth/refresh`, { method: "POST", credentials: "include" })
+  .then(async (r) => (r.ok ? r.json() : null)).catch(() => null));
+const firstName = (name) => String(name || "").trim().split(/\s+/).find((w) => w && !/^(dr|prof|mr|mrs|ms|miss|mx)\.?$/i.test(w)) || "";
+
 async function loadCustoms() {
   if (!SESSION_ID) return buildCustoms();
-  // The room is its own page, so it gets its access token from the refresh cookie itself.
-  const auth = await fetch(`${API}/api/auth/refresh`, { method: "POST", credentials: "include" });
-  if (!auth.ok) {
+  const auth = await getAuth();
+  if (!auth?.token) {
     window.location.href = "/login";
     throw new Error("Your login has expired. Taking you to the login page…");
   }
-  const { token } = await auth.json();
+  const { token } = auth;
   const r = await fetch(`${API}/api/scenarios/room/${SESSION_ID}`, { headers: { Authorization: `Bearer ${token}` } });
   const body = await r.json().catch(() => ({}));
   if (!r.ok) throw new Error(body.message || `Could not load the scenario (${r.status})`);
@@ -108,7 +139,6 @@ const asText = (v) => (v == null ? "" : typeof v === "string" ? v : JSON.stringi
 const time = () => new Date().toLocaleTimeString([], { hour: "2-digit", minute: "2-digit", second: "2-digit" });
 const initials = (name) => name.split(/\s+/).filter(Boolean).slice(0, 2).map((w) => w[0]).join("").toUpperCase() || "P";
 const clock = (s) => `${String(Math.floor(s / 60)).padStart(2, "0")}:${String(s % 60).padStart(2, "0")}`;
-const percentOf = (score) => (score == null ? null : Math.round(score <= 1 ? score * 100 : score));
 const asJson = (v) => { if (v && typeof v === "object") return v; try { return JSON.parse(v); } catch { return null; } };
 // The guide's hidden tag never reaches the learner (guide doc 1.8), even if it slips into speech.
 const noTag = (t) => asText(t).replace(/\[NARROW\]\s*/g, "");
@@ -135,45 +165,32 @@ const STATE = {
 const SPEAKER = { reflection: "Reflection guide", reasoning: "Clinical Reasoning guide" };
 const STAGE_TITLE = { reflection: "Self-reflection", reasoning: "Clinical Reasoning" };
 
-function ScoreRing({ value }) {
-  const r = 52, c = 2 * Math.PI * r, frac = value == null ? 0 : Math.max(0, Math.min(1, value / 100));
-  return (
-    <div className="relative h-32 w-32 shrink-0">
-      <svg viewBox="0 0 120 120" className="h-full w-full -rotate-90">
-        <circle cx="60" cy="60" r={r} fill="none" stroke="currentColor" strokeWidth="10" className="text-white/10" />
-        <circle cx="60" cy="60" r={r} fill="none" stroke="currentColor" strokeWidth="10" strokeLinecap="round"
-          strokeDasharray={c} strokeDashoffset={c * (1 - frac)} className="text-white transition-[stroke-dashoffset] duration-700" />
-      </svg>
-      <div className="absolute inset-0 grid place-items-center text-center">
-        <span className="text-3xl font-semibold">{value == null ? "–" : `${value}%`}</span>
-      </div>
-    </div>
-  );
-}
-
-function Modal({ title, onClose, children, actions }) {
-  return (
-    <div className="absolute inset-0 z-20 grid place-items-center bg-black/70 backdrop-blur-sm p-4">
-      <div className="w-full max-w-2xl max-h-full overflow-y-auto rounded-2xl border border-white/10 bg-neutral-900 p-6">
-        <div className="flex items-start justify-between">
-          <h2 className="text-xl font-semibold">{title}</h2>
-          {onClose && <button onClick={onClose} className="text-neutral-400 hover:text-white" title="Close"><X className="w-5 h-5" /></button>}
-        </div>
-        {children}
-        <div className="mt-6 flex flex-wrap justify-end gap-3">{actions}</div>
-      </div>
-    </div>
-  );
-}
-
-const PrimaryBtn = ({ children, ...p }) => <button {...p} className="flex items-center gap-2 px-5 py-2.5 rounded-full bg-white hover:bg-neutral-200 text-neutral-900 font-medium disabled:opacity-40">{children}</button>;
-const SecondaryBtn = ({ children, ...p }) => <button {...p} className="flex items-center gap-2 px-5 py-2.5 rounded-full border border-white/15 hover:bg-white/10">{children}</button>;
-
 function Room() {
   const [step, setStep] = useState("intro"); // intro -> name -> live
   const [learner, setLearner] = useState("");
+  const [reportOpen, setReportOpen] = useState(false);
+  const results = useRef({}); // what the flow sent back, sent to the server at each milestone
+  const [insight, setInsight] = useState(null); // the server's answer: skills, previous score, record id
+  const report = (patch) => {
+    Object.assign(results.current, patch);
+    // A learner turn with no score packet was cut short (Voxio dropped it): stored as failed, never as zero.
+    const learnerTurns = turnsRef.current.filter((t) => t.who === "you" && t.stage === "consult" && t.text !== END_SESSION_INPUT).length;
+    if (results.current.htTurns?.length) {
+      const have = new Set(results.current.htTurns.map((t) => t.turn));
+      const filled = [...results.current.htTurns];
+      for (let n = 1; n <= learnerTurns; n++) if (!have.has(n)) filled.push({ turn: n, at: null, status: "failed", scores: null });
+      results.current.htTurns = filled.sort((a, b) => a.turn - b.turn);
+      setHtTurns(results.current.htTurns);
+    }
+    const transcript = turnsRef.current.filter((t) => t.stage === "consult" && t.final && t.text && t.text !== END_SESSION_INPUT).map((t) => ({ who: t.who, text: t.text }));
+    saveResults({ ...results.current, transcript, voxioSessionId: session.current?.sessionId }).then((r) => { if (r?.recordId) setInsight(r); });
+  };
+  // The learner's name comes from their account; the name step is only a fallback.
+  useEffect(() => { getAuth().then((a) => { const n = firstName(a?.name); if (n) setLearner((cur) => cur || n); }); }, []);
   const [state, setState] = useState("idle");
   const [turns, setTurns] = useState([]); // {who: 'patient'|'you', text, final, stage}
+  const [htTurns, setHtTurns] = useState([]); // per-turn timeline scores
+  const startedAt = useRef(Date.now());
   const [error, setError] = useState("");
   const [muted, setMuted] = useState(false);
   const [text, setText] = useState("");
@@ -185,8 +202,9 @@ function Room() {
   const [devOpen, setDevOpen] = useState(true);
   const [feedback, setFeedback] = useState(null); // history-taking feedback, held until reflection ends
   const [crResult, setCrResult] = useState(null); // {fb, status}
-  const [showCase, setShowCase] = useState(false);
-  const [modal, setModal] = useState(null); // null | "feedback" | "cr"
+  const [modal, setModal] = useState(null); // null | "results"
+  const [tab, setTab] = useState("reflection"); // results tab: reflection | history | reasoning
+  const [reflection, setReflection] = useState(null); // {summary, self_rating} from the reflection guide
   const [seconds, setSeconds] = useState(0);
   const [crSeconds, setCrSeconds] = useState(0);
   /*
@@ -240,7 +258,8 @@ function Room() {
   const finishReflection = () => {
     if (!send(END_OF_REFLECTION)) return;
     setPhase("feedback");
-    setModal("feedback");
+    setTab("reflection");
+    setModal("results");
   };
   const startReasoning = () => {
     if (!send(START_OF_CLINICAL_REASONING)) return;
@@ -277,23 +296,52 @@ function Room() {
     const said = d?.user_input;
     if (typeof said === "string" && said.trim() && !said.startsWith("["))
       setTurns((t) => (t.some((x) => x.who === "you" && x.text === said && x.local) ? t : [...t, { who: "you", text: said, final: true, stage: stage() }]));
+    // The silent history-taking scorer (docs/HT_TIMELINE_PLAN.md): one packet per patient reply.
+    if (d?.ht_turn !== undefined && phaseRef.current === "consult") {
+      const mine = turnsRef.current.filter((t) => t.who === "you" && t.stage === "consult");
+      const turn = mine.length;
+      const lastSaid = mine[turn - 1]?.text || "";
+      // The closing "end session" line is bookkeeping, not a turn (ci skips it too).
+      if (!turn || lastSaid === END_SESSION_INPUT) return;
+      const lastSpeak = [...turnsRef.current].reverse().find((t) => t.who === "patient" && t.stage === "consult")?.text || "";
+      const scores = {};
+      for (const k of HT_KEYS) {
+        const f = htFields(k);
+        if (!(f.type in d) && !(f.score in d)) continue;
+        const type_ = String(d[f.type] ?? "").trim();
+        scores[k] = { type_: type_ === "None" ? "" : type_, score: Number(d[f.score]) || 0, description: String(d[f.note] ?? "").replace(/^None$/, "") };
+      }
+      const entry = { turn, at: Math.round((Date.now() - startedAt.current) / 1000), status: "scored", scores, transcript: lastSaid, speak: lastSpeak };
+      results.current.htTurns = [...(results.current.htTurns || []).filter((t) => t.turn !== turn), entry];
+      setHtTurns(results.current.htTurns);
+      saveHtTurn(entry); // stored now, per turn, like ci's webhook
+    }
     if (typeof d?.feedback === "string" || typeof d?.score === "number") {
       setFeedback({ text: asText(d.feedback), score: typeof d.score === "number" ? d.score : null });
+      report({ feedback: asText(d.feedback), score: d.score, questions: d.questions });
       // the goodbye turn has finished: now the reflection guide can start
       setTimeout(() => { if (phaseRef.current === "ending") startReflection(); }, SETTLE_MS);
     }
-    if (String(d?.reflection_done || "").toLowerCase() === "yes") setReflectionSaved(true);
+    if (String(d?.reflection_done || "").toLowerCase() === "yes") {
+      setReflectionSaved(true);
+      const rating = Number(d.self_rating);
+      const summary = typeof d.summary === "string" && !["", "None", "null"].includes(d.summary.trim()) ? d.summary.trim() : null;
+      setReflection({ summary, self_rating: Number.isFinite(rating) && rating >= 1 && rating <= 10 ? Math.round(rating) : null });
+      report({ reflection: { summary: d.summary, self_rating: d.self_rating, status: d.status, distress_flag: d.distress_flag } });
+    }
     // The guide spoke its close (normal, skip or distress): the platform ends the session.
     if (String(d?.cr_done || "").toLowerCase() === "yes") setTimeout(endReasoning, CLOSE_MS);
     if (d?.cr_feedback) {
       setCrResult({ fb: asJson(d.cr_feedback), status: d.cr_status || asJson(d.cr_feedback)?.status });
+      report({ cr: { feedback: d.cr_feedback, status: d.cr_status || asJson(d.cr_feedback)?.status } });
       setPhase("cr_feedback");
-      setModal("cr");
+      setTab("reasoning");
+      setModal("results");
     }
   };
 
   const start = async () => {
-    setError(""); setTurns([]); setEvents([]); setFeedback(null); setReflectionSaved(false); setCrResult(null); setModal(null); setHasVideo(false);
+    results.current = {}; setHtTurns([]); startedAt.current = Date.now(); setError(""); setTurns([]); setEvents([]); setFeedback(null); setReflectionSaved(false); setReflection(null); setCrResult(null); setModal(null); setTab("reflection"); setHasVideo(false);
     setPhase("consult"); setSeconds(0); setCrSeconds(0); setStep("live");
     let customs;
     try { customs = withLearnerName(await loadCustoms(), learner); } catch (e) { setError(e.message); return; }
@@ -309,7 +357,11 @@ function Room() {
     try { await s.start(); } catch (e) { setError(asText(e?.message || e)); setState("error"); }
   };
 
-  const exit = () => { session.current?.destroy(); history.length > 1 ? history.back() : (window.location.href = "/"); };
+  const exit = () => { if (Object.keys(results.current).length) report({}); session.current?.destroy();
+    // A student's run: straight to this scenario's page, on the attempt just done.
+    if (SCENARIO_ID) window.location.href = `/student/scenario/${encodeURIComponent(SCENARIO_ID)}${insight?.recordId ? `?attempt=${insight.recordId}` : ""}`;
+    else history.length > 1 ? history.back() : (window.location.href = "/");
+  };
   /*
    * End Session does not hang up: it types the end-of-session line into the agent loop over the
    * data channel (sendText, no transcription), exactly as if the learner had said it, so the flow
@@ -330,64 +382,58 @@ function Room() {
 
   const talking = ["reflection", "reasoning"].includes(phase) ? phase : "consult";
   const speaker = SPEAKER[talking] || PATIENT;
-  const st = STATE[state] || { label: state, dot: "bg-neutral-400" };
   const lastSpoken = [...turns].reverse().find((t) => t.who === "patient" && t.stage === talking);
   const moving = live.frame && live.frame !== "main";
-  const cr = crResult && scoreReasoning(crResult.fb, crResult.status);
-  const fb = crResult?.fb || {};
+  const cr = crResult ? reasoningRecord(crResult.fb, crResult.status) : null;
   const waiting = (label) => (
-    <span className="flex items-center gap-2 h-12 px-5 rounded-full bg-white/10 border border-white/15 text-sm text-neutral-200">
-      <span className="h-4 w-4 rounded-full border-2 border-white/30 border-t-white animate-spin" /> {label}
+    <span className="flex h-12 items-center gap-3 rounded-[24px] bg-[rgb(var(--vx-cell))] px-6 text-base">
+      <span className="size-5 rounded-full border-2 border-white/25 border-t-[rgb(var(--vx-accent))] animate-spin" /> <span className="vx-ai-text">{label}</span>
     </span>
   );
-  const exitBtn = (
-    <button onClick={exit} className="flex items-center gap-2 h-12 px-5 rounded-full bg-red-600 hover:bg-red-500 text-white font-medium"><LogOut className="w-4 h-4" /> Exit</button>
-  );
+  const exitBtn = <Button size="lg" onClick={exit} className="bg-[rgb(var(--vx-danger))] px-7 text-white"><LogOut /> Exit</Button>;
+  const nextBtn = (label, onClick) => <Button size="lg" onClick={onClick} className="px-7">{label}</Button>;
+  const crLeft = CR_LIMIT_S - crSeconds;
+  const clockTone = phase === "reasoning" && crLeft <= 60 ? "text-[rgb(var(--vx-danger))] animate-pulse" : phase === "reasoning" && crLeft <= 180 ? "text-[rgb(var(--vx-warn))]" : "";
 
   return (
-    <div className="h-screen bg-neutral-950 text-neutral-100 flex flex-col overflow-hidden">
-      <header className="shrink-0 px-4 sm:px-6 py-3 flex items-center justify-between border-b border-white/10 bg-neutral-950">
-        <div className="flex items-center gap-3 min-w-0">
-          <button onClick={exit} className="shrink-0 flex items-center gap-1 rounded-lg px-2 py-1.5 text-sm text-neutral-300 hover:bg-white/10 hover:text-white" title="Back to scenarios">
-            <ArrowLeft className="w-4 h-4" /> Back
-          </button>
+    <div className="vx vx-room h-screen flex flex-col overflow-hidden">
+      <style>{ROOM_MOTION}</style>
+      <header className="shrink-0 flex items-center justify-between gap-4 border-b border-[rgb(var(--vx-line))] px-4 py-3 sm:px-6">
+        <div className="flex min-w-0 items-center gap-4">
           <div className="min-w-0">
-            <h1 className="font-semibold leading-tight truncate">{STAGE_TITLE[talking] || PATIENT}</h1>
-            <p className="text-xs text-neutral-400 truncate">{TITLE}</p>
+            <h1 className="truncate text-lg font-semibold leading-tight">{SPEAKER[talking] || PATIENT}</h1>
+            <p className="truncate text-sm text-[rgb(var(--vx-muted))]">{TITLE}</p>
           </div>
         </div>
-        <div className="flex items-center gap-2">
-          {DEV && <span className="text-[10px] font-semibold tracking-wider uppercase px-2 py-1 rounded bg-amber-500/15 text-amber-300 border border-amber-500/30">Dev mode</span>}
-          {step === "live" && (
-            <span className="font-mono text-sm tabular-nums px-3 py-1.5 rounded-full bg-white/5 border border-white/10" title={phase === "reasoning" ? "Clinical Reasoning time left" : "Session time"}>
-              {phase === "reasoning" ? clock(Math.max(0, CR_LIMIT_S - crSeconds)) : clock(seconds)}
-            </span>
-          )}
-          <span className="flex items-center gap-2 text-xs px-3 py-1.5 rounded-full bg-white/5 border border-white/10">
-            <span className={`h-2 w-2 rounded-full ${st.dot}`} />{st.label}
-          </span>
-          {step === "live" && (
-            <button onClick={() => setChatOpen((o) => !o)} title="Transcript" className={`h-9 w-9 grid place-items-center rounded-full border ${chatOpen ? "bg-white/15 border-white/25" : "bg-white/5 border-white/10 text-neutral-300"}`}>
-              <MessageSquare className="w-4 h-4" />
-            </button>
-          )}
-        </div>
+        {(
+          <ButtonGroup className="shrink-0">
+            {DEV && <span className="flex h-12 items-center rounded-[24px] bg-[rgb(var(--vx-warn)/0.18)] px-4 text-xs font-semibold uppercase tracking-wider text-amber-300">Dev</span>}
+            {step === "live" && (
+              <span title={phase === "reasoning" ? "Clinical Reasoning time left" : "Session time"}
+                className={`flex h-12 items-center gap-2 rounded-[24px] bg-[rgb(var(--vx-cell))] px-5 font-mono text-base tabular-nums ${clockTone}`}>
+                <Clock className="size-[18px] opacity-70" />{phase === "reasoning" ? clock(Math.max(0, crLeft)) : clock(seconds)}
+              </span>
+            )}
+            {step === "live" && (
+              <Button size="lg" variant={chatOpen ? "default" : "secondary"} aria-pressed={chatOpen} onClick={() => setChatOpen((o) => !o)} title="Transcript" className="px-5">
+                <MessageSquare /> <span className="hidden sm:inline">Transcript</span>
+              </Button>
+            )}
+            <Button size="lg" onClick={exit} title="Leave the room" className="bg-[rgb(var(--vx-danger))] px-5 text-white"><LogOut /> <span className="hidden sm:inline">Leave</span></Button>
+          </ButtonGroup>
+        )}
       </header>
 
+      <Journey phase={phase} started={step === "live"} />
       <main className="flex-1 min-h-0 w-full flex flex-col lg:flex-row">
         <section className="relative flex-1 min-w-0 min-h-[55vh] lg:min-h-0 bg-black flex flex-col">
-          <div className="relative flex-1 grid place-items-center">
+          <div className="relative flex-1 grid place-items-center overflow-hidden bg-[radial-gradient(ellipse_at_top,rgba(56,189,248,.10),transparent_60%)]">
+            <StageBanner phase={phase} started={step === "live" && active} />
             <video ref={video} autoPlay playsInline className={`absolute inset-0 w-full h-full object-contain ${hasVideo ? "" : "hidden"}`} />
 
             {step === "intro" && (
-              <div className="w-full max-w-md mx-4 rounded-2xl border border-white/10 bg-neutral-900 p-6 text-center">
-                <p className="text-xs uppercase tracking-wider text-neutral-500">History taking</p>
-                <h2 className="mt-2 text-xl font-semibold">{TITLE}</h2>
-                <p className="mt-3 text-sm text-neutral-400">You are about to meet {PATIENT}. Take a history as you would in clinic. Speak naturally; when you are done, press End Session or say “let’s end the session”. A short self-reflection, your feedback and a Clinical Reasoning conversation follow.</p>
-                <button onClick={() => setStep("name")} className="mt-6 inline-flex items-center gap-2 px-6 py-3 rounded-full bg-white hover:bg-neutral-200 text-neutral-900 font-medium">
-                  <Play className="w-4 h-4" /> Start
-                </button>
-              </div>
+              <IntroCard title={TITLE} patient={PATIENT} initials={initials(PATIENT)} firstName={learner.trim()}
+                onStart={() => (learner.trim() ? start() : setStep("name"))} disabled={!FLOW_KEY} />
             )}
 
             {step === "name" && (
@@ -402,10 +448,8 @@ function Room() {
             )}
 
             {step === "live" && !hasVideo && (
-              <div className="flex flex-col items-center gap-4 text-center px-6">
-                <div className={`h-28 w-28 rounded-full bg-neutral-800 grid place-items-center text-3xl font-semibold text-neutral-300 ${state === "connecting" ? "animate-pulse" : ""}`}>{initials(PATIENT)}</div>
-                <p className="text-neutral-400 text-sm max-w-xs">{state === "ended" ? "The session has ended." : active ? "" : "Connecting to the patient…"}</p>
-              </div>
+              <Presence name={SPEAKER[talking] || PATIENT} initials={SPEAKER[talking] ? "AI" : initials(PATIENT)} state={state}
+                label={state === "ended" ? "The session has ended." : state === "connecting" || !active ? "Connecting…" : state === "speaking" ? "Speaking" : ""} />
             )}
 
             {DEV && hasVideo && (
@@ -430,114 +474,48 @@ function Room() {
               </div>
             )}
 
-            {/* History Taking: Feedback Summary, released only after the self-reflection */}
-            {modal === "feedback" && (
-              <Modal title="Feedback Summary" onClose={feedback ? () => setModal(null) : null}
-                actions={<>
-                  <PrimaryBtn onClick={startReasoning} disabled={!active || !feedback || !reflectionSaved || phase !== "feedback"}>
-                    {reflectionSaved ? <Brain className="w-4 h-4" /> : <span className="h-4 w-4 rounded-full border-2 border-neutral-400 border-t-neutral-900 animate-spin" />} Clinical Reasoning
-                  </PrimaryBtn>
-                  <SecondaryBtn onClick={exit}><LogOut className="w-4 h-4" /> Exit</SecondaryBtn>
-                </>}>
-                {!feedback ? (
-                  <div className="mt-8 mb-4 flex flex-col items-center gap-3 text-sm text-neutral-400">
-                    <span className="h-8 w-8 rounded-full border-2 border-white/20 border-t-white animate-spin" /> Preparing your feedback…
-                  </div>
-                ) : (
-                  <div className="mt-5 flex flex-col sm:flex-row gap-6 items-center sm:items-start">
-                    <ScoreRing value={percentOf(feedback.score)} />
-                    <div className="text-sm text-neutral-300 space-y-3 leading-relaxed">
-                      {feedback.text.split(/\n\s*\n/).filter(Boolean).map((p, i) => <p key={i}>{p}</p>)}
-                      <p className="text-xs text-neutral-500">This feedback is AI-generated.</p>
-                    </div>
-                  </div>
-                )}
-              </Modal>
+            {/* One results view: reflection, history-taking feedback (released only after the reflection), Clinical Reasoning */}
+            {modal === "results" && (
+              <Results tab={tab} setTab={setTab} phase={phase} reflection={reflection} reflectionSaved={reflectionSaved}
+                feedback={feedback} cr={cr} crUnreadable={phase === "cr_feedback" && !cr}
+                onReasoning={startReasoning} canReason={active && !!feedback && reflectionSaved && phase === "feedback"}
+                onExit={exit} onClose={feedback ? () => setModal(null) : null}
+                onReport={SESSION_ID && feedback ? () => setReportOpen(true) : null}
+                insight={insight} onSaveMine={(body) => saveMine(insight?.recordId, body)} htTurns={htTurns} />
             )}
-
-            {/* Clinical Reasoning feedback, as in feedback engine doc 1.8 */}
-            {modal === "cr" && crResult && (
-              <Modal title="Clinical Reasoning Feedback" onClose={() => setModal(null)} actions={<SecondaryBtn onClick={exit}><LogOut className="w-4 h-4" /> Exit</SecondaryBtn>}>
-                {!crResult.fb ? (
-                  <p className="mt-4 text-sm text-neutral-400">The feedback could not be read. Please try the session again.</p>
-                ) : (
-                  <div className="mt-5 space-y-5 text-sm">
-                    <div className="flex flex-col sm:flex-row gap-6 items-center sm:items-start">
-                      {cr.percent != null && <ScoreRing value={cr.percent} />}
-                      <div className="space-y-4 leading-relaxed text-neutral-300">
-                        {fb.summary && <p>{fb.summary}</p>}
-                        {fb.went_well?.length > 0 && (
-                          <div><h3 className="font-semibold text-white mb-1">What went well</h3>
-                            <ul className="list-disc pl-5 space-y-1">{fb.went_well.map((x, i) => <li key={i}>{x}</li>)}</ul></div>
-                        )}
-                        {fb.work_on?.length > 0 && (
-                          <div><h3 className="font-semibold text-white mb-1">What to work on</h3>
-                            <ul className="list-disc pl-5 space-y-1">{fb.work_on.map((x, i) => <li key={i}>{x}</li>)}</ul></div>
-                        )}
-                        {fb.focus_next_time && <div><h3 className="font-semibold text-white mb-1">Focus for next time</h3><p>{fb.focus_next_time}</p></div>}
-                      </div>
-                    </div>
-                    {cr.rows.length > 0 && (
-                      <div className="rounded-xl border border-white/10 divide-y divide-white/10">
-                        {cr.rows.map((r) => (
-                          <div key={r.n} className="px-3 py-2 flex flex-wrap items-center justify-between gap-2">
-                            <span className="text-neutral-200">{r.n}. {r.name}</span>
-                            <span className="text-xs text-neutral-400">{r.final}/4 · {LEVEL[r.final]} · {INDEPENDENCE_LABEL[r.independence]}</span>
-                          </div>
-                        ))}
-                      </div>
-                    )}
-                    {fb.case_reveal && (
-                      <div>
-                        <button onClick={() => setShowCase((v) => !v)} className="rounded-full border border-white/15 px-4 py-1.5 text-xs hover:bg-white/10">{showCase ? "Hide the case" : "Show the case"}</button>
-                        {showCase && (
-                          <dl className="mt-3 space-y-2 text-neutral-300">
-                            {[["diagnosis", "Diagnosis"], ["alternatives", "Alternatives"], ["key_findings", "Key findings"], ["red_flags", "Red flags"], ["examination", "Examination"], ["not_uncovered", "Not uncovered"], ["expert_reasoning", "Expert reasoning"]]
-                              .filter(([k]) => fb.case_reveal[k]).map(([k, label]) => (
-                                <div key={k}><dt className="text-xs uppercase tracking-wider text-neutral-500">{label}</dt><dd>{fb.case_reveal[k]}</dd></div>
-                              ))}
-                          </dl>
-                        )}
-                      </div>
-                    )}
-                    {DEV && <p className="text-xs font-mono text-amber-300">educator only · missed_red_flag: {String(fb.missed_red_flag)} · distress_flag: {String(fb.distress_flag)} · status: {crResult.status || "-"}</p>}
-                    <p className="text-xs text-neutral-500">This feedback is AI-generated.</p>
-                  </div>
-                )}
-              </Modal>
+            {reportOpen && (
+              <React.Suspense fallback={null}>
+                <PdfViewer url={`/api/sessions/${encodeURIComponent(SESSION_ID)}/report.pdf`} fetchPdf={fetchReport}
+                  title="History Taking Feedback Report" subtitle={TITLE} filename="feedback-report.pdf" onClose={() => setReportOpen(false)} />
+              </React.Suspense>
             )}
           </div>
 
           {step === "live" && (
-            <div className="absolute bottom-0 inset-x-0 z-10 p-5 flex items-center justify-center gap-3 bg-gradient-to-t from-black/70 to-transparent">
+            <div className="absolute bottom-0 inset-x-0 z-10 flex justify-center bg-gradient-to-t from-black/80 to-transparent p-6">
+              <div className="rp-rise flex flex-wrap items-center justify-center gap-3">
               {!active ? (
-                <button onClick={start} disabled={!FLOW_KEY || state === "connecting"} className="flex items-center gap-2 px-6 py-3 rounded-full bg-white hover:bg-neutral-200 text-neutral-900 font-medium disabled:opacity-40">
-                  <Play className="w-4 h-4" /> {state === "ended" || state === "error" ? "Start again" : "Connecting…"}
-                </button>
+                <Button size="lg" onClick={start} disabled={!FLOW_KEY || state === "connecting"} className="px-8">
+                  <Play /> {state === "ended" || state === "error" ? "Start again" : "Connecting…"}
+                </Button>
               ) : (
                 <>
-                  <button onClick={toggleMute} title={muted ? "Unmute" : "Mute"} className={`h-12 w-12 grid place-items-center rounded-full border ${muted ? "bg-red-500/20 border-red-400/40 text-red-200" : "bg-white/10 border-white/15 hover:bg-white/15"}`}>
-                    {muted ? <MicOff className="w-5 h-5" /> : <Mic className="w-5 h-5" />}
-                  </button>
-                  <button onClick={() => setCaptions((c) => !c)} title="Captions" className={`h-12 w-12 grid place-items-center rounded-full border ${captions ? "bg-white/15 border-white/25" : "bg-white/5 border-white/10 text-neutral-400"}`}>
-                    <Captions className="w-5 h-5" />
-                  </button>
-                  {phase === "consult" && (
-                    <button onClick={endVisit} className="flex items-center gap-2 h-12 px-5 rounded-full bg-red-600 hover:bg-red-500 text-white font-medium"><PhoneOff className="w-4 h-4" /> End Session</button>
-                  )}
+                  <ButtonGroup>
+                    <Button size="lg" variant="secondary" onClick={toggleMute} title={muted ? "Unmute" : "Mute"} aria-pressed={muted}
+                      className={`w-14 px-0 ${muted ? "bg-[rgb(var(--vx-danger)/0.2)] text-red-300" : ""}`}>{muted ? <MicOff /> : <Mic />}</Button>
+                    <Button size="lg" variant={captions ? "soft" : "secondary"} onClick={() => setCaptions((c) => !c)} title="Captions" aria-pressed={captions} className="w-14 px-0"><Captions /></Button>
+                    {phase === "consult" && <Button size="lg" onClick={endVisit} className="bg-[rgb(var(--vx-danger))] px-7 text-white"><PhoneOff /> End session</Button>}
+                    {phase === "reflection" && nextBtn("Finish reflection", finishReflection)}
+                    {phase === "feedback" && !modal && nextBtn("Your results", () => setModal("results"))}
+                    {phase === "reasoning" && nextBtn("Finish Clinical Reasoning", endReasoning)}
+                    {phase === "cr_feedback" && !modal && nextBtn("Your results", () => { setTab("reasoning"); setModal("results"); })}
+                    {(phase === "cr_feedback" || (phase === "ending" && waitedLong) || (phase === "cr_ending" && waitedLong)) && exitBtn}
+                  </ButtonGroup>
                   {phase === "ending" && !waitedLong && waiting("Preparing your self-reflection…")}
-                  {phase === "reflection" && (
-                    <button onClick={finishReflection} className="h-12 px-5 rounded-full bg-white text-neutral-900 font-medium">Finish reflection</button>
-                  )}
-                  {phase === "feedback" && !modal && <button onClick={() => setModal("feedback")} className="h-12 px-5 rounded-full bg-white text-neutral-900 font-medium">Feedback Summary</button>}
-                  {phase === "reasoning" && (
-                    <button onClick={endReasoning} className="h-12 px-5 rounded-full bg-white text-neutral-900 font-medium">Finish Clinical Reasoning</button>
-                  )}
-                  {phase === "cr_ending" && (waitedLong ? exitBtn : waiting("Preparing your Clinical Reasoning feedback…"))}
-                  {phase === "cr_feedback" && !modal && <button onClick={() => setModal("cr")} className="h-12 px-5 rounded-full bg-white text-neutral-900 font-medium">Clinical Reasoning Feedback</button>}
-                  {(phase === "cr_feedback" || (phase === "ending" && waitedLong)) && exitBtn}
+                  {phase === "cr_ending" && !waitedLong && waiting("Preparing your Clinical Reasoning feedback…")}
                 </>
               )}
+              </div>
             </div>
           )}
           {!FLOW_KEY && <p className="text-center text-xs text-red-300 pb-3">VITE_VOXIO_TEST_FLOW_KEY is missing in .env.</p>}
@@ -546,12 +524,12 @@ function Room() {
         </section>
 
         {(chatOpen || DEV) && step === "live" && (
-          <aside className="w-full lg:w-[380px] xl:w-[420px] shrink-0 min-h-0 flex flex-col border-l border-white/10 bg-neutral-900">
+          <aside className="vr-in w-full lg:w-[420px] xl:w-[460px] shrink-0 min-h-0 flex flex-col border-l border-[rgb(var(--vx-line))] bg-[rgb(var(--vx-card))]">
             {chatOpen && (
               <div className="flex-1 min-h-[20rem] lg:min-h-0 flex flex-col overflow-hidden">
-                <div className="px-4 py-3 border-b border-white/10 text-sm font-semibold flex items-center justify-between">
+                <div className="px-5 py-4 border-b border-[rgb(var(--vx-line))] font-semibold flex items-center justify-between">
                   <span>Transcript</span>
-                  <button onClick={() => setChatOpen(false)} className="text-neutral-400 hover:text-white"><X className="w-4 h-4" /></button>
+                  <Button variant="ghost" size="sm" onClick={() => setChatOpen(false)} title="Close" className="w-9 px-0"><X /></Button>
                 </div>
                 <div className="flex-1 overflow-y-auto p-4 space-y-3">
                   {turns.length === 0 && <p className="text-sm text-neutral-500 text-center mt-8">What you and {PATIENT} say appears here.</p>}
@@ -565,7 +543,7 @@ function Room() {
                       <div className={`flex ${t.who === "you" ? "justify-end" : "justify-start"}`}>
                         <div className={`max-w-[85%] ${t.who === "you" ? "items-end" : "items-start"} flex flex-col`}>
                           <span className="text-[11px] text-neutral-500 mb-1 px-1">{t.who === "you" ? "You" : SPEAKER[t.stage] || PATIENT}</span>
-                          <div className={`rounded-2xl px-3.5 py-2 text-sm leading-relaxed ${t.who === "you" ? "bg-white text-neutral-900 rounded-br-md" : "bg-neutral-800 text-neutral-100 rounded-bl-md"} ${t.final ? "" : "opacity-70"}`}>
+                          <div className={`rounded-2xl px-4 py-2.5 text-base leading-relaxed ${t.who === "you" ? "bg-[rgb(var(--vx-accent))] text-[rgb(var(--vx-on-accent))] rounded-br-md" : "bg-[rgb(var(--vx-cell))] rounded-bl-md"} ${t.final ? "" : "opacity-70"}`}>
                             {t.text || <span className="inline-flex gap-1"><span className="animate-bounce">·</span><span className="animate-bounce [animation-delay:120ms]">·</span><span className="animate-bounce [animation-delay:240ms]">·</span></span>}
                           </div>
                         </div>
@@ -575,38 +553,14 @@ function Room() {
                   <div ref={bottom} />
                 </div>
                 {/* typing stays as a fallback when the mic is not an option */}
-                <form onSubmit={typed} className="border-t border-white/10 p-3 flex gap-2">
-                  <input value={text} onChange={(e) => setText(e.target.value)} disabled={!active} placeholder={!active ? "Not connected" : `Type to the ${speaker}…`} className="flex-1 rounded-xl bg-neutral-800 border border-white/10 px-3 py-2 text-sm text-neutral-100 placeholder:text-neutral-500 outline-none focus:border-white/40 disabled:opacity-50" />
-                  <button disabled={!active || !text.trim()} className="h-10 w-10 grid place-items-center rounded-xl bg-white text-neutral-900 disabled:opacity-30"><Send className="w-4 h-4" /></button>
+                <form onSubmit={typed} className="border-t border-[rgb(var(--vx-line))] p-4 flex gap-2">
+                  <input value={text} onChange={(e) => setText(e.target.value)} disabled={!active} placeholder={!active ? "Not connected" : `Type to the ${speaker}…`} className="h-12 flex-1 rounded-[24px] bg-[rgb(var(--vx-cell))] px-5 text-base placeholder:text-[rgb(var(--vx-muted))] outline-none focus:ring-2 focus:ring-[rgb(var(--vx-accent))] disabled:opacity-50" />
+                  <Button type="submit" size="lg" disabled={!active || !text.trim()} title="Send" className="w-12 px-0"><Send /></Button>
                 </form>
               </div>
             )}
 
-            {DEV && (
-              <div className={`shrink-0 border-t border-amber-500/30 bg-neutral-950 ${chatOpen ? "" : "flex-1"}`}>
-                <button onClick={() => setDevOpen((o) => !o)} className="w-full px-4 py-2.5 flex items-center justify-between text-xs font-semibold text-amber-200">
-                  <span className="flex items-center gap-2"><Activity className="w-4 h-4" /> Received from the flow ({events.length})</span>
-                  {devOpen ? <ChevronDown className="w-4 h-4" /> : <ChevronUp className="w-4 h-4" />}
-                </button>
-                {devOpen && (
-                  <div className="px-4 pb-4">
-                    <div className="flex flex-wrap gap-2 mb-3 text-xs font-mono">
-                      <span className="px-2 py-1 rounded bg-white/5 border border-white/10">movement: {live.movement.length ? live.movement.join(", ") : "[]"}</span>
-                      <span className={`px-2 py-1 rounded border ${moving ? "bg-emerald-500/15 border-emerald-400/40 text-emerald-200" : "bg-white/5 border-white/10"}`}>frame: {live.frame}</span>
-                      <span className="px-2 py-1 rounded bg-white/5 border border-white/10">expression: {live.expression || "-"}</span>
-                    </div>
-                    <div className="max-h-56 overflow-y-auto space-y-1.5">
-                      {events.length === 0 && <p className="text-xs text-neutral-500">Packets appear here as the flow sends them.</p>}
-                      {events.map((e, i) => (
-                        <div key={i} className="text-[11px] font-mono leading-snug bg-black/30 rounded px-2 py-1.5 break-all">
-                          <span className="text-neutral-500">{e.at} </span><span className="text-neutral-200">{asText(e.data)}</span>
-                        </div>
-                      ))}
-                    </div>
-                  </div>
-                )}
-              </div>
-            )}
+            {DEV && <FlowPanel open={devOpen} onToggle={() => setDevOpen((o) => !o)} events={events} live={live} moving={moving} fill={!chatOpen} />}
           </aside>
         )}
       </main>

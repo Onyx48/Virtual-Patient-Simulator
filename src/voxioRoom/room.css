@@ -1,0 +1,25 @@
+/* The room uses the app's vx system (Figtree, the larger type scale, ButtonGroup), in a dark theme. */
+.vx.vx-room {
+  --vx-bg: 11 11 13;
+  --vx-ink: 244 242 237;
+  --vx-card: 24 24 27;
+  --vx-cell: 38 38 43;
+  --vx-muted: 158 153 145;
+  --vx-line: 52 52 58;
+  --vx-on-accent: 28 27 24;
+  --vx-accent-text: 255 176 122;
+  background: rgb(var(--vx-bg));
+  color: rgb(var(--vx-ink));
+}
+
+/* Custom scrollbars */
+.vx-room * { scrollbar-width: thin; scrollbar-color: rgb(var(--vx-ink) / .18) transparent; }
+.vx-room *::-webkit-scrollbar { width: 10px; height: 10px; }
+.vx-room *::-webkit-scrollbar-track { background: transparent; }
+.vx-room *::-webkit-scrollbar-thumb { background: rgb(var(--vx-ink) / .14); border-radius: 999px; border: 3px solid transparent; background-clip: content-box; }
+.vx-room *::-webkit-scrollbar-thumb:hover { background: rgb(var(--vx-accent) / .6); background-clip: content-box; border: 3px solid transparent; }
+.vx-room *::-webkit-scrollbar-corner { background: transparent; }
+
+@keyframes vr-in { from { opacity: 0; transform: translateX(10px) } to { opacity: 1; transform: none } }
+.vr-in { animation: vr-in .35s cubic-bezier(.2,.7,.2,1) both }
+@media (prefers-reduced-motion: reduce) { .vr-in { animation: none } }

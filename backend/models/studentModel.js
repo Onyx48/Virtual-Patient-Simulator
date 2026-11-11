@@ -33,6 +33,8 @@ const studentSchema = new mongoose.Schema(
   { timestamps: true },
 );
 
+// Indexes for the scoped lists and lookups (added for scale; additive, built at startup).
+studentSchema.index({ educatorId: 1 });
 const Student = mongoose.model("Student", studentSchema);
 
 export default Student;

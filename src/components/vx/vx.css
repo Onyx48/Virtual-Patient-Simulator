@@ -1,0 +1,190 @@
+/* VPS tokens, after ci/internal-shortlisting (docs/DESIGN_SYSTEM.md) but with our own accent:
+   the brand orange takes the place of their yellow and is used the same way (a fill with ink
+   text, a soft tint, the guide ring). Scoped to .vx so the rest of the app is untouched. */
+@import url("https://fonts.googleapis.com/css2?family=Figtree:wght@400;500;600;700&display=swap");
+
+.vx {
+  --vx-bg: 245 245 244;        /* neutral page */
+  --vx-ink: 28 27 24;          /* text, focus ring */
+  --vx-card: 255 255 255;
+  --vx-accent: 255 154 86;     /* brand orange: fills only, ink text on it */
+  --vx-on-accent: 28 27 24;    /* text on an orange fill, dark in both themes */
+  --vx-accent-text: 168 76 10; /* orange as text on white (plain orange is under 3:1) */
+  --vx-cell: 238 238 236;      /* input cells, secondary fills */
+  --vx-muted: 104 104 100;
+  --vx-line: 228 228 225;
+  /* Categorical colours for charts, tiles and tags (dataviz reference palette, validated order). */
+  --vx-c1: 42 120 214;  /* blue */
+  --vx-c2: 235 104 52;  /* orange */
+  --vx-c3: 27 175 122;  /* aqua */
+  --vx-c4: 237 161 0;   /* yellow */
+  --vx-c5: 232 123 164; /* magenta */
+  --vx-c6: 0 131 0;     /* green */
+  --vx-c7: 98 80 214;   /* violet */
+  --vx-c8: 227 73 72;   /* red */
+  --vx-warn: 196 104 0;
+  --vx-ok: 15 160 92;
+  --vx-danger: 230 57 53;
+  font-family: "Figtree", -apple-system, BlinkMacSystemFont, "Segoe UI", system-ui, sans-serif;
+  background: rgb(var(--vx-bg));
+  color: rgb(var(--vx-ink));
+}
+
+/* Momentary attention: a light running round the border (a CSS stand-in for border-beam). */
+@property --vx-beam-a { syntax: "<angle>"; initial-value: 0deg; inherits: false; }
+.vx-beam { position: relative; isolation: isolate; }
+.vx-beam::before {
+  content: ""; position: absolute; inset: -2px; border-radius: inherit; padding: 2px; z-index: 1;
+  background: conic-gradient(from var(--vx-beam-a), transparent 0 70%, rgb(var(--vx-accent)) 82%, #ffd2b0 88%, transparent 96%);
+  -webkit-mask: linear-gradient(#000 0 0) content-box, linear-gradient(#000 0 0);
+  -webkit-mask-composite: xor; mask-composite: exclude;
+  animation: vx-beam 2.2s linear infinite; pointer-events: none;
+}
+@keyframes vx-beam { to { --vx-beam-a: 360deg; } }
+
+@keyframes vx-pop { 0% { transform: scale(.9); } 60% { transform: scale(1.04); } 100% { transform: scale(1); } }
+.vx-pop { animation: vx-pop .32s cubic-bezier(.22,1,.36,1); }
+
+/* Expand: a grid-rows height transition. */
+.vx-expand { display: grid; grid-template-rows: 0fr; opacity: 0; transition: grid-template-rows .24s cubic-bezier(.22,1,.36,1), opacity .24s; }
+.vx-expand[data-open="true"] { grid-template-rows: 1fr; opacity: 1; }
+.vx-expand > div { overflow: hidden; min-height: 0; }
+.vx-expand.vx-tall { transition-duration: .45s; transition-timing-function: ease-in-out; }
+
+@media (prefers-reduced-motion: reduce) {
+  .vx-beam::before, .vx-pop { animation: none; }
+  .vx-expand { transition: none; }
+}
+
+/* "AI is writing" status: the words flow in a moving gradient (after internal-shortlisting's .ai-text). */
+.vx-ai-text {
+  background: linear-gradient(90deg, rgb(var(--vx-muted)) 0%, rgb(var(--vx-accent)) 25%, rgb(var(--vx-accent-text)) 50%, rgb(var(--vx-muted)) 75%, rgb(var(--vx-accent)) 100%);
+  background-size: 200% 100%;
+  -webkit-background-clip: text; background-clip: text; color: transparent;
+  animation: vx-ai-flow 2.8s linear infinite;
+}
+@keyframes vx-ai-flow { from { background-position: 200% 0; } to { background-position: 0 0; } }
+@media (prefers-reduced-motion: reduce) { .vx-ai-text { animation: none; background: none; color: rgb(var(--vx-muted)); } }
+
+/* internal-shortlisting's type scale (app/globals.css --text-*): every step is larger than
+   Tailwind's default, e.g. text-sm is 18px, not 14px. Applied only inside .vx. */
+.vx .text-xs { font-size: 1rem; line-height: 1.375rem; }
+.vx .text-sm { font-size: 1.125rem; line-height: 1.625rem; }
+.vx .text-base { font-size: 1.2rem; line-height: 1.75rem; }
+.vx .text-lg { font-size: 1.35rem; line-height: 1.875rem; }
+.vx .text-xl { font-size: 1.5rem; line-height: 2rem; }
+.vx .text-2xl { font-size: 1.8rem; line-height: 2.25rem; }
+.vx .text-3xl { font-size: 2.25rem; line-height: 2.625rem; }
+.vx { font-size: 1.2rem; }
+
+/* Chart tokens for the bklit charts (src/components/charts, from ci/internal-shortlisting).
+   The charts read full colours, so the shadcn names they use are given full values here too;
+   inside .vx nothing uses the HSL-channel versions from index.css. One orange series, warm greys. */
+/* The shadcn names (--foreground, --border, ...) are HSL channels app-wide and index.css builds
+   `* { border-color: hsl(var(--border)) }` from them, so they are only redefined inside a chart. */
+.vx-chart {
+  --foreground: rgb(var(--vx-ink));
+  --muted-foreground: rgb(var(--vx-muted));
+  --border: rgb(var(--vx-line));
+  --popover: rgb(var(--vx-card));
+  --popover-foreground: rgb(var(--vx-ink));
+}
+.vx-chart * { border-color: rgb(var(--vx-line)); }
+.vx {
+  --color-muted: rgb(var(--vx-cell));
+  --color-success: rgb(var(--vx-ok));
+  --color-red-500: rgb(var(--vx-danger));
+  --color-zinc-500: rgb(var(--vx-muted));
+  --chart-1: rgb(var(--vx-c1));
+  --chart-2: rgb(var(--vx-c2));
+  --chart-3: rgb(var(--vx-c3));
+  --chart-4: rgb(var(--vx-c4));
+  --chart-5: rgb(var(--vx-c5));
+  --chart-positive: rgb(var(--vx-ok));
+  --chart-negative: rgb(var(--vx-danger));
+  --chart-background: rgb(var(--vx-card));
+  --chart-foreground: rgb(var(--vx-ink));
+  --chart-foreground-muted: rgb(var(--vx-muted));
+  --chart-label: rgb(var(--vx-muted));
+  --chart-line-primary: var(--chart-1);
+  --chart-line-secondary: var(--chart-2);
+  --chart-crosshair: rgb(var(--vx-ink) / 0.35);
+  --chart-grid: rgb(var(--vx-line));
+  --chart-brush-border: var(--chart-grid);
+  --chart-tooltip-background: rgb(var(--vx-card));
+  --chart-tooltip-foreground: rgb(var(--vx-ink));
+  --chart-tooltip-muted: rgb(var(--vx-muted));
+  --chart-marker-background: rgb(var(--vx-cell));
+  --chart-marker-border: rgb(var(--vx-line));
+  --chart-marker-foreground: rgb(var(--vx-ink));
+  --chart-marker-badge-background: rgb(var(--vx-ink));
+  --chart-marker-badge-foreground: rgb(var(--vx-card));
+  --chart-indicator-color: rgb(var(--vx-ink));
+  --chart-indicator-secondary-color: rgb(var(--vx-line));
+  --chart-segment-background: rgb(var(--vx-accent) / 0.08);
+  --chart-segment-line: rgb(var(--vx-accent) / 0.4);
+  --chart-scale-mix: #fff;
+  --chart-scale-01: rgb(var(--vx-cell));
+  --chart-scale-02: color-mix(in oklab, var(--chart-1) 35%, var(--chart-scale-mix));
+  --chart-scale-03: color-mix(in oklab, var(--chart-1) 55%, var(--chart-scale-mix));
+  --chart-scale-04: color-mix(in oklab, var(--chart-1) 78%, var(--chart-scale-mix));
+  --chart-scale-05: var(--chart-1);
+  --chart-scale-pattern-color: #fff;
+}
+
+/* Dark mode: the same tokens, redefined. Set by Container on <html data-theme="dark">.
+   Near-black page, warm dark greys, the same orange; orange text gets lighter to stay readable. */
+:root[data-theme="dark"] { color-scheme: dark; }
+:root[data-theme="dark"] .vx {
+  --vx-bg: 15 15 15;
+  --vx-ink: 236 236 233;
+  --vx-card: 26 26 25;
+  --vx-accent: 255 154 86;
+  --vx-accent-text: 255 178 128;
+  --vx-cell: 37 37 36;
+  --vx-muted: 158 158 152;
+  --vx-line: 50 50 48;
+  --vx-c1: 57 135 229;
+  --vx-c2: 217 89 38;
+  --vx-c3: 25 158 112;
+  --vx-c4: 201 133 0;
+  --vx-c5: 213 81 129;
+  --vx-c6: 0 131 0;
+  --vx-c7: 144 133 233;
+  --vx-c8: 230 103 103;
+  --vx-warn: 232 162 58;
+  --vx-ok: 79 191 138;
+  --vx-danger: 236 110 100;
+  --chart-scale-mix: rgb(var(--vx-card));
+  --chart-scale-pattern-color: rgb(var(--vx-card));
+}
+
+/* Toasts live outside .vx (App.jsx), so their colours are on :root. */
+:root { --toast-bg: #ffffff; --toast-ink: #1c1b18; }
+:root[data-theme="dark"] { --toast-bg: #1b1b19; --toast-ink: #eceae4; }
+
+/* Print (dashboard "Print summary"): only the page content, full height, light colours. */
+@media print {
+  :root, :root[data-theme="dark"] { color-scheme: light; }
+  :root[data-theme="dark"] .vx { --vx-bg: 255 255 255; --vx-ink: 28 27 24; --vx-card: 255 255 255; --vx-cell: 239 236 229; --vx-muted: 107 102 93; --vx-line: 231 227 218; }
+  .vx > aside, header.h-14, .print\:hidden { display: none !important; }
+  html, body, #root, .vx.h-screen { height: auto !important; overflow: visible !important; }
+  .vx .overflow-hidden, .vx .overflow-y-auto { overflow: visible !important; }
+  /* Keep single cards whole, but never the app frame (it is a rounded box too: avoiding a break
+     inside it pushed the whole page to sheet 2 and left sheet 1 blank). */
+  main .rounded-2xl:not(:has(.rounded-2xl)) { break-inside: avoid; }
+  .vx-shell, .vx-shell > div, main { display: block !important; height: auto !important; border: 0 !important; box-shadow: none !important; padding: 0 !important; }
+  .vx { background: #fff !important; }
+}
+
+/* Colour tiles: an icon chip in one categorical hue (tile-1 .. tile-8). Text stays ink. */
+.vx [class*="vx-tint-"] { background: rgb(var(--t) / .14); color: rgb(var(--t)); }
+.vx .vx-tint-1 { --t: var(--vx-c1); } .vx .vx-tint-2 { --t: var(--vx-c2); } .vx .vx-tint-3 { --t: var(--vx-c3); } .vx .vx-tint-4 { --t: var(--vx-c4); }
+.vx .vx-tint-5 { --t: var(--vx-c5); } .vx .vx-tint-6 { --t: var(--vx-c6); } .vx .vx-tint-7 { --t: var(--vx-c7); } .vx .vx-tint-8 { --t: var(--vx-c8); }
+
+/* Joined group for any row of buttons, chips or fields (the ButtonGroup look, without the component):
+   2px apart, inner corners 8px, the outer ends round. Wraps onto a new line on narrow screens. */
+.vx .vx-join { display: inline-flex; flex-wrap: wrap; align-items: stretch; gap: 2px; }
+.vx .vx-join > * { border-radius: 8px !important; }
+.vx .vx-join > *:first-child { border-top-left-radius: 20px !important; border-bottom-left-radius: 20px !important; }
+.vx .vx-join > *:last-child { border-top-right-radius: 20px !important; border-bottom-right-radius: 20px !important; }

@@ -439,4 +439,35 @@ router.delete(
   },
 );
 
+/* Vendor notes on a school (superadmin): POST { text } adds, DELETE removes your own. */
+router.post("/:id/notes", protect, checkAccess("manageSchools"), async (req, res) => {
+  try {
+    const text = String(req.body?.text || "").trim();
+    if (!text) return res.status(400).json({ message: "Write a note first." });
+    const school = await School.findById(req.params.id).select("+notes");
+    if (!school) return res.status(404).json({ message: "School not found" });
+    school.notes = [...(school.notes || []), { text: text.slice(0, 4000), author: req.user._id, authorName: req.user.name || "" }];
+    await school.save({ validateBeforeSave: false });
+    const n = school.notes[school.notes.length - 1];
+    res.status(201).json({ _id: n._id, text: n.text, authorName: n.authorName, createdAt: n.createdAt, mine: true });
+  } catch (err) {
+    res.status(500).json({ message: err.message });
+  }
+});
+
+router.delete("/:id/notes/:noteId", protect, checkAccess("manageSchools"), async (req, res) => {
+  try {
+    const school = await School.findById(req.params.id).select("+notes");
+    if (!school) return res.status(404).json({ message: "School not found" });
+    const note = (school.notes || []).find((n) => String(n._id) === req.params.noteId);
+    if (!note) return res.status(404).json({ message: "Note not found" });
+    if (String(note.author) !== String(req.user._id)) return res.status(403).json({ message: "Only the author can remove this note." });
+    school.notes = school.notes.filter((n) => String(n._id) !== req.params.noteId);
+    await school.save({ validateBeforeSave: false });
+    res.json({ ok: true });
+  } catch (err) {
+    res.status(500).json({ message: err.message });
+  }
+});
+
 export default router;

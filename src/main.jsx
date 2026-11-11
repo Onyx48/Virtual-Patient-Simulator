@@ -9,6 +9,8 @@ import "./index.css";
 import App from "./App";
 import axios from "axios";
 import { initMonitoring } from "./lib/monitoring";
+import { QueryClientProvider } from "@tanstack/react-query";
+import { queryClient } from "./lib/query";
 
 initMonitoring();
 
@@ -24,6 +26,7 @@ axios.defaults.baseURL =
 
 root.render(
   <React.StrictMode>
+    <QueryClientProvider client={queryClient}>
     <Provider store={store}>
       <PersistGate loading={null} persistor={persistor}>
         <AuthProvider>
@@ -33,5 +36,6 @@ root.render(
         </AuthProvider>
       </PersistGate>
     </Provider>
+    </QueryClientProvider>
   </React.StrictMode>,
 );

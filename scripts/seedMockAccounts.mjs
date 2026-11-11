@@ -23,6 +23,7 @@ const Student = (await import("../backend/models/studentModel.js")).default;
 const Group = (await import("../backend/models/groupModel.js")).default;
 const Scenario = (await import("../backend/models/scenarioModel.js")).default;
 const Session = (await import("../backend/models/sessionModel.js")).default;
+const { rollupHt } = await import("../src/lib/htRubric.js");
 
 const MOCK_DOMAIN = "mock.proroleplay.test";
 const MOCK_SCHOOL_NAME = "Mock Physiotherapy Academy";
@@ -91,6 +92,43 @@ const transcriptFor = (patient) => [
   { role: "user", speaker: "", content: "Any numbness, tingling, weight loss or trouble sleeping?" },
   { role: "assistant", speaker: patient, content: "No numbness. Sleep is a bit disturbed when I roll onto it." },
 ];
+
+// History-taking timeline (docs/HT_TIMELINE_PLAN.md): per-turn kinks shaped like the scorer's
+// output. A stronger session (higher `skill`) earns more and bigger kinks; about one turn in
+// fifteen is "failed" (cut short), so the partial state shows up in the demo too.
+const HT_NOTES = {
+  questioning: { demonstrated: ["Opened with 'tell me about the pain' and let them finish.", "Moved from an open question to specifics, one at a time."], partial: ["Asked an open question, then answered it for the patient.", "Two questions in one breath; the patient answered only the second."], slipped: ["A second leading question: 'it doesn't wake you, does it?'"] },
+  coverage: { demonstrated: ["Opened the 24-hour pattern: morning stiffness and night pain.", "Screened red flags: weight loss, bladder and bowel, night sweats.", "Asked about work and what daily tasks are hard now.", "Asked what the patient hopes to get back to."], partial: ["Touched on past history but did not ask about medication."], slipped: ["Asked about severity again; it was already covered."] },
+  listening: { demonstrated: ["Picked up 'I'm worried about my job' and followed it up.", "Summarised the story and checked it with the patient."], partial: ["Noticed the worry but moved on without asking more."], slipped: ["A second cue about sleep went unasked."] },
+  rapport: { demonstrated: ["Acknowledged the pain: 'that sounds exhausting'.", "Explained what the examination would involve next."], partial: ["Said 'I understand' and went straight to the next question."], slipped: ["Used 'radiculopathy' twice without explaining it."] },
+};
+const HT_KEYS = Object.keys(HT_NOTES);
+const htTurnsFor = (skill) => {
+  const n = 14 + Math.floor(rand() * 10);
+  const cur = Object.fromEntries(HT_KEYS.map((k) => [k, 0]));
+  const turns = [];
+  let at = 8;
+  for (let turn = 1; turn <= n; turn++) {
+    at += 12 + Math.floor(rand() * 25);
+    if (turn > 1 && rand() < 0.07) { turns.push({ turn, at, status: "failed", scores: null }); continue; }
+    const scores = {};
+    let kinks = 0;
+    for (const k of [...HT_KEYS].sort(() => rand() - 0.5)) {
+      let type_ = "";
+      if (turn > 1 && kinks < 2 && rand() < 0.32) {
+        const r = rand();
+        type_ = r < skill * 0.9 ? "demonstrated" : r < 0.9 ? "partial" : "slipped";
+      }
+      if (type_ === "demonstrated") cur[k] = Math.min(10, cur[k] + (rand() < skill ? 3 : 2));
+      if (type_ === "partial") cur[k] = Math.min(10, cur[k] + (rand() < 0.5 ? 1 : 1.5));
+      if (type_ === "slipped") cur[k] = Math.max(0, cur[k] - (rand() < 0.5 ? 1 : 0));
+      if (type_) kinks += 1;
+      scores[k] = { type_, score: cur[k], description: type_ ? pick(HT_NOTES[k][type_]) : "" };
+    }
+    turns.push({ turn, at, status: kinks ? "scored" : "empty", scores });
+  }
+  return turns;
+};
 
 const feedbackFor = (score) => {
   const s = [pick(STRENGTHS), pick(STRENGTHS)];
@@ -267,6 +305,11 @@ const seedData = async () => {
         transcription: transcriptFor(scenario.patientName),
         feedback: feedbackFor(score),
         score: Number(score.toFixed(2)),
+        ...(() => {
+          const ht_turns = htTurnsFor(score);
+          const { final, state } = rollupHt(ht_turns);
+          return { ht_turns, ht_final: final, ht_state: state };
+        })(),
         student_id: student._id.toString(),
         scenario_id: scenario._id.toString(),
         createdAt: when,

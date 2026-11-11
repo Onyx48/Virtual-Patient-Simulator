@@ -148,3 +148,15 @@ export const reflectionTurnsOf = (state) =>
   );
 
 export const reasoningTurnsOf = (state) => cleanHistory(state?.reasoning_conversation_history);
+
+/** The Clinical Reasoning engine's result ({ status, feedback }), or null until it has run. */
+export const reasoningOf = (state) => {
+  const raw = state?.cr_feedback;
+  if (!raw) return null;
+  let fb = raw;
+  if (typeof raw === "string") {
+    try { fb = JSON.parse(raw.replace(/^```(?:json)?\s*|\s*```$/g, "")); } catch { fb = parseStoredOutput(raw); }
+  }
+  if (!fb || typeof fb !== "object") return null;
+  return { status: String(state.cr_status || fb.status || "") || null, feedback: fb };
+};

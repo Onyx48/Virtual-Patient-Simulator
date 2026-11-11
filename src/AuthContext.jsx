@@ -82,12 +82,15 @@ export const AuthProvider = ({ children }) => {
     };
   }, [processUserSession]);
 
+  /*
+   * These never touch `loading`: it means "still checking the refresh cookie on page load", and
+   * setting it here made the signed-out routes swap the login page for a blank screen mid-request,
+   * so a wrong password looked like a page refresh and the error was never shown.
+   */
   const login = async (email, password) => {
-    setLoading(true);
     try {
       const response = await axios.post("/api/auth/login", { email, password });
       processUserSession(response.data);
-      setLoading(false);
       return { success: true, user: response.data };
     } catch (error) {
       console.error(
@@ -95,13 +98,11 @@ export const AuthProvider = ({ children }) => {
         error.response?.data || error.message,
       );
       processUserSession(null);
-      setLoading(false);
       throw error;
     }
   };
 
   const signup = async (name, email, password) => {
-    setLoading(true);
     try {
       const response = await axios.post("/api/auth/register", {
         name,
@@ -109,33 +110,28 @@ export const AuthProvider = ({ children }) => {
         password,
         roleToCreate: "student",
       });
-      setLoading(false);
       return { success: true, data: response.data };
     } catch (error) {
       console.error(
         "Signup failed in AuthContext:",
         error.response?.data || error.message,
       );
-      setLoading(false);
       throw error;
     }
   };
 
   const createUserByAuthorized = async (newUserDetails, creatorDetails) => {
-    setLoading(true);
     try {
       const response = await axios.post("/api/auth/register", {
         ...newUserDetails,
         ...creatorDetails,
       });
-      setLoading(false);
       return { success: true, data: response.data };
     } catch (error) {
       console.error(
         "Create user by authorized failed:",
         error.response?.data || error.message,
       );
-      setLoading(false);
       throw error;
     }
   };
@@ -152,8 +148,11 @@ export const AuthProvider = ({ children }) => {
     console.log("Logging out user...");
     dispatch(clearSessions());
     // Cancels the refresh token on the server and clears the cookie.
-    axios.post("/api/auth/logout", {}, { _skipAuthRefresh: true }).catch(() => {});
-    processUserSession(null);
+    // Wait for the server to clear the refresh cookie (or fail), then load the login page fresh.
+    // Navigating ourselves avoids the signed-in layout redirecting mid-render, and the full load
+    // drops everything the last user had in memory.
+    const done = () => { processUserSession(null); window.location.replace("/login"); };
+    axios.post("/api/auth/logout", {}, { _skipAuthRefresh: true }).then(done, done);
   };
 
   const value = {

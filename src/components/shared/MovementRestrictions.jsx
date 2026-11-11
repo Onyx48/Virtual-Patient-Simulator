@@ -134,10 +134,6 @@ function MovementRestrictions({ control, regions }) {
           <h3 className="text-sm font-bold text-gray-800">
             Movement restrictions
           </h3>
-          <p className="text-xs text-gray-500 mt-0.5">
-            Every movement is full range unless you limit it here. Select these
-            yourself — the AI does not fill them in.
-          </p>
         </div>
 
         {restrictions.length === 0 ? (

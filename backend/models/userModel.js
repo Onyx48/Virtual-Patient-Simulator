@@ -49,9 +49,9 @@ const userSchema = new mongoose.Schema(
     department: {
       type: String,
       enum: {
-        values: ["Science", "History", "English", "Mathematics"],
+        values: ["Physiotherapy", "Occupational Therapy", "Science", "History", "English", "Mathematics"],
         message:
-          "{VALUE} is not a valid department. Must be Science, History, English, or Mathematics.",
+          "{VALUE} is not a valid department. Must be Physiotherapy, Occupational Therapy, Science, History, English, or Mathematics.",
       },
     },
     phoneNumber: {
@@ -84,6 +84,19 @@ const userSchema = new mongoose.Schema(
     lastLoginAt: {
       type: Date,
       default: null,
+    },
+    // An educator's override of the proposed CPE readiness (routes/studentRoutes.js). Absent = use the proposal.
+    readinessOverride: {
+      status: { type: String, enum: ["ready", "almost", "notyet"] },
+      note: { type: String, default: "" },
+      byName: { type: String, default: "" },
+      at: { type: Date },
+    },
+    // An educator's private note on a student (mindsets/educator.md). Never sent to the student.
+    educatorNote: {
+      text: { type: String, default: "" },
+      byName: { type: String, default: "" },
+      at: { type: Date },
     },
   },
   {
@@ -122,5 +135,10 @@ userSchema.methods.matchPassword = async function (enteredPassword) {
   }
 };
 
+// Indexes for the scoped lists and lookups (added for scale; additive, built at startup).
+userSchema.index({ role: 1, supervisor: 1 });
+userSchema.index({ role: 1, schoolId: 1 });
+userSchema.index({ groupId: 1 });
+userSchema.index({ role: 1, name: 1 });
 const User = mongoose.model("User", userSchema);
 export default User;

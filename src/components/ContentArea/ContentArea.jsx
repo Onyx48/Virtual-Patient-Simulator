@@ -1,5 +1,5 @@
-import React, { lazy, Suspense } from "react";
-import { Routes, Route, Navigate } from "react-router-dom";
+import React, { lazy, Suspense, useEffect, useRef } from "react";
+import { Navigate, Outlet, useLocation } from "../../lib/router";
 import { useAuth } from "../../AuthContext";
 import { FullPageSpinner } from "../../lib/hooks/useLoading";
 
@@ -14,12 +14,13 @@ const SchoolAdminDashboard = lazy(
 
 const SchoolsPage = lazy(() => import("../../roles/superadmin/schools/Schools"));
 const SchoolFormPage = lazy(() => import("../../roles/superadmin/schools/SchoolFormPage"));
+const SchoolDetailPage = lazy(() => import("../../roles/superadmin/schools/SchoolDetail"));
 
 const ScenariosPage = lazy(() => import("../../roles/educator/scenarios/index.jsx"));
-const SchoolAdminScenariosPage = lazy(() => import("../../roles/school_admin/scenarios/index.jsx"));
+const ScenarioAnalytics = lazy(() => import("../../roles/educator/scenarios/ScenarioAnalytics.jsx"));
 const StudentScenariosPage = lazy(() => import("../StudentScenariosPage.jsx"));
 const StudentScenarioDetails = lazy(() => import("../../roles/student/scenarios/StudentScenarioDetails.jsx"));
-const ScenarioFormPage = lazy(() => import("../shared/ScenarioFormPage"));
+const ScenarioFormPage = lazy(() => import("../shared/NewScenarioPage"));
 
 const EducatorStudentsPage = lazy(() => import("../../roles/educator/students/Student.jsx"));
 const SchoolAdminStudentsPage = lazy(() => import("../../roles/school_admin/students/Student.jsx"));
@@ -28,6 +29,10 @@ const StudentsPage = lazy(() => import("../StudentsPage.jsx"));
 const SchoolAdminEducatorsPage = lazy(() => import("../../roles/school_admin/educators/Educator.jsx"));
 
 const AccountSettingsPage = lazy(() => import("../settings/SettingsPage"));
+const DefinitionsPage = lazy(() => import("../shared/DefinitionsPage"));
+const GroupPage = lazy(() => import("../../roles/educator/groups/GroupPage"));
+const ReadinessPage = lazy(() => import("../../roles/educator/readiness/ReadinessPage"));
+const RubricBankPage = lazy(() => import("../../roles/educator/rubrics/RubricBank"));
 
 const RoleBasedRoute = ({ children, allowedRoles }) => {
   const { user, loading } = useAuth();
@@ -39,158 +44,85 @@ const RoleBasedRoute = ({ children, allowedRoles }) => {
   return children;
 };
 
-function ContentArea() {
-  const { user } = useAuth();
+/*
+ * Keeps each page's scroll position for the tab's lifetime, so going back from an edit page
+ * lands where the educator left the list. Restores once the page has had a moment to render.
+ */
+// Only Back/Forward restores a position; a fresh visit (signing in, a link, the sidebar) starts at the top.
+let cameBack = false;
+if (typeof window !== "undefined") window.addEventListener("popstate", () => { cameBack = true; });
 
-  const getDashboardComponent = () => {
+function useScrollMemory(ref) {
+  const { pathname, search } = useLocation();
+  const key = `vps.scroll:${pathname}${search}`;
+  useEffect(() => {
+    const el = ref.current;
+    if (!el) return undefined;
+    let saved = 0;
+    if (cameBack) { try { saved = Number(sessionStorage.getItem(key)) || 0; } catch { /* storage blocked */ } }
+    cameBack = false;
+    el.scrollTop = 0;
+    const timers = saved ? [80, 300, 800].map((ms) => setTimeout(() => { if (el.scrollTop < saved) el.scrollTop = saved; }, ms)) : [];
+    let raf = 0;
+    const onScroll = () => {
+      cancelAnimationFrame(raf);
+      raf = requestAnimationFrame(() => { try { sessionStorage.setItem(key, String(el.scrollTop)); } catch { /* storage blocked */ } });
+    };
+    el.addEventListener("scroll", onScroll, { passive: true });
+    return () => { timers.forEach(clearTimeout); cancelAnimationFrame(raf); el.removeEventListener("scroll", onScroll); };
+  }, [key, ref]);
+}
+
+const guard = (roles, el) => <RoleBasedRoute allowedRoles={roles}>{el}</RoleBasedRoute>;
+const ALL = ["superadmin", "school_admin", "educator", "student"];
+
+/** Page components for the route tree in src/router.jsx; role rules unchanged from the old <Routes>. */
+export const pages = {
+  Dashboard: function DashboardPage() {
+    const { user } = useAuth();
     switch (user?.role) {
-      case "student":
-        return (
-          <Suspense fallback={<FullPageSpinner />}>
-            <StudentDashboard />
-          </Suspense>
-        );
-      case "educator":
-        return (
-          <Suspense fallback={<FullPageSpinner />}>
-            <EducatorDashboard />
-          </Suspense>
-        );
-      case "superadmin":
-        return (
-          <Suspense fallback={<FullPageSpinner />}>
-            <SuperAdminDashboard />
-          </Suspense>
-        );
-      case "school_admin":
-        return (
-          <Suspense fallback={<FullPageSpinner />}>
-            <SchoolAdminDashboard />
-          </Suspense>
-        );
-      default:
-        return <div>Unknown role</div>;
+      case "student": return <StudentDashboard />;
+      case "educator": return <EducatorDashboard />;
+      case "superadmin": return <SuperAdminDashboard />;
+      case "school_admin": return <SchoolAdminDashboard />;
+      default: return <div>Unknown role</div>;
     }
-  };
+  },
+  Schools: () => guard(["superadmin", "school_admin"], <SchoolsPage />),
+  SchoolForm: () => guard(["superadmin"], <SchoolFormPage />),
+  SchoolDetail: () => guard(["superadmin"], <SchoolDetailPage />),
+  Scenarios: function ScenariosRoute() {
+    const { user } = useAuth();
+    return guard(["school_admin", "educator", "student"],
+      user?.role === "student" ? <StudentScenariosPage /> : <ScenariosPage />);
+  },
+  StudentScenario: () => guard(["student"], <StudentScenarioDetails />),
+  ScenarioAdd: () => guard(["educator"], <ScenarioFormPage />),
+  ScenarioEdit: () => guard(["educator", "school_admin"], <ScenarioFormPage />),
+  ScenarioView: () => guard(["educator", "school_admin", "superadmin"], <ScenarioAnalytics />),
+  Students: function StudentsRoute() {
+    const { user } = useAuth();
+    return guard(["superadmin", "school_admin", "educator"],
+      user?.role === "educator" ? <EducatorStudentsPage /> : user?.role === "school_admin" ? <SchoolAdminStudentsPage /> : <StudentsPage role={user?.role} />);
+  },
+  Educators: () => guard(["school_admin"], <SchoolAdminEducatorsPage />),
+  Settings: () => guard(ALL, <AccountSettingsPage />),
+  Definitions: () => guard(ALL, <DefinitionsPage />),
+  Group: () => guard(["educator", "school_admin"], <GroupPage />),
+  Readiness: () => guard(["educator", "school_admin"], <ReadinessPage />),
+  Rubrics: () => guard(["educator", "school_admin"], <RubricBankPage />),
+  NotFound: () => <Navigate to="/" replace />,
+};
 
+/** The scrolling page area inside the app panel; the matched route renders into the Outlet. */
+function ContentArea() {
+  const mainRef = useRef(null);
+  useScrollMemory(mainRef);
   return (
-    <main className="absolute top-16 left-64 right-0 bottom-0 overflow-y-auto bg-gray-50 p-4">
-      <Routes>
-        <Route path="/" element={getDashboardComponent()} />
-
-        {/* Schools Routes */}
-        <Route
-          path="/schools"
-          element={
-            <RoleBasedRoute allowedRoles={["superadmin", "school_admin"]}>
-              <SchoolsPage />
-            </RoleBasedRoute>
-          }
-        />
-        <Route
-          path="/schools/add"
-          element={
-            <RoleBasedRoute allowedRoles={["superadmin"]}>
-              <SchoolFormPage />
-            </RoleBasedRoute>
-          }
-        />
-        <Route
-          path="/schools/edit/:id"
-          element={
-            <RoleBasedRoute allowedRoles={["superadmin"]}>
-              <SchoolFormPage />
-            </RoleBasedRoute>
-          }
-        />
-
-        <Route
-          path="/scenarios"
-          element={
-            <RoleBasedRoute
-              allowedRoles={["school_admin", "educator", "student"]}
-            >
-              {user?.role === "student" ? (
-                <StudentScenariosPage />
-              ) : user?.role === "school_admin" ? (
-                <SchoolAdminScenariosPage />
-              ) : (
-                <ScenariosPage />
-              )}
-            </RoleBasedRoute>
-          }
-        />
-        <Route
-          path="/student/scenario/:id"
-          element={
-            <RoleBasedRoute allowedRoles={["student"]}>
-              <div className="p-8 bg-[#F9FAFB] min-h-screen">
-                <StudentScenarioDetails onBack={() => window.history.back()} />
-              </div>
-            </RoleBasedRoute>
-          }
-        />
-        <Route
-          path="/scenarios/add"
-          element={
-            <RoleBasedRoute allowedRoles={["educator"]}>
-              <ScenarioFormPage />
-            </RoleBasedRoute>
-          }
-        />
-        <Route
-          path="/scenarios/edit/:id"
-          element={
-            <RoleBasedRoute allowedRoles={["educator", "school_admin"]}>
-              <ScenarioFormPage />
-            </RoleBasedRoute>
-          }
-        />
-
-        <Route
-          path="/students/*"
-          element={
-            <RoleBasedRoute
-              allowedRoles={["superadmin", "school_admin", "educator"]}
-            >
-              {user?.role === "educator" ? (
-                <EducatorStudentsPage />
-              ) : user?.role === "school_admin" ? (
-                <SchoolAdminStudentsPage />
-              ) : (
-                <StudentsPage role={user?.role} />
-              )}
-            </RoleBasedRoute>
-          }
-        />
-
-        <Route
-          path="/educators"
-          element={
-            <RoleBasedRoute allowedRoles={["school_admin"]}>
-              <SchoolAdminEducatorsPage />
-            </RoleBasedRoute>
-          }
-        />
-
-        <Route
-          path="/settings/*"
-          element={
-            <RoleBasedRoute
-              allowedRoles={[
-                "superadmin",
-                "school_admin",
-                "educator",
-                "student",
-              ]}
-            >
-              <AccountSettingsPage />
-            </RoleBasedRoute>
-          }
-        />
-
-        <Route path="*" element={<Navigate to="/" replace />} />
-      </Routes>
+    <main ref={mainRef} className="relative min-h-0 flex-1 overflow-y-auto">
+      <Suspense fallback={<FullPageSpinner />}>
+        <Outlet />
+      </Suspense>
     </main>
   );
 }

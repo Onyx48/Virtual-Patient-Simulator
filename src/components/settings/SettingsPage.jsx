@@ -1,510 +1,183 @@
-import React, { useState, useEffect } from "react";
-import { useForm } from "react-hook-form";
-import { useAuth } from "@/AuthContext.jsx";
-import { toast } from "react-hot-toast";
+// Account settings in the vx design (docs/DESIGN_SYSTEM.md). Same endpoints as before:
+// PUT /api/auth/change-password and PUT /api/auth/change-email.
+import React, { useState } from "react";
 import axios from "axios";
+import { toast } from "react-hot-toast";
+import { Eye, EyeOff, Loader2, Mail, KeyRound } from "lucide-react";
+import { useLanguage } from "../../i18n/LanguageContext";
+import { Segmented } from "../vx/ui";
+import { useAuth } from "@/AuthContext.jsx";
+import { Button, ButtonGroup, InputGroup, InputCell, Expand, Section, controlClass } from "../vx/ui";
+import { cn } from "../../lib/utils";
 
-/*
- * A placeholder for the avatar only. The name and email were mock values
- * ("John Doe") shown whenever the account had none, so the form displayed
- * details the user had never entered. Empty is honest.
- */
-const initialUserData = {
-  profilePictureUrl: "https://via.placeholder.com/150/FF5733/FFFFFF?text=JD",
-  fullName: "",
-  email: "",
-};
+const muted = "text-[rgb(var(--vx-muted))]";
+const ROLE_LABEL = { student: "Student", educator: "Educator", school_admin: "School admin", superadmin: "Super admin" };
 
-const EditIcon = () => (
-  <svg
-    className="w-4 h-4 text-gray-500"
-    fill="none"
-    stroke="currentColor"
-    viewBox="0 0 24 24"
-    xmlns="http://www.w3.org/2000/svg"
-  >
-    <path
-      strokeLinecap="round"
-      strokeLinejoin="round"
-      strokeWidth="2"
-      d="M15.232 5.232l3.536 3.536m-2.036-5.036a2.5 2.5 0 113.536 3.536L6.5 21.036H3v-3.572L16.732 3.732z"
-    ></path>
-  </svg>
-);
+function PasswordCell({ label, id, value, onChange, autoComplete, invalid }) {
+  const [show, setShow] = useState(false);
+  return (
+    <InputCell label={label} htmlFor={id} className={cn(invalid && "bg-[rgb(var(--vx-danger)/0.08)]")}>
+      <span className="flex items-center gap-2">
+        <input id={id} type={show ? "text" : "password"} value={value} onChange={(e) => onChange(e.target.value)}
+          autoComplete={autoComplete} className={cn(controlClass, "text-lg")} />
+        <button type="button" onClick={() => setShow((s) => !s)} aria-label={show ? "Hide password" : "Show password"}
+          className={cn("grid size-8 shrink-0 place-items-center rounded-full hover:bg-[rgb(var(--vx-bg))]", muted)}>
+          {show ? <EyeOff size={18} /> : <Eye size={18} />}
+        </button>
+      </span>
+    </InputCell>
+  );
+}
 
-const EyeIcon = ({ isVisible, onClick }) => (
-  <button
-    type="button"
-    onClick={onClick}
-    className="p-1 rounded-full hover:bg-gray-100 focus:outline-none"
-  >
-    {isVisible ? (
-      <svg
-        className="w-5 h-5 text-gray-500"
-        fill="none"
-        stroke="currentColor"
-        viewBox="0 0 24 24"
-        xmlns="http://www.w3.org/2000/svg"
-      >
-        <path
-          strokeLinecap="round"
-          strokeLinejoin="round"
-          strokeWidth="2"
-          d="M15 12a3 3 0 11-6 0 3 3 0 016 0z"
-        ></path>
-        <path
-          strokeLinecap="round"
-          strokeLinejoin="round"
-          strokeWidth="2"
-          d="M2.458 12C3.732 7.943 7.523 5 12 5c4.478 0 8.268 2.943 9.542 7-1.274 4.057-5.064 7-9.542 7-4.477 0-8.268-2.943-9.542-7z"
-        ></path>
-      </svg>
-    ) : (
-      <svg
-        className="w-5 h-5 text-gray-500"
-        fill="none"
-        stroke="currentColor"
-        viewBox="0 0 24 24"
-        xmlns="http://www.w3.org/2000/svg"
-      >
-        <path
-          strokeLinecap="round"
-          strokeLinejoin="round"
-          strokeWidth="2"
-          d="M13.875 18.825A10.05 10.05 0 0112 19c-4.478 0-8.268-2.943-9.542-7a10.07 10.07 0 01.681-1.11l-.003-.002A1.105 1.105 0 013.3 9.242m2.292 5.46a3 3 0 104.243-4.243m1.765 2.47a1.313 1.313 0 01-.776-.5V7.071c0-1.006.811-1.817 1.817-1.817.552 0 1.053.247 1.406.665m0 0a1.997 1.997 0 011.414-.665C18.281 5.254 19 6.065 19 7.071v1.07a1.147 1.147 0 01-.776.51l-.776-.51zM7.172 7.172A7 7 0 0112 5c4.478 0 8.268 2.943 9.542 7a10.07 10.07 0 01-.681 1.11l-.003.002A1.105 1.105 0 0120.7 14.758l-2.292-5.46z"
-        ></path>
-        <path
-          strokeLinecap="round"
-          strokeLinejoin="round"
-          strokeWidth="2"
-          d="M15 12a3 3 0 11-6 0 3 3 0 016 0z"
-        ></path>
-      </svg>
-    )}
-  </button>
-);
+const readPref = (k, d) => { try { return localStorage.getItem(k) || d; } catch { return d; } };
+const writePref = (k, v) => { try { localStorage.setItem(k, v); } catch { /* private window */ } };
 
-function SettingsPage() {
+/** Per-browser preferences. Theme and language apply at once; the others on the next page load. */
+function Preferences({ role }) {
+  const { language, toggleLanguage } = useLanguage();
+  const [theme, setTheme] = useState(() => document.documentElement.dataset.theme || "light");
+  const [view, setView] = useState(() => readPref("vps.scenarios.view", "cards"));
+  const [rows, setRows] = useState(() => readPref("vps.pageSize", "8"));
+  const cell = (label, control) => (
+    <InputCell as="div" label={label} className="flex-1">{control}</InputCell>
+  );
+  return (
+    <Section title="Preferences" hint="Saved in this browser.">
+      <div className="flex flex-col gap-0.5">
+        <InputGroup>
+          {cell("Theme", <Segmented label="Theme" value={theme} onChange={(t) => { setTheme(t); window.dispatchEvent(new CustomEvent("vps-theme", { detail: t })); }}
+            options={[{ value: "light", label: "Light" }, { value: "dark", label: "Dark" }]} />)}
+          {cell("Language", <Segmented label="Language" value={language} onChange={(l) => { if (l !== language) toggleLanguage(); }}
+            options={[{ value: "en", label: "English" }, { value: "ja", label: "日本語" }]} />)}
+        </InputGroup>
+        {role !== "student" && (
+          <InputGroup>
+            {cell("Scenarios open as", <Segmented label="Scenarios view" value={view} onChange={(v) => { setView(v); writePref("vps.scenarios.view", v); }}
+              options={[{ value: "cards", label: "Cards" }, { value: "table", label: "Table" }]} />)}
+            {cell("Rows per page", <Segmented label="Rows per page" value={rows} onChange={(r) => { setRows(r); writePref("vps.pageSize", r); }}
+              options={["8", "16", "32", "64"].map((n) => ({ value: n, label: n }))} />)}
+          </InputGroup>
+        )}
+      </div>
+    </Section>
+  );
+}
+
+export default function SettingsPage() {
   const { user, updateProfile } = useAuth();
-  const [userData, setUserData] = useState(initialUserData);
-  const [showChangeEmailModal, setShowChangeEmailModal] = useState(false);
-  const [uploading, setUploading] = useState(false);
-  const [passwordData, setPasswordData] = useState({
-    currentPassword: "",
-    newPassword: "",
-    confirmPassword: "",
-  });
-  const [emailData, setEmailData] = useState({
-    newEmail: "",
-    password: "",
-  });
 
+  const [pw, setPw] = useState({ currentPassword: "", newPassword: "", confirmPassword: "" });
+  const [pwBusy, setPwBusy] = useState(false);
+  const mismatch = !!pw.confirmPassword && pw.newPassword !== pw.confirmPassword;
+  const pwReady = pw.currentPassword && pw.newPassword && pw.confirmPassword && !mismatch;
 
-  const {
-    register,
-    reset,
-    watch,
-    formState: { errors },
-  } = useForm({
-    defaultValues: userData,
-  });
+  const [emailOpen, setEmailOpen] = useState(false);
+  const [em, setEm] = useState({ newEmail: "", password: "" });
+  const [emBusy, setEmBusy] = useState(false);
 
-  const [showCurrentPassword, setShowCurrentPassword] = useState(false);
-  const [showNewPassword, setShowNewPassword] = useState(false);
-  const [showConfirmPassword, setShowConfirmPassword] = useState(false);
-
-  useEffect(() => {
-    if (user) {
-      setUserData({
-        profilePictureUrl: user.profilePicture
-          ? `https://vpsbackend.metawingsxr.com${user.profilePicture}`
-          : initialUserData.profilePictureUrl,
-        fullName: user.name || initialUserData.fullName,
-        email: user.email || initialUserData.email,
-      });
-      // Both fields are display-only; reset just puts the account's real
-      // values into them once the user has loaded.
-      reset({
-        fullName: user.name || "",
-        email: user.email || "",
-      });
-    }
-  }, [user, reset]);
-
-
-  /*   const handleProfilePictureChange = async (e) => {
-    const file = e.target.files[0];
-    if (file) {
-      const allowedTypes = [
-        "image/jpeg",
-        "image/jpg",
-        "image/png",
-        "image/gif",
-      ];
-      if (!allowedTypes.includes(file.type)) {
-        toast.error("Only JPG, PNG, and GIF files are allowed");
-        return;
-      }
-      if (file.size > 2 * 1024 * 1024) {
-        toast.error("File size must be less than 2MB");
-        return;
-      }
-
-      const reader = new FileReader();
-      reader.onloadend = () => {
-        setUserData({ ...userData, profilePictureUrl: reader.result });
-      };
-      reader.readAsDataURL(file);
-
-      setUploading(true);
-      try {
-        const formData = new FormData();
-        formData.append("profilePicture", file);
-        const response = await axios.post(
-          "/api/auth/upload-profile-picture",
-          formData,
-          {
-            headers: {
-              "Content-Type": "multipart/form-data",
-            },
-          },
-        );
-        updateProfile({ profilePicture: response.data.profilePicture });
-        toast.success("Profile picture updated successfully");
-      } catch (error) {
-        console.error("Upload error:", error);
-        toast.error(
-          error.response?.data?.message || "Failed to upload profile picture",
-        );
-        setUserData({
-          ...userData,
-          profilePictureUrl: user?.profilePicture
-            ? `http://localhost:5001${user.profilePicture}`
-            : initialUserData.profilePictureUrl,
-        });
-      } finally {
-        setUploading(false);
-      }
-    }
-  }; */
-
-  /*   const handleRemoveProfilePicture = async () => {
+  const submitPassword = async (e) => {
+    e.preventDefault();
+    if (!pwReady || pwBusy) return;
+    setPwBusy(true);
     try {
-      await axios.delete("/api/auth/profile-picture");
-      updateProfile({ profilePicture: null });
-      setUserData({
-        ...userData,
-        profilePictureUrl: initialUserData.profilePictureUrl,
-      });
-      toast.success("Profile picture removed successfully");
+      await axios.put("/api/auth/change-password", pw);
+      setPw({ currentPassword: "", newPassword: "", confirmPassword: "" });
+      toast.success("Password updated.");
     } catch (error) {
-      console.error("Remove error:", error);
-      toast.error(
-        error.response?.data?.message || "Failed to remove profile picture",
-      );
-    }
-  }; */
-
-  const handlePasswordSubmit = async () => {
-    if (passwordData.newPassword !== passwordData.confirmPassword) {
-      toast.error("New passwords do not match");
-      return;
-    }
-    try {
-      await axios.put("/api/auth/change-password", passwordData);
-      setPasswordData({
-        currentPassword: "",
-        newPassword: "",
-        confirmPassword: "",
-      });
-      toast.success("Password updated successfully");
-    } catch (error) {
-      console.error("Password change error:", error);
-      toast.error(error.response?.data?.message || "Failed to update password");
+      toast.error(error.response?.data?.message || "Could not update the password.");
+    } finally {
+      setPwBusy(false);
     }
   };
 
-  const handleEmailSubmit = async (e) => {
+  const submitEmail = async (e) => {
     e.preventDefault();
+    if (!em.newEmail || !em.password || emBusy) return;
+    setEmBusy(true);
     try {
-      const response = await axios.put("/api/auth/change-email", emailData);
-      updateProfile({ email: response.data.email });
-      setEmailData({ newEmail: "", password: "" });
-      setShowChangeEmailModal(false);
-      toast.success("Email updated successfully");
+      const { data } = await axios.put("/api/auth/change-email", em);
+      updateProfile({ email: data.email });
+      setEm({ newEmail: "", password: "" });
+      setEmailOpen(false);
+      toast.success("Email updated.");
     } catch (error) {
-      console.error("Email change error:", error);
-      toast.error(error.response?.data?.message || "Failed to update email");
+      toast.error(error.response?.data?.message || "Could not update the email.");
+    } finally {
+      setEmBusy(false);
     }
   };
 
   return (
-    <div>
-      <div className="max-w-4xl mx-auto p-6 bg-white rounded-lg shadow-md">
-        <h1 className="text-2xl font-bold text-gray-900 mb-6">Settings</h1>
+    <div className="vx min-h-full px-4 pb-16 pt-6 md:px-6">
+      <div className="flex max-w-4xl flex-col gap-5">
+        <h1 className="text-3xl font-semibold tracking-tight">Settings</h1>
 
-        {/*
-          Not a form any more. Every field in it is read-only — the name is set
-          by whoever administers the account and the email is changed through the
-          modal below — so there is nothing to submit.
-        */}
-        <div className="space-y-8">
-          {/* Profile Picture Section */}
-          {/* <div className="flex items-center space-x-6">
-            {user?.profilePicture ? (
-              <img
-                src={userData.profilePictureUrl}
-                alt="Profile"
-                className="w-24 h-24 rounded-full object-cover"
-              />
-            ) : (
-              <div className="w-24 h-24 rounded-full bg-gray-200 flex items-center justify-center">
-                <span className="text-gray-400 text-sm">No Image</span>
-              </div>
+        {/* Name is set by whoever administers the account, so it is read-only here. */}
+        <Section title="Account">
+          <InputGroup>
+            <InputCell as="div" label="Name" className="flex-1">
+              <span className="truncate text-lg">{user?.name || "—"}</span>
+            </InputCell>
+            <InputCell as="div" label="Email" className="flex-1">
+              <span className="flex items-center justify-between gap-3">
+                <span className="truncate text-lg">{user?.email || "—"}</span>
+                {!emailOpen && (
+                  <Button variant="soft" size="sm" onClick={() => setEmailOpen(true)}><Mail /> Change</Button>
+                )}
+              </span>
+            </InputCell>
+            {user?.role && (
+              <InputCell as="div" label="Role" className="md:w-56">
+                <span className="text-lg">{ROLE_LABEL[user.role] || user.role}</span>
+              </InputCell>
             )}
-            <div className="flex flex-col space-y-2">
-              <div className="flex space-x-2">
-                <input
-                  type="file"
-                  accept="image/*"
-                  onChange={handleProfilePictureChange}
-                  disabled={!canEditPersonalInfo}
-                  className="hidden"
-                  id="profile-pic"
-                />
-                <label
-                  htmlFor="profile-pic"
-                  className={`px-4 py-2 text-sm font-medium text-white bg-blue-600 rounded-md cursor-pointer ${
-                    uploading || !canEditPersonalInfo
-                      ? "opacity-50 cursor-not-allowed"
-                      : "hover:bg-blue-700"
-                  }`}
-                >
-                  {uploading
-                    ? "Uploading..."
-                    : user?.profilePicture
-                      ? "Change Picture"
-                      : "Upload"}
-                </label>
-                {user?.profilePicture && (
-                  <button
-                    type="button"
-                    onClick={handleRemoveProfilePicture}
-                    disabled={uploading || !canEditPersonalInfo}
-                    className={`px-4 py-2 text-sm font-medium text-gray-700 bg-gray-200 rounded-md ${
-                      uploading || !canEditPersonalInfo
-                        ? "opacity-50 cursor-not-allowed"
-                        : "hover:bg-gray-300"
-                    }`}
-                  >
-                    Remove
-                  </button>
-                )}
-              </div>
-              <p className="text-sm text-gray-500">
-                JPG, GIF or PNG. Max size of 2MB.
-              </p>
-            </div>
-          </div> */}
+          </InputGroup>
 
-          <div>
-            <h2 className="text-lg font-semibold text-gray-900 mb-4">
-              Personal Information
-            </h2>
-            <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-              <div>
-                <label className="block text-sm font-medium text-gray-700 mb-1">
-                  Full Name
-                </label>
-                {/*
-                  Read-only for every role, including superadmin. The name is how
-                  an educator identifies a student on a roster and how a session
-                  is attributed, so it is set at account creation and changed by
-                  whoever administers the account — not by its holder. `name` is
-                  no longer in the submitted payload either; disabling the input
-                  alone would still leave the field editable through the form
-                  state.
-                */}
-                <div className="flex items-center">
-                  <input
-                    {...register("fullName")}
-                    type="text"
-                    disabled={true}
-                    className="flex-1 px-3 py-2 border border-gray-300 rounded-md bg-gray-100 cursor-not-allowed"
-                  />
-                </div>
-              </div>
-              <div>
-                <label className="block text-sm font-medium text-gray-700 mb-1">
-                  Email Address
-                </label>
-                <div className="flex items-center">
-                  <input
-                    {...register("email", { required: "Email is required" })}
-                    type="email"
-                    disabled={true} // Email always read-only
-                    className="flex-1 px-3 py-2 border border-gray-300 rounded-md bg-gray-100 cursor-not-allowed"
-                  />
-                  <button
-                    type="button"
-                    onClick={() => setShowChangeEmailModal(true)}
-                    className="ml-2 px-4 py-2 text-sm font-medium text-blue-600 bg-blue-50 rounded-md hover:bg-blue-100"
-                  >
-                    Change Email
-                  </button>
-                </div>
-                {errors.email && (
-                  <p className="text-sm text-red-600 mt-1">
-                    {errors.email.message}
-                  </p>
-                )}
-              </div>
-            </div>
-          </div>
-
-        </div>
-      </div>
-
-      <React.Fragment>
-        <div className="max-w-4xl mx-auto mt-6 p-6 bg-white rounded-lg shadow-md">
-          <h2 className="text-lg font-semibold text-gray-900 mb-4">
-            Change Password
-          </h2>
-          <div className="space-y-4">
-            <div>
-              <label className="block text-sm font-medium text-gray-700 mb-1">
-                Current Password
-              </label>
-              <div className="relative">
-                <input
-                  type={showCurrentPassword ? "text" : "password"}
-                  value={passwordData.currentPassword}
-                  onChange={(e) =>
-                    setPasswordData({
-                      ...passwordData,
-                      currentPassword: e.target.value,
-                    })
-                  }
-                  className="w-full px-3 py-2 pr-10 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500"
-                  placeholder="Enter current password"
-                />
-                <EyeIcon
-                  isVisible={showCurrentPassword}
-                  onClick={() => setShowCurrentPassword(!showCurrentPassword)}
-                />
-              </div>
-            </div>
-            <div>
-              <label className="block text-sm font-medium text-gray-700 mb-1">
-                New Password
-              </label>
-              <div className="relative">
-                <input
-                  type={showNewPassword ? "text" : "password"}
-                  value={passwordData.newPassword}
-                  onChange={(e) =>
-                    setPasswordData({
-                      ...passwordData,
-                      newPassword: e.target.value,
-                    })
-                  }
-                  className="w-full px-3 py-2 pr-10 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500"
-                  placeholder="Enter new password"
-                />
-                <EyeIcon
-                  isVisible={showNewPassword}
-                  onClick={() => setShowNewPassword(!showNewPassword)}
-                />
-              </div>
-            </div>
-            <div>
-              <label className="block text-sm font-medium text-gray-700 mb-1">
-                Confirm New Password
-              </label>
-              <div className="relative">
-                <input
-                  type={showConfirmPassword ? "text" : "password"}
-                  value={passwordData.confirmPassword}
-                  onChange={(e) =>
-                    setPasswordData({
-                      ...passwordData,
-                      confirmPassword: e.target.value,
-                    })
-                  }
-                  className="w-full px-3 py-2 pr-10 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500"
-                  placeholder="Confirm new password"
-                />
-                <EyeIcon
-                  isVisible={showConfirmPassword}
-                  onClick={() => setShowConfirmPassword(!showConfirmPassword)}
-                />
-              </div>
-            </div>
-            <button
-              onClick={handlePasswordSubmit}
-              disabled={uploading}
-              className="px-4 py-2 text-white bg-blue-600 rounded-md hover:bg-blue-700 disabled:bg-gray-400"
-            >
-              Update Password
-            </button>
-          </div>
-        </div>
-
-        <div
-          className={`fixed inset-0 bg-gray-600 bg-opacity-50 flex items-center justify-center z-50 ${showChangeEmailModal ? "" : "hidden"}`}
-        >
-          <div className="bg-white p-6 rounded-lg shadow-lg w-full max-w-md">
-            <h3 className="text-lg font-semibold mb-4">Change Email</h3>
-            <form onSubmit={handleEmailSubmit} className="space-y-4">
-              <div>
-                <label className="block text-sm font-medium text-gray-700 mb-1">
-                  New Email
-                </label>
-                <input
-                  type="email"
-                  value={emailData.newEmail}
-                  onChange={(e) =>
-                    setEmailData({ ...emailData, newEmail: e.target.value })
-                  }
-                  className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500"
-                  required
-                />
-              </div>
-              <div>
-                <label className="block text-sm font-medium text-gray-700 mb-1">
-                  Password
-                </label>
-                <input
-                  type="password"
-                  value={emailData.password}
-                  onChange={(e) =>
-                    setEmailData({ ...emailData, password: e.target.value })
-                  }
-                  className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500"
-                  required
-                />
-              </div>
-              <div className="flex justify-end space-x-2">
-                <button
-                  type="button"
-                  onClick={() => setShowChangeEmailModal(false)}
-                  className="px-4 py-2 text-gray-600 bg-gray-200 rounded-md hover:bg-gray-300"
-                >
-                  Cancel
-                </button>
-                <button
-                  type="submit"
-                  className="px-4 py-2 text-white bg-blue-600 rounded-md hover:bg-blue-700"
-                >
-                  Update Email
-                </button>
+          <Expand open={emailOpen}>
+            <form onSubmit={submitEmail} className="mt-4 flex flex-col gap-3">
+              <InputGroup>
+                <InputCell label="New email" htmlFor="set-email" className="flex-1">
+                  <input id="set-email" type="email" autoComplete="email" value={em.newEmail}
+                    onChange={(e) => setEm({ ...em, newEmail: e.target.value })} placeholder="name@example.com" className={cn(controlClass, "text-lg")} />
+                </InputCell>
+                <PasswordCell label="Your password" id="set-email-pw" autoComplete="current-password"
+                  value={em.password} onChange={(v) => setEm({ ...em, password: v })} />
+              </InputGroup>
+              <div className="flex justify-end">
+                <ButtonGroup>
+                  <Button variant="secondary" size="lg" onClick={() => { setEmailOpen(false); setEm({ newEmail: "", password: "" }); }}>Cancel</Button>
+                  <Button type="submit" size="lg" disabled={!em.newEmail || !em.password || emBusy}>
+                    {emBusy ? <><Loader2 className="animate-spin" /> Saving</> : "Update email"}
+                  </Button>
+                </ButtonGroup>
               </div>
             </form>
-          </div>
-        </div>
-      </React.Fragment>
+          </Expand>
+        </Section>
+
+        <Preferences role={user?.role} />
+
+        <Section title="Password">
+          <form onSubmit={submitPassword} className="flex flex-col gap-3">
+            <InputGroup vertical>
+              <PasswordCell label="Current password" id="set-cur" autoComplete="current-password"
+                value={pw.currentPassword} onChange={(v) => setPw({ ...pw, currentPassword: v })} />
+              <PasswordCell label="New password" id="set-new" autoComplete="new-password"
+                value={pw.newPassword} onChange={(v) => setPw({ ...pw, newPassword: v })} />
+              <PasswordCell label="Confirm new password" id="set-conf" autoComplete="new-password" invalid={mismatch}
+                value={pw.confirmPassword} onChange={(v) => setPw({ ...pw, confirmPassword: v })} />
+            </InputGroup>
+            <div className="flex flex-wrap items-center justify-between gap-3">
+              <p className={cn("px-1 text-sm", mismatch ? "text-[rgb(var(--vx-danger))]" : muted)} role={mismatch ? "alert" : undefined}>
+                {mismatch ? "The new passwords don't match." : ""}
+              </p>
+              <Button type="submit" size="lg" disabled={!pwReady || pwBusy}>
+                {pwBusy ? <><Loader2 className="animate-spin" /> Saving</> : <><KeyRound /> Update password</>}
+              </Button>
+            </div>
+          </form>
+        </Section>
+      </div>
     </div>
   );
 }
-
-export default SettingsPage;

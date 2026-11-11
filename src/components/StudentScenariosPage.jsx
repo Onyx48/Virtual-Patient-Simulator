@@ -1,169 +1,105 @@
+// A student's scenarios in the vx design: one toolbar (search, to do / done, sort), cards, pages.
+// Same data as before: /api/scenarios filtered to this student, plus /api/dashboard/student-stats.
 import React, { useState, useEffect, useMemo } from "react";
-import { useAuth } from "../AuthContext.jsx";
+import { fetchCached } from "../lib/query";
 import axios from "axios";
-import { getAuthHeaders } from "../lib/utils.js";
-import ScenarioManagementControlsStudent from "../roles/student/scenarios/ScenarioManagementControlsStudent.jsx";
-import ScenrioGridStudent from "../roles/student/scenarios/ScenrioGridStudent.jsx";
-import PaginationBar from "./ui/PaginationBar";
-import { usePagination } from "../lib/hooks/usePagination";
-import { useLoading, Spinner } from "../lib/hooks/useLoading";
-import toast from "react-hot-toast";
+import { useAuth } from "../AuthContext.jsx";
+import { getAuthHeaders, cn } from "../lib/utils.js";
 import { isAssignedToStudent } from "../lib/assignment.js";
+import ScenarioGridStudent from "../roles/student/scenarios/ScenrioGridStudent.jsx";
+import { ListToolbar, ToolbarToggle, Pagination } from "./vx/list";
+import { Select } from "./vx/bits";
+import "./vx/vx.css";
 
-function StudentScenariosPage() {
+const muted = "text-[rgb(var(--vx-muted))]";
+
+export default function StudentScenariosPage() {
   const { user } = useAuth();
-  const [scenarios, setScenarios] = useState([]);
-  const { isLoading, withLoading } = useLoading(true);
-  const [searchTerm, setSearchTerm] = useState("");
-  const [sortConfig, setSortConfig] = useState("All");
+  const [scenarios, setScenarios] = useState(null);
+  const [search, setSearch] = useState("");
+  const [show, setShow] = useState("");
+  const [sort, setSort] = useState("todo");
+  const [page, setPage] = useState(1);
+  const [pageSize, setPageSize] = useState(8);
 
   useEffect(() => {
-    const fetchScenarios = async () => {
-      await withLoading(async () => {
-        /*
-         * Both calls are needed: /api/scenarios has no idea whether *this*
-         * student has attempted anything, and its `status` field is the
-         * educator's publication state ("Published"), not a completion state.
-         * Reading it as one is why every card showed a bare "Start Now" —
-         * ScenrioGridStudent keys the Results / Start Again pair off
-         * status === "Completed", which the scenario document never says.
-         *
-         * /api/dashboard/student-stats derives isCompleted and bestScore per
-         * scenario from this student's sessions, so a finished run turns the
-         * card into two buttons. Mirrors roles/student/Dashboard.jsx.
-         */
-        const [statsResponse, scenariosResponse] = await Promise.all([
-          axios.get("/api/dashboard/student-stats", getAuthHeaders()),
-          axios.get("/api/scenarios", getAuthHeaders()),
-        ]);
-
-        const stats = statsResponse.data;
-
-        const assignedScenarios = scenariosResponse.data.filter((scenario) =>
-          isAssignedToStudent(scenario, user),
-        );
-
-        const mappedScenarios = assignedScenarios.map((scenario) => {
-          const scenarioStat = stats.scenarioScores?.find(
-            (s) => s.scenarioId === scenario._id,
-          );
-          return {
-            id: scenario._id,
-            scenarioName: scenario.scenarioName,
-            description: scenario.description,
-            difficulty: scenario.difficulty,
-            highestScore:
-              scenarioStat?.bestScore != null
-                ? Math.round(scenarioStat.bestScore * 100)
-                : null,
-            status: scenarioStat?.isCompleted ? "Completed" : "Available",
-            // Carried through so the card can grey its own button. Only the
-            // scenarios the backend has enabled can be run — see
-            // backend/utils/testableScenarios.js.
-            testable: scenario.testable === true,
-          };
-        });
-        setScenarios(mappedScenarios);
-      });
-    };
-    if (user) fetchScenarios();
+    if (!user) return;
+    Promise.all([
+      // Through the TanStack cache: shared with the dashboard, so no second load.
+      fetchCached("/api/dashboard/student-stats").then((data) => ({ data })),
+      fetchCached("/api/scenarios", { fields: "lite" }).then((data) => ({ data })),
+      fetchCached("/api/sessions/mine").then((data) => ({ data })).catch(() => ({ data: [] })),
+    ]).then(([statsRes, scenRes, mineRes]) => {
+      const mine = mineRes.data || [];
+      const stats = statsRes.data;
+      const list = Array.isArray(scenRes.data) ? scenRes.data : scenRes.data?.items || [];
+      setScenarios(list.filter((s) => isAssignedToStudent(s, user)).map((s) => {
+        const st = stats.scenarioScores?.find((x) => x.scenarioId === s._id);
+        return {
+          id: s._id, scenarioName: s.scenarioName, description: s.description || "", difficulty: s.difficulty,
+          highestScore: st?.bestScore != null ? Math.round(st.bestScore * 100) : null,
+          status: st?.isCompleted ? "Completed" : "Available", testable: s.testable === true,
+          attempts: mine.filter((m) => m.scenarioId === s._id).length,
+          lastAt: mine.find((m) => m.scenarioId === s._id)?.createdAt || null,
+        };
+      }));
+    }).catch(() => setScenarios([]));
   }, [user]);
 
-  const handleStartNow = async (scenarioId) => {
-    try {
-      const response = await axios.post(
-        "/api/sessions/start",
-        { scenario_id: scenarioId },
-        getAuthHeaders(),
-      );
-      const redirectUrl = response.data?.redirect_url;
-      if (!redirectUrl) {
-        throw new Error("Redirect URL missing in response");
-      }
-      window.open(redirectUrl, "_blank", "noopener,noreferrer");
-    } catch (error) {
-      console.error("Error starting session:", error);
-      const message =
-        error?.response?.data?.message || "Failed to start session.";
-      toast.error(message);
-    }
-  };
+  const rows = useMemo(() => {
+    let r = [...(scenarios || [])];
+    const q = search.trim().toLowerCase();
+    if (q) r = r.filter((s) => `${s.scenarioName} ${s.description}`.toLowerCase().includes(q));
+    if (show === "todo") r = r.filter((s) => s.status !== "Completed");
+    if (show === "done") r = r.filter((s) => s.status === "Completed");
+    const by = {
+      todo: (a, b) => (a.status === "Completed") - (b.status === "Completed") || (b.testable - a.testable),
+      best: (a, b) => (b.highestScore ?? -1) - (a.highestScore ?? -1),
+      low: (a, b) => (a.highestScore ?? 101) - (b.highestScore ?? 101),
+      name: (a, b) => a.scenarioName.localeCompare(b.scenarioName),
+      recent: (a, b) => new Date(b.lastAt || 0) - new Date(a.lastAt || 0),
+    }[sort];
+    return r.sort(by);
+  }, [scenarios, search, show, sort]);
 
-  const processedScenarios = useMemo(() => {
-    let filtered = scenarios;
-    if (searchTerm) {
-      filtered = filtered.filter(
-        (s) =>
-          s.scenarioName.toLowerCase().includes(searchTerm.toLowerCase()) ||
-          s.description.toLowerCase().includes(searchTerm.toLowerCase()),
-      );
-    }
-    if (sortConfig === "Highest") {
-      filtered = [...filtered].sort(
-        (a, b) => (b.highestScore || 0) - (a.highestScore || 0),
-      );
-    } else if (sortConfig === "Lowest") {
-      filtered = [...filtered].sort(
-        (a, b) => (a.highestScore || 0) - (b.highestScore || 0),
-      );
-    } else if (sortConfig === "Recent") {
-    }
-    return filtered;
-  }, [scenarios, searchTerm, sortConfig]);
-
-  const {
-    paginatedData,
-    currentPage,
-    totalPages,
-    totalItems,
-    pageNumbers,
-    handlePageChange,
-    nextPage,
-    prevPage,
-    isFirstPage,
-    isLastPage,
-    rangeStart,
-    rangeEnd,
-    resetPage,
-  } = usePagination(processedScenarios, 8);
-
-  useEffect(() => {
-    resetPage();
-  }, [searchTerm, sortConfig]);
-
-  if (isLoading) return <div className="p-8 flex justify-center"><Spinner size={40} /></div>;
+  useEffect(() => setPage(1), [search, show, sort, pageSize]);
+  const shown = rows.slice((page - 1) * pageSize, page * pageSize);
+  const done = (scenarios || []).filter((s) => s.status === "Completed").length;
 
   return (
-    <div className="p-8 bg-gray-50 min-h-screen font-sans">
-      <div className="mb-8">
-        <h1 className="text-3xl font-bold text-gray-900">Scenarios</h1>
-        <p className="text-gray-600 mt-2">View your assigned scenarios.</p>
+    <div className="vx min-h-full px-4 pb-16 pt-6 md:px-6">
+      <div className="flex flex-col gap-5">
+        <header className="flex flex-wrap items-end justify-between gap-3">
+          <h1 className="flex items-baseline gap-3 text-3xl font-semibold tracking-tight">
+            Scenarios {scenarios?.length > 0 && <span className={cn("tabular-nums", muted)}>{done} of {scenarios.length} done</span>}
+          </h1>
+        </header>
+
+        <ListToolbar
+          search={{ value: search, onChange: setSearch, placeholder: "Search scenarios" }}
+          filters={
+            <>
+              <ToolbarToggle label="Show" value={show} onChange={setShow}
+                options={[{ value: "", label: "All" }, { value: "todo", label: "To do" }, { value: "done", label: "Done" }]} />
+              <div className="px-1">
+                <Select variant="ghost" label="Sort" value={sort} onChange={setSort}
+                  options={[{ value: "todo", label: "To do first" }, { value: "best", label: "Best score" }, { value: "low", label: "Lowest score" }, { value: "recent", label: "Recently practised" }, { value: "name", label: "Name" }]} />
+              </div>
+            </>
+          }
+        />
+
+        {scenarios === null ? (
+          <div className="grid grid-cols-1 gap-3 md:grid-cols-2 xl:grid-cols-4">
+            {Array.from({ length: 4 }).map((_, i) => <div key={i} className="h-56 animate-pulse rounded-2xl bg-[rgb(var(--vx-cell)/0.7)]" />)}
+          </div>
+        ) : (
+          <div>
+            <ScenarioGridStudent data={shown} />
+            <Pagination page={page} pageSize={pageSize} total={rows.length} onPage={setPage} onPageSize={setPageSize} />
+          </div>
+        )}
       </div>
-      <ScenarioManagementControlsStudent
-        searchTerm={searchTerm}
-        onSearchChange={setSearchTerm}
-        sortConfig={sortConfig}
-        onSortChange={setSortConfig}
-      />
-      <ScenrioGridStudent
-        data={paginatedData}
-        onStartNow={handleStartNow}
-      />
-      <PaginationBar
-        currentPage={currentPage}
-        totalPages={totalPages}
-        totalItems={totalItems}
-        pageNumbers={pageNumbers}
-        onPageChange={handlePageChange}
-        onPrevPage={prevPage}
-        onNextPage={nextPage}
-        isFirstPage={isFirstPage}
-        isLastPage={isLastPage}
-        rangeStart={rangeStart}
-        rangeEnd={rangeEnd}
-      />
     </div>
   );
 }
-
-export default StudentScenariosPage;

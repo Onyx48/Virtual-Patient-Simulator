@@ -1,489 +1,148 @@
-import React, { useState, useEffect } from "react";
-import { useNavigate, useParams } from "react-router-dom";
-import { useForm, Controller } from "react-hook-form";
-import DatePicker from "react-datepicker";
-import "react-datepicker/dist/react-datepicker.css";
-import "../../../components/ui/react-datepicker-custom.css";
-import { format, isValid, parse } from "date-fns";
+// Add or edit a school, in the vx design (mindsets/superadmin.md, V6). Same endpoints and payload as
+// before (POST/PUT /api/schools, dates as dd/MM/yyyy). Fixes: editing now loads the description and
+// contact email (they were read into differently named fields and saved back blank), and the end
+// date follows from start date + duration unless set by hand.
+import React, { useEffect, useState } from "react";
+import { fetchCached } from "../../../lib/query";
 import axios from "axios";
-import { ChevronLeftIcon, EyeIcon } from "@heroicons/react/24/outline";
 import { toast } from "react-hot-toast";
+import { addMonths, format, isValid, parse, differenceInCalendarDays } from "date-fns";
+import { Loader2, Save } from "lucide-react";
+import { useNavigate, useParams } from "../../../lib/router";
+import { Button, ButtonGroup, InputGroup, InputCell, Section, Segmented, controlClass } from "../../../components/vx/ui";
+import { cn } from "../../../lib/utils";
+import "../../../components/vx/vx.css";
 
-function SchoolFormPage() {
+const muted = "text-[rgb(var(--vx-muted))]";
+const toInput = (d) => (d && isValid(d) ? format(d, "yyyy-MM-dd") : "");
+const fromInput = (s) => (s ? parse(s, "yyyy-MM-dd", new Date()) : null);
+const fromApi = (v) => {
+  if (!v) return null;
+  const d = typeof v === "string" && /^\d{2}\/\d{2}\/\d{4}$/.test(v) ? parse(v, "dd/MM/yyyy", new Date()) : new Date(v);
+  return isValid(d) ? d : null;
+};
+
+export default function SchoolFormPage() {
   const navigate = useNavigate();
   const { id } = useParams();
   const isEdit = !!id;
-
-  const [isSubmitting, setIsSubmitting] = useState(false);
-  const [isLoading, setIsLoading] = useState(false);
-  const [isPreviewOpen, setIsPreviewOpen] = useState(false);
-
-  const {
-    register,
-    handleSubmit,
-    control,
-    reset,
-    watch,
-    formState: { errors },
-  } = useForm({
-    defaultValues: {
-      status: "Active",
-      subscriptionType: "Basic",
-      permissions: "Read Only",
-    },
+  // Editing returns to that school; adding returns to the list.
+  const back = isEdit ? `/schools/${id}` : "/schools";
+  const [loading, setLoading] = useState(isEdit);
+  const [saving, setSaving] = useState(false);
+  const [error, setError] = useState("");
+  const [f, setF] = useState({
+    schoolName: "", description: "", email: "", duration: "1 Year", subscriptionType: "Basic",
+    status: "Active", permissions: "Read Only", startDate: new Date(), endDate: addMonths(new Date(), 12), endTouched: false,
   });
+  const set = (k) => (v) => setF((x) => ({ ...x, [k]: v }));
 
-  const onSubmit = async (data) => {
-    setIsSubmitting(true);
+  useEffect(() => {
+    if (!isEdit) return;
+    fetchCached(`/api/schools/${id}`)
+      .then((data) => setF({
+        schoolName: data.schoolName || "", description: data.description || "", email: data.email || "",
+        duration: data.duration || "1 Year", subscriptionType: data.subscriptionType || "Basic", status: data.status || "Active",
+        permissions: data.permissions || "Read Only", startDate: fromApi(data.startDate), endDate: fromApi(data.expireDate), endTouched: true,
+      }))
+      .catch(() => { toast.error("Could not load this school."); navigate("/schools"); })
+      .finally(() => setLoading(false));
+  }, [id, isEdit, navigate]);
 
-    if (
-      isValid(data.startDate) &&
-      isValid(data.endDate) &&
-      data.endDate < data.startDate
-    ) {
-      toast.error("Start date must be before end date.");
-      setIsSubmitting(false);
-      return;
-    }
+  // End date follows start + duration until the admin sets it by hand.
+  const setStart = (d) => setF((x) => ({ ...x, startDate: d, endDate: x.endTouched || !d ? x.endDate : addMonths(d, x.duration === "6 Months" ? 6 : 12) }));
+  const setDuration = (v) => setF((x) => ({ ...x, duration: v, endDate: x.endTouched || !x.startDate ? x.endDate : addMonths(x.startDate, v === "6 Months" ? 6 : 12) }));
 
+  const submit = async (e) => {
+    e?.preventDefault();
+    if (!f.schoolName.trim()) return setError("Add the school's name.");
+    if (f.email && !/\S+@\S+\.\S+/.test(f.email)) return setError("That contact email doesn't look right.");
+    if (!f.startDate || !f.endDate) return setError("Set the start and end dates.");
+    if (f.endDate < f.startDate) return setError("The end date is before the start date.");
+    setError("");
+    setSaving(true);
     try {
-      const submissionData = {
-        schoolName: data.schoolName,
-        description: data.shortDescription,
-        email: data.emailAddress,
-        subscriptionType: data.subscriptionType,
-        duration: data.duration,
-        startDate: isValid(data.startDate)
-          ? format(data.startDate, "dd/MM/yyyy")
-          : null,
-        expireDate: isValid(data.endDate)
-          ? format(data.endDate, "dd/MM/yyyy")
-          : null,
-        status: data.status,
-        permissions: data.permissions,
+      const body = {
+        schoolName: f.schoolName.trim(), description: f.description, email: f.email.trim(), subscriptionType: f.subscriptionType,
+        duration: f.duration, startDate: format(f.startDate, "dd/MM/yyyy"), expireDate: format(f.endDate, "dd/MM/yyyy"),
+        status: f.status, permissions: f.permissions,
       };
-
-      if (isEdit) {
-        const response = await axios.put(`/api/schools/${id}`, submissionData);
-      } else {
-        const response = await axios.post("/api/schools", submissionData);
-      }
-      navigate("/schools");
+      if (isEdit) await axios.put(`/api/schools/${id}`, body);
+      else await axios.post("/api/schools", body);
+      toast.success(isEdit ? "School saved." : "School added.");
+      navigate(back);
     } catch (err) {
-      console.error("Submission error:", err);
-      console.error("Response data:", err.response?.data);
-      console.error("Response status:", err.response?.status);
-      toast.error(
-        err.response?.data?.message ||
-          `Failed to ${isEdit ? "update" : "add"} school.`,
-      );
+      toast.error(err.response?.data?.message || `Could not ${isEdit ? "save" : "add"} the school.`);
+    } finally {
+      setSaving(false);
     }
   };
 
-  useEffect(() => {
-    if (isEdit && id) {
-      const fetchSchool = async () => {
-        try {
-          const response = await axios.get(`/api/schools/${id}`);
-          const schoolData = response.data;
+  if (loading) return <div className={cn("vx flex min-h-full items-center justify-center gap-2 p-10 text-base", muted)}><Loader2 className="animate-spin" size={18} /> Loading school…</div>;
 
-          const parsedStart = schoolData.startDate
-            ? parse(schoolData.startDate, "dd/MM/yyyy", new Date())
-            : null;
-          const parsedEnd = schoolData.expireDate
-            ? parse(schoolData.expireDate, "dd/MM/yyyy", new Date())
-            : null;
-
-          const parsedData = {
-            ...schoolData,
-            startDate: isValid(parsedStart) ? parsedStart : null,
-            endDate: isValid(parsedEnd) ? parsedEnd : null,
-          };
-
-          if (!isValid(parsedStart) && schoolData.startDate) {
-          }
-          if (!isValid(parsedEnd) && schoolData.expireDate) {
-          }
-
-          reset(parsedData);
-        } catch (err) {
-          console.error("Fetch error:", err);
-          toast.error("Failed to load school details.");
-          navigate("/schools");
-        } finally {
-          setIsLoading(false);
-        }
-      };
-      fetchSchool();
-    } else {
-      setIsLoading(false);
-    }
-  }, [id, isEdit, reset, navigate]);
-
-  if (isLoading) {
-    return (
-      <div className="p-8 flex justify-center text-gray-500">Loading...</div>
-    );
-  }
+  const days = f.startDate && f.endDate ? differenceInCalendarDays(f.endDate, f.startDate) : null;
 
   return (
-    <div className="absolute inset-0 bg-gray-50 flex flex-col z-20 overflow-y-auto">
-      <header className="bg-white border-b border-gray-200 px-6 py-4 flex items-center justify-between sticky top-0 z-30 shadow-sm">
-        <button
-          onClick={() => navigate(-1)}
-          className="flex items-center text-gray-600 hover:text-gray-900 text-sm font-medium border border-gray-300 rounded-lg px-3 py-2 bg-white hover:bg-gray-50 transition-colors"
-        >
-          <ChevronLeftIcon className="h-4 w-4 mr-1" />
-          Go Back
-        </button>
-        <div className="flex items-center space-x-3">
-          <button
-            type="button"
-            onClick={() => setIsPreviewOpen(true)}
-            className="flex items-center text-gray-700 bg-gray-100 hover:bg-gray-200 px-4 py-2 rounded-lg text-sm font-medium transition-colors"
-          >
-            <EyeIcon className="h-4 w-4 mr-2" />
-            Preview
-          </button>
-          <button
-            onClick={handleSubmit(onSubmit)}
-            disabled={isSubmitting}
-            className="bg-orange-500 hover:bg-orange-600 text-white px-6 py-2 rounded-lg text-sm font-medium shadow-sm disabled:opacity-50 transition-colors"
-          >
-            {isSubmitting
-              ? "Saving..."
-              : isEdit
-                ? "Save Changes"
-                : "Save School"}
-          </button>
-        </div>
-      </header>
+    <div className="vx min-h-full px-4 pb-28 pt-6 md:px-6">
+      <form onSubmit={submit} className="flex max-w-4xl flex-col gap-5">
+        <h1 className="text-3xl font-semibold tracking-tight">{isEdit ? f.schoolName || "Edit school" : "New school"}</h1>
 
-      <main className="flex-1 flex justify-center p-8">
-        <div className="bg-white rounded-xl shadow-sm border border-gray-200 w-full max-w-xl p-8 h-fit">
-          <div className="flex items-center justify-between mb-6">
-            <h1 className="text-xl font-bold text-gray-900">
-              {isEdit ? "Edit School" : "Add New School"}
-            </h1>
-            {(() => {
-              const currentStatus =
-                watch()?.status || (isEdit ? "Active" : "Draft");
-              return (
-                <span
-                  className={`text-xs font-medium px-2.5 py-0.5 rounded-full ${
-                    currentStatus === "Active"
-                      ? "bg-green-100 text-green-800"
-                      : "bg-gray-100 text-gray-800"
-                  }`}
-                >
-                  {isEdit
-                    ? currentStatus === "Active"
-                      ? "Published"
-                      : currentStatus
-                    : "Draft"}
-                </span>
-              );
-            })()}
+        <Section title="School">
+          <div className="flex flex-col gap-0.5">
+            <InputGroup>
+              <InputCell label="Name" htmlFor="sc-name" className="flex-1">
+                <input id="sc-name" autoFocus={!isEdit} value={f.schoolName} onChange={(e) => set("schoolName")(e.target.value)} placeholder="e.g. Singapore Institute of Technology" className={cn(controlClass, "text-xl font-medium")} />
+              </InputCell>
+              <InputCell label="Contact email" htmlFor="sc-email" className="md:w-96">
+                <input id="sc-email" type="email" value={f.email} onChange={(e) => set("email")(e.target.value)} placeholder="programme@school.edu" className={cn(controlClass, "text-lg")} />
+              </InputCell>
+            </InputGroup>
+            <InputGroup>
+              <InputCell label="Short description (optional)" htmlFor="sc-desc" className="flex-1">
+                <input id="sc-desc" value={f.description} onChange={(e) => set("description")(e.target.value)} placeholder="e.g. Physiotherapy, years 2 and 3" className={cn(controlClass, "text-lg")} />
+              </InputCell>
+            </InputGroup>
           </div>
+        </Section>
 
-          <form className="space-y-5">
-            <div>
-              <label className="block text-sm font-medium text-gray-700 mb-1">
-                School Name
-              </label>
-              <input
-                type="text"
-                {...register("schoolName", {
-                  required: "School Name is required",
-                })}
-                className="w-full px-4 py-2 rounded-lg border border-gray-300 focus:ring-2 focus:ring-orange-500 focus:border-orange-500 outline-none transition-shadow"
-              />
-              {errors.schoolName && (
-                <p className="text-red-500 text-xs mt-1">
-                  {errors.schoolName.message}
-                </p>
-              )}
-            </div>
+        <Section title="Subscription" hint={days != null && days >= 0 ? `${days} days, ending ${format(f.endDate, "d MMM yyyy")}` : undefined}>
+          <div className="flex flex-col gap-0.5">
+            <InputGroup>
+              <InputCell as="div" label="Plan" className="flex-1">
+                <Segmented label="Plan" value={f.subscriptionType} onChange={set("subscriptionType")} options={["Free", "Basic", "Premium"].map((v) => ({ value: v, label: v }))} />
+              </InputCell>
+              <InputCell as="div" label="Duration" className="md:w-80">
+                <Segmented label="Duration" value={f.duration} onChange={setDuration} options={[{ value: "6 Months", label: "6 months" }, { value: "1 Year", label: "1 year" }]} />
+              </InputCell>
+            </InputGroup>
+            <InputGroup>
+              <InputCell label="Starts" htmlFor="sc-start" className="flex-1">
+                <input id="sc-start" type="date" value={toInput(f.startDate)} onChange={(e) => setStart(fromInput(e.target.value))} className={cn(controlClass, "text-lg")} />
+              </InputCell>
+              <InputCell label="Ends" htmlFor="sc-end" className="flex-1">
+                <input id="sc-end" type="date" value={toInput(f.endDate)} onChange={(e) => setF((x) => ({ ...x, endDate: fromInput(e.target.value), endTouched: true }))} className={cn(controlClass, "text-lg")} />
+              </InputCell>
+            </InputGroup>
+            <InputGroup>
+              <InputCell as="div" label="Status" className="flex-1">
+                <Segmented label="Status" value={f.status} onChange={set("status")} options={["Active", "Pending", "Expired"].map((v) => ({ value: v, label: v }))} />
+              </InputCell>
+              <InputCell as="div" label="Permissions" className="flex-1">
+                <Segmented label="Permissions" value={f.permissions} onChange={set("permissions")} options={[{ value: "Read Only", label: "Read only" }, { value: "Write Only", label: "Write only" }, { value: "Both", label: "Both" }]} />
+              </InputCell>
+            </InputGroup>
+          </div>
+        </Section>
 
-            <div>
-              <label className="block text-sm font-medium text-gray-700 mb-1">
-                Short Description
-              </label>
-              <textarea
-                rows="3"
-                {...register("shortDescription")}
-                className="w-full px-4 py-2 rounded-lg border border-gray-300 focus:ring-2 focus:ring-orange-500 focus:border-orange-500 outline-none resize-none transition-shadow"
-              />
-            </div>
+        {error && <p role="alert" className="rounded-2xl bg-[rgb(var(--vx-danger)/0.1)] px-4 py-3 text-base text-[rgb(var(--vx-danger))]">{error}</p>}
+      </form>
 
-            <div>
-              <label className="block text-sm font-medium text-gray-700 mb-1">
-                Email Address
-              </label>
-              <input
-                type="email"
-                {...register("emailAddress", {
-                  required: "Email is required",
-                  pattern: {
-                    value: /^[a-zA-Z0-9._%+-]+@[a-zA-Z0-9.-]+\.[a-zA-Z]{2,}$/,
-                    message: "Please enter a valid email address",
-                  },
-                })}
-                className="w-full px-4 py-2 rounded-lg border border-gray-300 focus:ring-2 focus:ring-orange-500 focus:border-orange-500 outline-none transition-shadow"
-              />
-              {errors.emailAddress && (
-                <p className="text-red-500 text-xs mt-1">
-                  {errors.emailAddress.message}
-                </p>
-              )}
-            </div>
-
-            <div>
-              <label className="block text-sm font-medium text-gray-700 mb-1">
-                Duration
-              </label>
-              <select
-                {...register("duration")}
-                className="w-full px-4 py-2 rounded-lg border border-gray-300 focus:ring-2 focus:ring-orange-500 focus:border-orange-500 outline-none bg-white transition-shadow"
-              >
-                <option value="1 Year">1 Year</option>
-                <option value="6 Months">6 Months</option>
-              </select>
-            </div>
-
-            <div className="grid grid-cols-2 gap-4">
-              <div>
-                <label className="block text-sm font-medium text-gray-700 mb-1">
-                  Start Date
-                </label>
-                <Controller
-                  control={control}
-                  name="startDate"
-                  rules={{ required: "Required" }}
-                  render={({ field }) => (
-                    <DatePicker
-                      selected={field.value}
-                      onChange={field.onChange}
-                      dateFormat="dd/MM/yyyy"
-                      placeholderText="DD/MM/YYYY"
-                      className="w-full px-4 py-2 rounded-lg border border-gray-300 focus:ring-2 focus:ring-orange-500 outline-none transition-shadow"
-                      showYearDropdown={true}
-                      showMonthDropdown={true}
-                      dropdownMode="select"
-                      yearDropdownItemNumber={10}
-                      monthDropdownItemNumber={12}
-                    />
-                  )}
-                />
-              </div>
-              <div>
-                <label className="block text-sm font-medium text-gray-700 mb-1">
-                  End Date
-                </label>
-                <Controller
-                  control={control}
-                  name="endDate"
-                  rules={{ required: "Required" }}
-                  render={({ field }) => (
-                    <DatePicker
-                      selected={field.value}
-                      onChange={field.onChange}
-                      dateFormat="dd/MM/yyyy"
-                      placeholderText="DD/MM/YYYY"
-                      className="w-full px-4 py-2 rounded-lg border border-gray-300 bg-gray-50 focus:ring-2 focus:ring-orange-500 outline-none transition-shadow"
-                      showYearDropdown={true}
-                      showMonthDropdown={true}
-                      dropdownMode="select"
-                      yearDropdownItemNumber={10}
-                      monthDropdownItemNumber={12}
-                    />
-                  )}
-                />
-              </div>
-            </div>
-
-            <div>
-              <label className="block text-sm font-medium text-gray-700 mb-1">
-                Status
-              </label>
-              <select
-                {...register("status")}
-                className="w-full px-4 py-2 rounded-lg border border-gray-300 bg-white focus:ring-2 focus:ring-orange-500 outline-none transition-shadow"
-              >
-                <option value="Active">Active</option>
-                <option value="Expired">Expired</option>
-                <option value="Pending">Pending</option>
-              </select>
-            </div>
-
-            <input
-              type="hidden"
-              {...register("permissions")}
-              value="Read Only"
-            />
-            <input
-              type="hidden"
-              {...register("subscriptionType")}
-              value="Basic"
-            />
-          </form>
-        </div>
-      </main>
-
-      {isPreviewOpen &&
-        (() => {
-          const watchedData = watch();
-          return (
-            <div className="fixed inset-0 z-50 bg-black/40 backdrop-blur-sm flex justify-center items-center p-4">
-              <div className="bg-white rounded-lg shadow-xl max-w-2xl w-full max-h-[90vh] overflow-y-auto">
-                <div className="flex items-center justify-between p-6 border-b border-gray-200">
-                  <h2 className="text-xl font-bold text-gray-900">
-                    School Preview
-                  </h2>
-                  <button
-                    onClick={() => setIsPreviewOpen(false)}
-                    className="text-gray-400 hover:text-gray-600"
-                  >
-                    <svg
-                      className="w-6 h-6"
-                      fill="none"
-                      stroke="currentColor"
-                      viewBox="0 0 24 24"
-                    >
-                      <path
-                        strokeLinecap="round"
-                        strokeLinejoin="round"
-                        strokeWidth="2"
-                        d="M6 18L18 6M6 6l12 12"
-                      />
-                    </svg>
-                  </button>
-                </div>
-
-                <div className="p-6 space-y-6">
-                  <div className="bg-gray-50 rounded-lg p-4">
-                    <h3 className="text-lg font-semibold text-gray-800 mb-3">
-                      School Details
-                    </h3>
-                    <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                      <div>
-                        <label className="block text-sm font-medium text-gray-600">
-                          School Name
-                        </label>
-                        <p className="text-gray-900">
-                          {watchedData.schoolName || "Not set"}
-                        </p>
-                      </div>
-                      <div>
-                        <label className="block text-sm font-medium text-gray-600">
-                          Email Address
-                        </label>
-                        <p className="text-gray-900">
-                          {watchedData.emailAddress || "Not set"}
-                        </p>
-                      </div>
-                    </div>
-                    <div className="mt-4">
-                      <label className="block text-sm font-medium text-gray-600">
-                        Short Description
-                      </label>
-                      <p className="text-gray-900">
-                        {watchedData.shortDescription || "Not set"}
-                      </p>
-                    </div>
-                  </div>
-
-                  <div className="bg-gray-50 rounded-lg p-4">
-                    <h3 className="text-lg font-semibold text-gray-800 mb-3">
-                      Subscription
-                    </h3>
-                    <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                      <div>
-                        <label className="block text-sm font-medium text-gray-600">
-                          Subscription Type
-                        </label>
-                        <p className="text-gray-900">
-                          {watchedData.subscriptionType || "Not set"}
-                        </p>
-                      </div>
-                      <div>
-                        <label className="block text-sm font-medium text-gray-600">
-                          Duration
-                        </label>
-                        <p className="text-gray-900">
-                          {watchedData.duration || "Not set"}
-                        </p>
-                      </div>
-                    </div>
-                  </div>
-
-                  <div className="bg-gray-50 rounded-lg p-4">
-                    <h3 className="text-lg font-semibold text-gray-800 mb-3">
-                      Dates
-                    </h3>
-                    <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                      <div>
-                        <label className="block text-sm font-medium text-gray-600">
-                          Start Date
-                        </label>
-                        <p className="text-gray-900">
-                          {watchedData.startDate
-                            ? format(watchedData.startDate, "dd/MM/yyyy")
-                            : "Not set"}
-                        </p>
-                      </div>
-                      <div>
-                        <label className="block text-sm font-medium text-gray-600">
-                          End Date
-                        </label>
-                        <p className="text-gray-900">
-                          {watchedData.endDate
-                            ? format(watchedData.endDate, "dd/MM/yyyy")
-                            : "Not set"}
-                        </p>
-                      </div>
-                    </div>
-                  </div>
-
-                  <div className="bg-gray-50 rounded-lg p-4">
-                    <h3 className="text-lg font-semibold text-gray-800 mb-3">
-                      Settings
-                    </h3>
-                    <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                      <div>
-                        <label className="block text-sm font-medium text-gray-600">
-                          Status
-                        </label>
-                        <p className="text-gray-900">
-                          {watchedData.status || "Not set"}
-                        </p>
-                      </div>
-                      <div>
-                        <label className="block text-sm font-medium text-gray-600">
-                          Permissions
-                        </label>
-                        <p className="text-gray-900">
-                          {watchedData.permissions || "Not set"}
-                        </p>
-                      </div>
-                    </div>
-                  </div>
-                </div>
-
-                <div className="flex justify-end p-6 border-t border-gray-200">
-                  <button
-                    onClick={() => setIsPreviewOpen(false)}
-                    className="bg-gray-200 hover:bg-gray-300 text-gray-700 px-6 py-2 rounded-lg font-medium"
-                  >
-                    Close
-                  </button>
-                </div>
-              </div>
-            </div>
-          );
-        })()}
+      <div className="fixed bottom-6 right-6 z-40 rounded-full border border-[rgb(var(--vx-line))] bg-[rgb(var(--vx-bg)/0.95)] p-1.5 shadow-lg backdrop-blur">
+        <ButtonGroup>
+          <Button variant="secondary" size="lg" onClick={() => navigate(back)} disabled={saving}>Cancel</Button>
+          <Button size="lg" onClick={submit} disabled={saving}>{saving ? <Loader2 className="animate-spin" /> : <Save />} {isEdit ? "Save school" : "Add school"}</Button>
+        </ButtonGroup>
+      </div>
     </div>
   );
 }
-
-export default SchoolFormPage;
