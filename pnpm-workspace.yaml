@@ -1,0 +1,10 @@
+# Packages allowed to run install scripts. pnpm blocks them by default
+# (ERR_PNPM_IGNORED_BUILDS on a fresh server). esbuild needs its script for
+# the Vite build; core-js only prints a notice.
+# pnpm 10 reads onlyBuiltDependencies; pnpm 11 reads allowBuilds.
+onlyBuiltDependencies:
+  - core-js
+  - esbuild
+allowBuilds:
+  core-js: true
+  esbuild: true
