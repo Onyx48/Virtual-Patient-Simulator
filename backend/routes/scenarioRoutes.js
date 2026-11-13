@@ -25,6 +25,7 @@ import { startTrace } from "../utils/routeTrace.js";
 // The educator Test button's destination, from the same place the student room
 // comes from.
 import { roomUrlFor } from "../utils/roomUrl.js";
+import { detectInputLanguage } from "../utils/inputLanguage.js";
 import { languageCodeFor } from "../utils/languageCode.js";
 import {
   isScenarioTestable,
@@ -189,12 +190,15 @@ const CREATION_PROMPT = readPrompt("scenario-creation.md");
 const EDITING_PROMPT = readPrompt("scenario-editing.md");
 
 /*
- * The scenario is written entirely in the language of the user's request:
- * Japanese text in, Japanese scenario out; anything else gets English. The
+ * The scenario is written entirely in the language of the user's request,
+ * detected from its script (utils/inputLanguage.js): Japanese, Hindi, Chinese
+ * (Traditional or Simplified), Korean, Thai, Arabic, the Indian scripts...;
+ * Latin-script text gets English. The
  * prompts' own language rules leave the fixed template parts (headings,
  * instruction lines, the 18 core questions) in English, and the model copies
  * them verbatim, so each language gets a system-prompt section that overrides
- * that — Japanese with the Japanese replacement for every fixed string.
+ * that — Japanese with the Japanese replacement for every fixed string, every
+ * other language with language-generic.md, which has the model translate them.
  */
 const LANGUAGE_SECTIONS = {
   en: `
@@ -206,14 +210,18 @@ const LANGUAGE_SECTIONS = {
 Write scenario_name, all of scenario_prompt (headings, instructions and sample conversation) and all 23 questions_for_feedback in English, whatever language any existing scenario text is in. Set "language" to "English".`,
   ja: readPrompt("language-ja.md"),
 };
-// Any kana or kanji counts as Japanese, so a Japanese brief that mentions an
-// English term (e.g. "SLR") still produces a Japanese scenario.
-const JAPANESE_TEXT = /[぀-ヿ㐀-鿿ｦ-ﾟ]/;
-const withInputLanguage = (systemPrompt, query) =>
-  systemPrompt + LANGUAGE_SECTIONS[JAPANESE_TEXT.test(query) ? "ja" : "en"];
+const GENERIC_LANGUAGE_SECTION = readPrompt("language-generic.md");
+const withInputLanguage = (systemPrompt, query) => {
+  const { key, name, scriptRule } = detectInputLanguage(query);
+  if (key !== "generic") return systemPrompt + LANGUAGE_SECTIONS[key];
+  return (
+    systemPrompt +
+    GENERIC_LANGUAGE_SECTION.replaceAll("{{LANGUAGE}}", name).replaceAll("{{SCRIPT_RULE}}", scriptRule)
+  );
+};
 
 /**
- * Normalise what Gemini returns into the shape the form reads.
+ * Normalise what the AI returns into the shape the form reads.
  *
  * `status` is deliberately not passed through: the Python service set it to
  * 'success' as a transport flag, and the form treated that as the scenario's

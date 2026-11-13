@@ -449,8 +449,8 @@ const askReason = async (req, res) => {
     });
     const aiMs = Date.now() - aiStartedAt;
 
-    // Which provider answered matters: it is how you tell a working Gemini from a
-    // silent permanent failover to Groq.
+    // Which model answered matters: it is how you tell the primary model from a
+    // silent failover to an OpenRouter fallback model.
     trace.log(`answered by ${provider} (${model})`, {
       chars: text.length,
       aiMs,
@@ -471,7 +471,7 @@ const askReason = async (req, res) => {
   } catch (err) {
     /*
      * trace.fail carries the status and provider detail the bare stack does not:
-     * this is where a Gemini 429 with no Groq key configured surfaces, and it does
+     * this is where an OpenRouter 402/429 or a missing key surfaces, and it does
      * not otherwise say which provider gave up or how long was spent first.
      */
     trace.fail(err);

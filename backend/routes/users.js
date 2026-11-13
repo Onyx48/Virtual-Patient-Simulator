@@ -10,6 +10,7 @@ import { invalidateStudentsCache } from "../utils/studentsCache.js";
 import { publicMessage } from "../utils/appEnv.js";
 import { parsePagination, pageResponse, escapeRegex } from "../utils/pagination.js";
 import { groupNameMatcher } from "../utils/groupName.js";
+import { passwordProblem } from "../utils/passwordPolicy.js";
 
 const router = express.Router();
 const USERS_CACHE_TTL = 120; // seconds
@@ -110,7 +111,8 @@ router.get("/", protect, checkAccess("manageUsers"), async (req, res) => {
 
 // CREATE SINGLE USER
 router.post("/", protect, checkAccess("manageUsers"), async (req, res) => {
-  console.log("[USERS] POST route hit. Body:", req.body);
+  // Never log the body: it can carry a plaintext password.
+  console.log("[USERS] POST route hit for role:", req.body?.role);
   try {
     let { password } = req.body;
     const { name, email, role, schoolId, department, groupId, newGroupName } = req.body;
@@ -122,6 +124,9 @@ router.post("/", protect, checkAccess("manageUsers"), async (req, res) => {
     }
     if (!password) {
       password = crypto.randomBytes(8).toString("hex");
+    } else {
+      const problem = passwordProblem(password, email);
+      if (problem) return res.status(400).json({ message: problem });
     }
 
     const normalizedRole = role.toLowerCase();

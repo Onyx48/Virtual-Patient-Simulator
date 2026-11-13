@@ -12,10 +12,18 @@ const validateName = (name) => {
 const validateEmail = (email) => {
   /* ... */
 };
+// Mirrors backend/utils/passwordPolicy.js; the server is the real check.
 const validatePasswordSignup = (password) => {
-  /* ... */
+  if (password.length < 12) return "Use at least 12 characters.";
+  if (!/[a-z]/i.test(password) || !/d/.test(password)) {
+    return "Include at least one letter and one number.";
+  }
+  return "";
 };
-// const errorIcon = ( /* ... */ );
+// Shown inside a field that failed validation.
+const errorIcon = (
+  <span className="absolute inset-y-0 right-3 flex items-center text-red-500" aria-hidden="true">!</span>
+);
 
 function SignupPage() {
   const { signup } = useAuth(); // Get signup function from context
@@ -200,7 +208,7 @@ function SignupPage() {
                       ? "border-red-500 ring-red-500 focus:ring-red-500"
                       : "border-gray-700 focus:ring-custom-orange"
                   }`}
-                  minLength={8}
+                  minLength={12}
                 />
                 {passwordError && errorIcon}
               </div>

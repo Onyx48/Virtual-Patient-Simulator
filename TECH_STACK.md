@@ -40,8 +40,8 @@
 
 | What                          | Technology                                 |
 | ----------------------------- | ------------------------------------------ |
-| Scenario generation (primary) | Google Gemini 2.5 Flash (REST API, no SDK) |
-| Reasoning coach (fallback)    | Groq (OpenAI-compatible API, no SDK)       |
+| Default model (via OpenRouter) | google/gemini-2.5-flash, fallback openai/gpt-oss-120b |
+| AI (all model calls)          | OpenRouter (OpenAI-compatible API, no SDK) |
 
 ## External Services
 

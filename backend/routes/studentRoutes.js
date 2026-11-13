@@ -15,6 +15,7 @@ import {
   invalidateStudentsCache,
 } from "../utils/studentsCache.js";
 import { inviteStatusOf } from "../utils/inviteStatus.js";
+import { passwordProblem } from "../utils/passwordPolicy.js";
 
 const router = express.Router();
 const STUDENTS_CACHE_TTL = 120;
@@ -47,6 +48,9 @@ router.post("/", protect, checkAccess("manageStudents"), async (req, res) => {
       .status(400)
       .json({ message: "Name, email, and password are required" });
   }
+
+  const problem = passwordProblem(password, email);
+  if (problem) return res.status(400).json({ message: problem });
 
   try {
     const existingUser = await User.findOne({ email: email.toLowerCase() });

@@ -12,6 +12,28 @@ import { protect } from "../middleware/authMiddleware.js";
 import { sendWelcomeEmail } from "../utils/emailService.js";
 import { canonicalizeEmail, findUserByEmail } from "../utils/emailLookup.js";
 import { capture } from "../utils/analytics.js";
+import { passwordValidator } from "../utils/passwordPolicy.js";
+
+/*
+ * protect, but only when a token is sent: /register serves both anonymous
+ * student signup and logged-in staff creating accounts. A token that is sent
+ * but invalid is still rejected, so a bad token never downgrades to anonymous.
+ */
+const optionalProtect = (req, res, next) =>
+  req.headers.authorization?.startsWith("Bearer") ? protect(req, res, next) : next();
+
+// Who may create whom. The creator is always req.user, never the request body.
+const ALLOWED_CREATIONS = {
+  superadmin: ["school_admin", "educator", "student"],
+  school_admin: ["educator", "student"],
+  educator: ["student"],
+};
+
+// A short-lived, single-use password reset token, issued by /verify-otp.
+// Signed with the user's current password hash, so it stops working the
+// moment the password changes (i.e. after one successful reset).
+const RESET_TOKEN_MINUTES = 10;
+const resetSecret = (user) => `${process.env.JWT_SECRET}:reset:${user.password}`;
 
 const router = express.Router();
 
@@ -146,12 +168,11 @@ const verifyOTPAndHandleAttempts = async (email, providedOtp) => {
 
 router.post(
   "/register",
+  optionalProtect,
   [
     body("name", "Name is required").notEmpty().trim(),
     body("email", "Please include a valid email").isEmail().trim(),
-    body("password", "Password must be at least 6 characters").isLength({
-      min: 6,
-    }),
+    body("password").custom(passwordValidator("email")),
     body("roleToCreate").isIn([
       "student",
       "educator",
@@ -166,37 +187,43 @@ router.post(
       .withMessage("Invalid School ID"),
   ],
   async (req, res) => {
-    console.log("[REGISTER] Route hit. Body:", req.body);
+    // Never log the body: it carries the plaintext password.
+    console.log("[REGISTER] Route hit for role:", req.body?.roleToCreate);
     const errors = validationResult(req);
     if (!errors.isEmpty()) {
       console.log("[REGISTER] Validation errors:", errors.array());
       return res.status(400).json({ errors: errors.array() });
     }
 
-    const { name, email, password, roleToCreate, creatorRole, schoolId } =
-      req.body;
+    // creatorRole in the body is ignored: it used to be trusted, which let an
+    // anonymous caller create a superadmin.
+    const { name, email, password, roleToCreate } = req.body;
+    let { schoolId } = req.body;
+    const creator = req.user || null;
+    const creatorRole = creator?.role || null;
     const lowerEmail = canonicalizeEmail(email);
     const lowerRoleToCreate = roleToCreate.toLowerCase();
 
     try {
       // Authorization Check
       if (creatorRole) {
-        const lowerCreatorRole = creatorRole.toLowerCase();
-        const allowedCreations = {
-          superadmin: ["school_admin"],
-          school_admin: ["educator", "student"],
-          educator: ["student"],
-        };
-
-        if (!allowedCreations[lowerCreatorRole]?.includes(lowerRoleToCreate)) {
+        if (!ALLOWED_CREATIONS[creatorRole]?.includes(lowerRoleToCreate)) {
           return res.status(403).json({
             message: `${creatorRole} cannot create ${roleToCreate} role.`,
           });
         }
-      } else if (lowerRoleToCreate !== "student") {
-        return res.status(403).json({
-          message: "Public registration is only for students.",
-        });
+        // Below superadmin, accounts land in the creator's own school only.
+        if (creatorRole !== "superadmin") {
+          schoolId = creator.schoolId?._id || creator.schoolId || undefined;
+        }
+      } else {
+        if (lowerRoleToCreate !== "student") {
+          return res.status(403).json({
+            message: "Public registration is only for students.",
+          });
+        }
+        // An anonymous signup cannot attach itself to a school.
+        schoolId = undefined;
       }
 
       const userExists = await User.findOne({ email: lowerEmail });
@@ -333,9 +360,14 @@ router.post(
 
       const result = await verifyOTPAndHandleAttempts(user.email, otp);
       if (result.success) {
+        const resetToken = jwt.sign(
+          { id: String(user._id), purpose: "password-reset" },
+          resetSecret(await findUserByEmail(email, "+password")),
+          { expiresIn: `${RESET_TOKEN_MINUTES}m` },
+        );
         res
           .status(200)
-          .json({ message: result.message, canResetPassword: true });
+          .json({ message: result.message, canResetPassword: true, resetToken });
       } else {
         res.status(result.lockoutUntil ? 429 : 400).json(result);
       }
@@ -349,13 +381,29 @@ router.post(
   "/reset-password",
   [
     body("email").isEmail().trim(),
-    body("newPassword").isLength({ min: 6 }),
+    body("newPassword").custom(passwordValidator("email")),
+    body("resetToken", "Reset token is required").notEmpty(),
   ],
   async (req, res) => {
-    const { email, newPassword } = req.body;
+    const errors = validationResult(req);
+    if (!errors.isEmpty()) {
+      return res.status(400).json({ message: errors.array()[0].msg, errors: errors.array() });
+    }
+
+    const { email, newPassword, resetToken } = req.body;
+    // One answer for every failure, so this cannot be used to probe accounts.
+    const invalid = () =>
+      res.status(400).json({ message: "This reset link is invalid or has expired. Request a new code." });
     try {
-      const user = await findUserByEmail(email);
-      if (!user) return res.status(404).json({ message: "User not found." });
+      // Used to accept any email with no proof of the OTP: an account takeover.
+      const user = await findUserByEmail(email, "+password");
+      if (!user) return invalid();
+      try {
+        const claims = jwt.verify(String(resetToken), resetSecret(user));
+        if (claims.purpose !== "password-reset" || claims.id !== String(user._id)) return invalid();
+      } catch {
+        return invalid();
+      }
 
       user.password = newPassword;
       await user.save();
@@ -466,9 +514,7 @@ router.put(
   protect,
   [
     body("currentPassword", "Current password is required").exists(),
-    body("newPassword", "New password must be at least 6 characters").isLength({
-      min: 6,
-    }),
+    body("newPassword").custom(passwordValidator("email")),
     body("confirmPassword", "Confirm password is required").exists(),
   ],
   async (req, res) => {

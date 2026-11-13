@@ -1,4 +1,4 @@
-import React, { useState } from "react";
+import React, { useEffect, useState } from "react";
 import { useLocation, useNavigate, useParams } from "react-router-dom";
 import axios from "axios";
 import formBgImage from "./Login-bg.jpg";
@@ -6,10 +6,10 @@ import formBgImage from "./Login-bg.jpg";
 function ResetPasswordPage() {
   const navigate = useNavigate();
   const location = useLocation();
-  const { token } = useParams(); // If using a token in the URL: /reset-password/:token
+  // The short-lived reset token /verify-otp issued; the backend requires it.
+  const { token } = useParams();
 
   const email = location.state?.email;
-  const verifiedOtp = location.state?.otp; // If you passed the OTP itself (less secure than a token)
 
   const [newPassword, setNewPassword] = useState("");
   const [confirmPassword, setConfirmPassword] = useState("");
@@ -29,7 +29,7 @@ function ResetPasswordPage() {
 
   useEffect(() => {
     // Redirect if email (or token) is missing, meaning user didn't come through proper flow
-    if (!email && !token) {
+    if (!email || !token) {
       // Adjust condition based on your flow (email or token)
       navigate("/login", {
         state: { message: "Invalid password reset attempt." },
@@ -42,6 +42,11 @@ function ResetPasswordPage() {
     // Client-side validation for newPassword and confirmPassword
     // ...
 
+    if (newPassword.length < 12 || !/[a-z]/i.test(newPassword) || !/d/.test(newPassword)) {
+      setPasswordError("Use at least 12 characters, with at least one letter and one number.");
+      return;
+    }
+    setPasswordError("");
     if (newPassword !== confirmPassword) {
       setConfirmPasswordError("Passwords do not match.");
       return;
@@ -61,8 +66,7 @@ function ResetPasswordPage() {
       const payload = {
         email,
         newPassword,
-        // otp: verifiedOtp, // If your backend expects the OTP again
-        // resetToken: token, // If your backend expects a token from the URL/state
+        resetToken: token,
       };
 
       await axios.post("/api/auth/reset-password", payload);
