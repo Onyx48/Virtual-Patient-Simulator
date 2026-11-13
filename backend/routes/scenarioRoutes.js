@@ -371,6 +371,10 @@ router.get("/json", (req, res) => {
     patient_name: liveScenario?.patientName || null,
     gender: liveScenario?.patientGender || null,
     language: liveScenario?.language || null,
+    // ISO 639-1 code ("en", "hi", "ja", "zh-Hant"), same value as the
+    // simulator link's &language=.
+    language_code:
+      liveScenario?.languageCode || languageCodeFor(liveScenario?.language) || null,
     environment: liveScenario?.environment || null,
     model: liveScenario?.avatarModel || null,
   });
