@@ -11,7 +11,13 @@ import {
   updateScenario,
   deleteScenario,
 } from "../../redux/slices/scenarioSlice.js";
-import { Sparkles, ArrowUp, Loader, X, AlertCircle } from "lucide-react";
+import { Sparkles, ArrowUp, Loader, X, AlertCircle, Lock, FileText } from "lucide-react";
+import {
+  DISCIPLINES,
+  OT_TWC_CASES,
+  disciplineName,
+  isDisciplineLocked,
+} from "../../lib/disciplines";
 
 import ReactQuill from "react-quill-new";
 import "react-quill-new/dist/quill.snow.css";
@@ -289,9 +295,10 @@ function ScenarioFormPage() {
     ? scenarios.find((s) => s._id === id || s.id === id)
     : null;
 
-  const { register, handleSubmit, setValue, control, getValues } = useForm({
+  const { register, handleSubmit, setValue, control, getValues, watch } = useForm({
     defaultValues: {
       scenarioName: "",
+      discipline: "PT",
       difficulty: "Medium",
       environment: "",
       avatarModel: "",
@@ -322,6 +329,10 @@ function ScenarioFormPage() {
   const [errorPopup, setErrorPopup] = useState({ open: false, message: "" });
   const [showConfirmModal, setShowConfirmModal] = useState(false);
 
+  const discipline = watch("discipline");
+  // Fixed once the scenario has been published (backend enforces it too).
+  const disciplineLocked = isDbEdit && isDisciplineLocked(selectedScenario);
+
   const isSchoolAdmin = user?.role === "school_admin";
   const isEducator = user?.role === "educator";
 
@@ -338,6 +349,7 @@ function ScenarioFormPage() {
         language: selectedScenario.language || "",
       });
       setValue("scenarioName", selectedScenario.scenarioName || "");
+      setValue("discipline", selectedScenario.discipline === "OT" ? "OT" : "PT");
       setValue("difficulty", selectedScenario.difficulty || "Medium");
       setValue("environment", selectedScenario.environment || "");
       setValue("avatarModel", selectedScenario.avatarModel || "");
@@ -381,9 +393,11 @@ function ScenarioFormPage() {
       Math.min(Math.floor(aiElapsed / STAGE_SECONDS), AI_STAGES.length - 1)
     ];
 
-  const handleAskAI = async (e) => {
-    e.preventDefault();
-    if (!aiInput) return;
+  // `presetQuery` is a full TWC case text; otherwise the prompt bar is used.
+  const handleAskAI = async (e, presetQuery) => {
+    e?.preventDefault?.();
+    const query = presetQuery || aiInput;
+    if (!query) return;
     setAiElapsed(0);
     setIsAiLoading(true);
 
@@ -398,7 +412,8 @@ function ScenarioFormPage() {
         : "/api/scenarios/ai/generate";
 
       const response = await axios.post(url, {
-        scenario_prompt: aiInput,
+        scenario_prompt: query,
+        discipline: getValues("discipline") || "PT",
         ...(existingApiKey && { api_key: existingApiKey }),
       });
 
@@ -649,6 +664,82 @@ function ScenarioFormPage() {
           </div>
 
           <div className="p-6 pt-0 overflow-y-auto max-h-[85vh]">
+            {/*
+              Discipline first: it decides how the AI writes the case and which
+              core feedback questions the session is graded against.
+            */}
+            <div className="mb-4">
+              <div className="flex items-center justify-between mb-1">
+                <label className="block text-xs font-semibold text-gray-700">
+                  Discipline
+                </label>
+                <span className="flex items-center gap-1 text-[11px] text-gray-500">
+                  {disciplineLocked && <Lock className="w-3 h-3" />}
+                  {disciplineLocked
+                    ? "Locked: this scenario has been published"
+                    : "Cannot be changed after the scenario is published"}
+                </span>
+              </div>
+              <div
+                role="radiogroup"
+                aria-label="Discipline"
+                className="grid grid-cols-2 gap-2"
+              >
+                {DISCIPLINES.map((d) => {
+                  const selected = discipline === d.id;
+                  return (
+                    <button
+                      key={d.id}
+                      type="button"
+                      role="radio"
+                      aria-checked={selected}
+                      disabled={disciplineLocked || isAiLoading}
+                      onClick={() => setValue("discipline", d.id, { shouldDirty: true })}
+                      className={`flex items-center gap-3 rounded-md border p-3 text-left transition-colors ${
+                        selected
+                          ? "border-orange-400 bg-orange-50 ring-1 ring-orange-400"
+                          : "border-gray-300 bg-white hover:border-gray-400"
+                      } ${disciplineLocked && !selected ? "opacity-40" : ""} disabled:cursor-not-allowed`}
+                    >
+                      <span
+                        className={`flex h-9 w-9 shrink-0 items-center justify-center rounded-md text-sm font-bold ${
+                          selected ? "bg-orange-400 text-white" : "bg-gray-100 text-gray-600"
+                        }`}
+                      >
+                        {d.short}
+                      </span>
+                      <span className="text-sm font-semibold text-gray-800">{d.name}</span>
+                    </button>
+                  );
+                })}
+              </div>
+            </div>
+
+            {discipline === "OT" && !isDbEdit && (
+              <div className="mb-4 rounded-md border border-gray-200 bg-gray-50 p-3">
+                <p className="text-xs font-semibold text-gray-700 mb-2">
+                  Start from a Tung Wah College OT case
+                </p>
+                <div className="grid grid-cols-1 sm:grid-cols-3 gap-2">
+                  {OT_TWC_CASES.map((c) => (
+                    <button
+                      key={c.id}
+                      type="button"
+                      disabled={isAiLoading}
+                      onClick={(e) => handleAskAI(e, c.text)}
+                      className="flex items-start gap-2 rounded-md border border-gray-300 bg-white p-2 text-left hover:border-orange-400 disabled:opacity-50"
+                    >
+                      <FileText className="mt-0.5 h-4 w-4 shrink-0 text-orange-400" />
+                      <span>
+                        <span className="block text-xs font-semibold text-gray-800">{c.title}</span>
+                        <span className="block text-[11px] text-gray-500">{c.patient}</span>
+                      </span>
+                    </button>
+                  ))}
+                </div>
+              </div>
+            )}
+
             <div className="mb-6 p-1 rounded-lg border border-orange-300 bg-white shadow-sm flex items-center relative z-0">
               <div className="pl-3 text-orange-400">
                 {isAiLoading ? (
@@ -663,7 +754,7 @@ function ScenarioFormPage() {
                 onChange={(e) => setAiInput(e.target.value)}
                 onKeyDown={(e) => e.key === "Enter" && handleAskAI(e)}
                 disabled={isAiLoading}
-                placeholder="Provide input for AI to create scenario"
+                placeholder={`Describe the ${disciplineName(discipline).toLowerCase()} case for the AI to create`}
                 className="w-full px-3 py-2 text-sm outline-none bg-transparent placeholder-gray-400 text-gray-700"
               />
               <button
@@ -785,7 +876,11 @@ function ScenarioFormPage() {
                   {...register("shortDescription")}
                   type="text"
                   className="w-full border border-gray-300 p-2.5 rounded-md text-sm outline-none focus:ring-1 focus:ring-blue-500"
-                  placeholder="Junior MSK physiotherapist practicing history taking and clinical..."
+                  placeholder={
+                    discipline === "OT"
+                      ? "Junior OT student practising upper-limb intake assessment and history taking..."
+                      : "Junior MSK physiotherapist practicing history taking and clinical..."
+                  }
                 />
               </div>
 

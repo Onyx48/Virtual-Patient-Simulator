@@ -23,6 +23,8 @@ The user's request is in Japanese, so the whole scenario must be written in Japa
 | `--- Simulation Instructions ---` | `--- シミュレーション指示 ---` |
 | `--- Sample Conversation ---` | `--- 会話例 ---` |
 
+For an occupational therapy case, use `作業療法症例:` for `Occupational Therapy Case:`, translate every other OT heading into natural Japanese, and in instruction 1 say 作業療法を学ぶ学生 instead of 理学療法を学ぶ学生.
+
 Sub-labels inside sections (PMH, ROM, Gait, General appearance, etc.) are also written in Japanese. Established test names (e.g. Spurling's test, SLR) may stay as they are.
 
 ### Simulation instructions (use these Japanese lines in place of the English ones)
@@ -50,4 +52,4 @@ Sub-labels inside sections (PMH, ROM, Gait, General appearance, etc.) are also w
 
 ### `questions_for_feedback`
 
-All 23 items are written in Japanese. Translate the 18 mandatory questions faithfully, keeping their meaning and order, then write the 5 scenario-specific questions in Japanese.
+Every item is written in Japanese. Translate the mandatory core questions faithfully, keeping their meaning and order, then write the scenario-specific questions in Japanese.

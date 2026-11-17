@@ -3,8 +3,12 @@ import { Routes, Route, Navigate } from "react-router-dom";
 import { useAuth } from "../../AuthContext";
 import { FullPageSpinner } from "../../lib/hooks/useLoading";
 
-const StudentDashboard = lazy(() => import("../../roles/student/Dashboard"));
-const EducatorDashboard = lazy(() => import("../../roles/educator/Dashboard"));
+// The vps_dashboards_v18 designs. The previous dashboards (roles/*/Dashboard.jsx)
+// are no longer routed.
+const StudentDashboard = lazy(() => import("../../roles/student/LearnerDashboard"));
+const EducatorDashboard = lazy(() => import("../../roles/educator/EducatorDashboard"));
+const SessionDetail = lazy(() => import("../Dashboard/SessionDetail"));
+const LearnerDetail = lazy(() => import("../Dashboard/LearnerDetail"));
 const SuperAdminDashboard = lazy(
   () => import("../../roles/superadmin/Dashboard"),
 );
@@ -77,6 +81,27 @@ function ContentArea() {
     <main className="absolute top-16 left-64 right-0 bottom-0 overflow-y-auto bg-gray-50 p-4">
       <Routes>
         <Route path="/" element={getDashboardComponent()} />
+
+        <Route
+          path="/sessions/:id"
+          element={
+            <RoleBasedRoute allowedRoles={["student", "educator", "school_admin", "superadmin"]}>
+              <Suspense fallback={<FullPageSpinner />}>
+                <SessionDetail />
+              </Suspense>
+            </RoleBasedRoute>
+          }
+        />
+        <Route
+          path="/learners/:id"
+          element={
+            <RoleBasedRoute allowedRoles={["educator", "school_admin", "superadmin"]}>
+              <Suspense fallback={<FullPageSpinner />}>
+                <LearnerDetail />
+              </Suspense>
+            </RoleBasedRoute>
+          }
+        />
 
         {/* Schools Routes */}
         <Route

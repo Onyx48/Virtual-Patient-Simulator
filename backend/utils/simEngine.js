@@ -17,6 +17,7 @@ import { htmlToText, questionsToArray } from "./bubbleScenario.js";
 import { decodeEntities } from "./richText.js";
 import { chatJson } from "./simLlm.js";
 import { MOVEMENT_IDS, normalizeAction } from "./movements.js";
+import { normalizeDiscipline, withDisciplineStudent } from "./discipline.js";
 
 /*
  * The exact turn that ends the consultation. The game sends it through the
@@ -62,22 +63,22 @@ export const httpError = (statusCode, message) => Object.assign(new Error(messag
 
 // ---- scenario --------------------------------------------------------------
 
-const scenarioCache = new Map(); // id -> { at, brief, questions }
+const scenarioCache = new Map(); // id -> { at, brief, questions, discipline }
 const SCENARIO_TTL_MS = 60_000;
 
-/** The patient brief and grading questions, as plain text. */
+/** The patient brief and grading questions, as plain text, and PT or OT. */
 const scenarioFor = async (scenarioId) => {
   const hit = scenarioCache.get(scenarioId);
   if (hit && Date.now() - hit.at < SCENARIO_TTL_MS) return hit;
 
-  const scenario = await Scenario.findById(scenarioId).select("scenarioPrompt aiQuestions").lean();
+  const scenario = await Scenario.findById(scenarioId).select("scenarioPrompt aiQuestions discipline").lean();
   if (!scenario) throw httpError(404, "The scenario for this session no longer exists.");
 
   const brief = htmlToText(decodeEntities(scenario.scenarioPrompt || ""));
   const questions = questionsToArray(decodeEntities(scenario.aiQuestions || ""))
     .map((q, i) => `${i + 1}. ${q.replace(/^\d+[.)]\s*/, "")}`)
     .join(" ");
-  const entry = { at: Date.now(), brief, questions };
+  const entry = { at: Date.now(), brief, questions, discipline: normalizeDiscipline(scenario.discipline) };
   scenarioCache.set(scenarioId, entry);
   return entry;
 };
@@ -192,14 +193,14 @@ const toScore = (value) => {
 const fixParagraphs = (text) => String(text || "").replace(/([.!?"'”])\s{3,}/g, "$1\n\n").trim();
 
 const grade = async (conv) => {
-  const { brief, questions } = await scenarioFor(conv.scenario_id);
+  const { brief, questions, discipline } = await scenarioFor(conv.scenario_id);
   const history = [
     { role: "system", content: brief },
     ...conv.diagnosis_history.map(({ role, content }) => ({ role, content })),
   ];
   const { data, usage } = await chatJson({
     label: `feedback session=${conv.session_id}`,
-    system: FEEDBACK_PROMPT,
+    system: withDisciplineStudent(FEEDBACK_PROMPT, discipline),
     messages: [
       {
         role: "user",
@@ -285,7 +286,7 @@ export const reasoningTurn = (sessionId, input) =>
       throw httpError(409, "Call /api/sessions/feedback for this session before clinical reasoning.");
     }
 
-    const { brief, questions } = await scenarioFor(conv.scenario_id);
+    const { brief, questions, discipline } = await scenarioFor(conv.scenario_id);
     const context = {
       diagnosis_conversation_history: [
         { role: "system", content: brief },
@@ -302,7 +303,7 @@ export const reasoningTurn = (sessionId, input) =>
     ];
     const { data, usage } = await chatJson({
       label: `reasoning session=${sessionId}`,
-      system: REASONING_PROMPT,
+      system: withDisciplineStudent(REASONING_PROMPT, discipline),
       messages,
       schema: SCHEMAS.reasoning,
       effort: "low",

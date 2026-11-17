@@ -1,4 +1,5 @@
 import React, { useState } from "react";
+import DisciplineBadge from "../../../components/ui/DisciplineBadge";
 import axios from "axios";
 import toast from "react-hot-toast";
 import { Target, Edit, Loader2 } from "lucide-react";
@@ -147,6 +148,7 @@ function ScenarioTable({ data, onEditClick, canEdit = true }) {
               )}
 
               <div className="flex items-center gap-2 text-[10px] font-bold uppercase tracking-wider">
+                <DisciplineBadge scenario={scenario} />
                 <span className={getStatusStyle(scenario.status)}>
                   {scenario.status || "DRAFT"}
                 </span>

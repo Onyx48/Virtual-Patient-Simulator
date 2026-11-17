@@ -1,4 +1,5 @@
 import React from "react";
+import DisciplineBadge from "../../../components/ui/DisciplineBadge";
 import { Target } from "lucide-react";
 import { useNavigate } from "react-router-dom";
 
@@ -116,6 +117,7 @@ function ScenarioGridStudent({ data, onStartNow }) {
             </div>
 
             <div className="flex items-center gap-2">
+              <DisciplineBadge scenario={scenario} />
               {getSignalIcon(scenario.difficulty)}
               <span
                 className={`text-xs font-bold ${getDifficultyColor(

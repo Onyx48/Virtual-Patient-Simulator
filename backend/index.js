@@ -11,6 +11,7 @@ import scenarioRoutes from "./routes/scenarioRoutes.js";
 import sessionRoutes from "./routes/sessionRoutes.js";
 import simRoutes from "./routes/simRoutes.js";
 import dashboardRoutes from "./routes/dashboardRoutes.js";
+import dashboardV2Routes from "./routes/dashboardV2Routes.js";
 import importRoutes from "./routes/importRoutes.js";
 import groupRoutes from "./routes/groupRoutes.js";
 import askReasonRoutes from "./routes/askReasonRoutes.js";
@@ -73,6 +74,7 @@ app.use("/api/sessions", sessionRoutes);
 // /agents keeps Voxio's paths so the game only changes its base URL.
 app.use("/agents", simRoutes);
 app.use("/api/chat", simRoutes);
+app.use("/api/dashboard/v2", dashboardV2Routes);
 app.use("/api/dashboard", dashboardRoutes);
 app.use("/api/import", importRoutes);
 app.use("/api/groups", groupRoutes);

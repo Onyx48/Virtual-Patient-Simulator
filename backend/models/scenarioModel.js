@@ -1,6 +1,7 @@
 import mongoose from "mongoose";
 import { BODY_REGIONS } from "../utils/bodyRegions.js";
 import { languageCodeFor } from "../utils/languageCode.js";
+import { DISCIPLINES, DEFAULT_DISCIPLINE } from "../utils/discipline.js";
 
 const scenarioSchema = new mongoose.Schema(
   {
@@ -40,6 +41,16 @@ const scenarioSchema = new mongoose.Schema(
     aiInstructions: { type: String },
     aiQuestions: { type: String },
     difficulty: { type: String, default: "Medium" },
+
+    /*
+     * Physiotherapy or occupational therapy (utils/discipline.js). Chosen by the
+     * educator; once the scenario has been published it can no longer change,
+     * because students' sessions and grades were produced under it.
+     * disciplineLocked records that, and is never cleared: unpublishing does not
+     * unlock it. The PUT route refuses a change while it is set.
+     */
+    discipline: { type: String, enum: DISCIPLINES, default: DEFAULT_DISCIPLINE },
+    disciplineLocked: { type: Boolean, default: false },
 
     apiKey: { type: String },
 
@@ -81,6 +92,7 @@ scenarioSchema.pre("validate", function (next) {
   if (this.isModified("language") || !this.languageCode) {
     this.languageCode = languageCodeFor(this.language);
   }
+  if (this.status === "Published") this.disciplineLocked = true;
   next();
 });
 
